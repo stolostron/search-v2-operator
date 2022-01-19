@@ -1,0 +1,34 @@
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  creationTimestamp: null
+  name: manager-role
+rules:
+- apiGroups:
+  - cache.open-cluster-management.io
+  resources:
+  - ocmsearches
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - cache.open-cluster-management.io
+  resources:
+  - ocmsearches/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - cache.open-cluster-management.io
+  resources:
+  - ocmsearches/status
+  verbs:
+  - get
+  - patch
+  - update

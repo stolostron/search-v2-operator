@@ -1,0 +1,7 @@
+apiVersion: cache.open-cluster-management.io/v1
+kind: OCMSearch
+metadata:
+  name: ocmsearch-sample
+  namespace: search-v2-operator-system
+spec:
+  # Add fields here
