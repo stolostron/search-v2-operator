@@ -1,0 +1,14 @@
+# Copyright Contributors to the Open Cluster Management project
+
+-include /opt/build-harness/Makefile.prow
+
+
+.PHONY: lint
+lint:
+	go get github.com/golangci/golangci-lint/cmd/golangci-lint@v1.38.0
+	golangci-lint run
+	gosec ./...
+
+.PHONY: unit-test
+unit-test:
+	go test ./... -v -coverprofile cover.out
