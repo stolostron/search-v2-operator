@@ -49,7 +49,7 @@ func (r *OCMSearchReconciler) PGService(instance *cachev1.OCMSearch) *corev1.Ser
 	svc.Spec.Ports = append(svc.Spec.Ports, corev1.ServicePort{})
 
 	svc.Spec.Ports[0].Name = "search-postgres"
-	svc.Spec.Ports[0].Port = 5433
+	svc.Spec.Ports[0].Port = 5432
 	svc.Spec.Ports[0].TargetPort = intstr.IntOrString{IntVal: 5432}
 	svc.Spec.Ports[0].Protocol = corev1.ProtocolTCP
 	svc.Spec.Selector = map[string]string{"name": "search-postgres"}
