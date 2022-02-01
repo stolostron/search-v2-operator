@@ -157,6 +157,8 @@ spec:
                   allowPrivilegeEscalation: false
               securityContext:
                 runAsNonRoot: true
+              imagePullSecrets:
+              - name: search-pull-secret
               serviceAccountName: search-v2-operator
               terminationGracePeriodSeconds: 10
       permissions:
