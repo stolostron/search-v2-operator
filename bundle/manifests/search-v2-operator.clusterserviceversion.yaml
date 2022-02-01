@@ -86,6 +86,7 @@ spec:
           - create
           - update
           - delete
+          - watch
         - apiGroups:
           - apps
           resources:
@@ -118,14 +119,20 @@ spec:
                 - containerPort: 8443
                   name: https
                   protocol: TCP
-                resources: {}
+                resources:
+                  limits:
+                    cpu: 200m
+                    memory: 100Mi
+                  requests:
+                    cpu: 100m
+                    memory: 50Mi
               - args:
                 - --health-probe-bind-address=:8081
                 - --metrics-bind-address=127.0.0.1:8080
                 - --leader-elect
                 command:
                 - /manager
-                image: quay.io/xrajesh/search-v2-operator:2.0.1
+                image: quay.io/stolostron/search-v2-operator:2.5.0-PR1-d2438c739260ace488ee634a5ba1b1c316ffa955
                 livenessProbe:
                   httpGet:
                     path: /healthz
@@ -142,10 +149,10 @@ spec:
                 resources:
                   limits:
                     cpu: 200m
-                    memory: 100Mi
+                    memory: 200Mi
                   requests:
                     cpu: 100m
-                    memory: 20Mi
+                    memory: 50Mi
                 securityContext:
                   allowPrivilegeEscalation: false
               securityContext:
