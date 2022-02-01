@@ -1,0 +1,45 @@
+apiVersion: operators.coreos.com/v1alpha1
+kind: ClusterServiceVersion
+metadata:
+  annotations:
+    alm-examples: '[]'
+    capabilities: Basic Install
+  name: search-v2-operator.v0.0.0
+  namespace: placeholder
+spec:
+  apiservicedefinitions: {}
+  customresourcedefinitions:
+    owned:
+    - description: OCMSearch is the Schema for the ocmsearches API
+      displayName: OCMSearch
+      kind: OCMSearch
+      name: ocmsearches.cache.open-cluster-management.io
+      version: v1
+  description: Operator to install ACM Search
+  displayName: search-v2-operator
+  icon:
+  - base64data: ""
+    mediatype: ""
+  install:
+    spec:
+      deployments: null
+    strategy: ""
+  installModes:
+  - supported: false
+    type: OwnNamespace
+  - supported: false
+    type: SingleNamespace
+  - supported: false
+    type: MultiNamespace
+  - supported: true
+    type: AllNamespaces
+  keywords:
+  - search
+  - acm
+  links:
+  - name: Search V2 Operator
+    url: https://search-v2-operator.domain
+  maturity: alpha
+  provider:
+    name: Red Hat
+  version: 0.0.0
