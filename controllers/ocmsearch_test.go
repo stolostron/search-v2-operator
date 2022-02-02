@@ -29,7 +29,10 @@ func TestSearch_controller(t *testing.T) {
 		Spec:       cachev1.OCMSearchSpec{},
 	}
 	s := scheme.Scheme
-	cachev1.SchemeBuilder.AddToScheme(s)
+	err := cachev1.SchemeBuilder.AddToScheme(s)
+	if err != nil {
+		t.Fatalf("error adding scheme: (%v)", err)
+	}
 
 	objs := []runtime.Object{ocmsearch}
 	// Create a fake client to mock API calls.
@@ -45,7 +48,7 @@ func TestSearch_controller(t *testing.T) {
 	}
 
 	// trigger reconcile
-	_, err := r.Reconcile(context.TODO(), req)
+	_, err = r.Reconcile(context.TODO(), req)
 	if err != nil {
 		t.Fatalf("reconcile: (%v)", err)
 	}
