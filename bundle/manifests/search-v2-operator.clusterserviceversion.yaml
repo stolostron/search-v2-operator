@@ -1,0 +1,221 @@
+apiVersion: operators.coreos.com/v1alpha1
+kind: ClusterServiceVersion
+metadata:
+  annotations:
+    alm-examples: |-
+      [
+        {
+          "apiVersion": "cache.open-cluster-management.io/v1",
+          "kind": "OCMSearch",
+          "metadata": {
+            "name": "search-v2-operator",
+            "namespace": "open-cluster-management"
+          },
+          "spec": null
+        }
+      ]
+    capabilities: Basic Install
+    operators.operatorframework.io/builder: operator-sdk-v1.15.0
+    operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
+  name: search-v2-operator.v0.0.1
+  namespace: placeholder
+spec:
+  apiservicedefinitions: {}
+  customresourcedefinitions:
+    owned:
+    - description: OCMSearch is the Schema for the ocmsearches API
+      displayName: OCMSearch
+      kind: OCMSearch
+      name: ocmsearches.cache.open-cluster-management.io
+      version: v1
+  description: Operator to install OCM Search
+  displayName: search-v2-operator
+  icon:
+  - base64data: ""
+    mediatype: ""
+  install:
+    spec:
+      clusterPermissions:
+      - rules:
+        - apiGroups:
+          - cache.open-cluster-management.io
+          resources:
+          - ocmsearches
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - cache.open-cluster-management.io
+          resources:
+          - ocmsearches/finalizers
+          verbs:
+          - update
+        - apiGroups:
+          - cache.open-cluster-management.io
+          resources:
+          - ocmsearches/status
+          verbs:
+          - get
+          - patch
+          - update
+        - apiGroups:
+          - authentication.k8s.io
+          resources:
+          - tokenreviews
+          verbs:
+          - create
+        - apiGroups:
+          - authorization.k8s.io
+          resources:
+          - subjectaccessreviews
+          verbs:
+          - create
+        - apiGroups:
+          - ''
+          resources:
+          - secrets
+          - services
+          verbs:
+          - get
+          - list
+          - create
+          - update
+          - delete
+          - watch
+        - apiGroups:
+          - apps
+          resources:
+          - deployments
+          verbs:
+          - '*'          
+        serviceAccountName: search-v2-operator
+      deployments:
+      - name: search-v2-operator-controller-manager
+        spec:
+          replicas: 1
+          selector:
+            matchLabels:
+              control-plane: controller-manager
+          strategy: {}
+          template:
+            metadata:
+              labels:
+                control-plane: controller-manager
+            spec:
+              containers:
+              - args:
+                - --secure-listen-address=0.0.0.0:8443
+                - --upstream=http://127.0.0.1:8080/
+                - --logtostderr=true
+                - --v=10
+                image: gcr.io/kubebuilder/kube-rbac-proxy:v0.8.0
+                name: kube-rbac-proxy
+                ports:
+                - containerPort: 8443
+                  name: https
+                  protocol: TCP
+                resources:
+                  limits:
+                    cpu: 200m
+                    memory: 100Mi
+                  requests:
+                    cpu: 100m
+                    memory: 50Mi
+              - args:
+                - --health-probe-bind-address=:8081
+                - --metrics-bind-address=127.0.0.1:8080
+                - --leader-elect
+                command:
+                - /manager
+                image: quay.io/stolostron/search-v2-operator:2.5.0-PR1-d2438c739260ace488ee634a5ba1b1c316ffa955
+                livenessProbe:
+                  httpGet:
+                    path: /healthz
+                    port: 8081
+                  initialDelaySeconds: 15
+                  periodSeconds: 20
+                name: manager
+                readinessProbe:
+                  httpGet:
+                    path: /readyz
+                    port: 8081
+                  initialDelaySeconds: 5
+                  periodSeconds: 10
+                resources:
+                  limits:
+                    cpu: 200m
+                    memory: 200Mi
+                  requests:
+                    cpu: 50m
+                    memory: 50Mi
+                securityContext:
+                  allowPrivilegeEscalation: false
+              imagePullSecrets:
+              - name: search-pull-secret
+              securityContext:
+                runAsNonRoot: true
+              serviceAccountName: search-v2-operator
+              terminationGracePeriodSeconds: 10
+      permissions:
+      - rules:
+        - apiGroups:
+          - ""
+          resources:
+          - configmaps
+          verbs:
+          - get
+          - list
+          - watch
+          - create
+          - update
+          - patch
+          - delete
+        - apiGroups:
+          - coordination.k8s.io
+          resources:
+          - leases
+          verbs:
+          - get
+          - list
+          - watch
+          - create
+          - update
+          - patch
+          - delete
+        - apiGroups:
+          - ""
+          resources:
+          - events
+          verbs:
+          - create
+          - patch
+        serviceAccountName: search-v2-operator
+    strategy: deployment
+  installModes:
+  - supported: true
+    type: OwnNamespace
+  - supported: false
+    type: SingleNamespace
+  - supported: false
+    type: MultiNamespace
+  - supported: true
+    type: AllNamespaces
+  keywords:
+  - search
+  - acm
+  - ocm
+  - Advanced Cluster Management
+  - Open Cluster Management
+  - stolostron
+  links:
+  - name: Search V2 Operator
+    url: https://search-v2-operator.domain
+  maturity: alpha
+  provider:
+    name: Red Hat
+  version: 0.0.1
