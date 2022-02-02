@@ -17,7 +17,7 @@ metadata:
     capabilities: Basic Install
     operators.operatorframework.io/builder: operator-sdk-v1.15.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
-  name: search-v2-operator.v2.0.0
+  name: search-v2-operator.v0.0.1
   namespace: placeholder
 spec:
   apiservicedefinitions: {}
@@ -28,7 +28,7 @@ spec:
       kind: OCMSearch
       name: ocmsearches.cache.open-cluster-management.io
       version: v1
-  description: Operator to install ACM Search
+  description: Operator to install OCM Search
   displayName: search-v2-operator
   icon:
   - base64data: ""
@@ -151,14 +151,14 @@ spec:
                     cpu: 200m
                     memory: 200Mi
                   requests:
-                    cpu: 100m
+                    cpu: 50m
                     memory: 50Mi
                 securityContext:
                   allowPrivilegeEscalation: false
-              securityContext:
-                runAsNonRoot: true
               imagePullSecrets:
               - name: search-pull-secret
+              securityContext:
+                runAsNonRoot: true
               serviceAccountName: search-v2-operator
               terminationGracePeriodSeconds: 10
       permissions:
@@ -208,10 +208,14 @@ spec:
   keywords:
   - search
   - acm
+  - ocm
+  - Advanced Cluster Management
+  - Open Cluster Management
+  - stolostron
   links:
   - name: Search V2 Operator
     url: https://search-v2-operator.domain
   maturity: alpha
   provider:
     name: Red Hat
-  version: 2.0.0
+  version: 0.0.1
