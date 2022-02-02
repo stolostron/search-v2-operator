@@ -33,7 +33,7 @@ func TestSearch_controller(t *testing.T) {
 
 	objs := []runtime.Object{ocmsearch}
 	// Create a fake client to mock API calls.
-	cl := fake.NewFakeClient(objs...)
+	cl := fake.NewFakeClientWithScheme(s, objs...)
 
 	r := &OCMSearchReconciler{Client: cl, Scheme: s}
 
