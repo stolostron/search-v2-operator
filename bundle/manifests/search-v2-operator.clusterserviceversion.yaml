@@ -92,7 +92,13 @@ spec:
           resources:
           - deployments
           verbs:
-          - '*'          
+          - '*'    
+        - apiGroups: ["*"]
+          resources: ["*"]
+          verbs:
+          - get
+          - list
+          - watch        
         serviceAccountName: search-v2-operator
       deployments:
       - name: search-v2-operator-controller-manager
@@ -132,7 +138,7 @@ spec:
                 - --leader-elect
                 command:
                 - /manager
-                image: quay.io/stolostron/search-v2-operator:2.5.0-PR1-d2438c739260ace488ee634a5ba1b1c316ffa955
+                image: quay.io/xrajesh/search-v2-operator:v0.0.17
                 livenessProbe:
                   httpGet:
                     path: /healthz
@@ -140,6 +146,15 @@ spec:
                   initialDelaySeconds: 15
                   periodSeconds: 20
                 name: manager
+                env:
+                - name: POSTGRES_IMAGE
+                  value: 'registry.redhat.io/rhscl/postgresql-13-rhel7:1-31.1638430360'
+                - name: INDEXER_IMAGE
+                  value: 'quay.io/stolostron/search-indexer:2.5.0-SNAPSHOT-2022-02-06-20-41-41'
+                - name: COLLECTOR_IMAGE
+                  value: 'quay.io/stolostron/search-collector:2.5.0-SNAPSHOT-2022-02-06-20-41-41'
+                - name: API_IMAGE
+                  value: 'quay.io/stolostron/search-v2-api:2.5.0-SNAPSHOT-2022-02-06-20-41-41'      
                 readinessProbe:
                   httpGet:
                     path: /readyz

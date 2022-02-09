@@ -76,6 +76,32 @@ func (r *OCMSearchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		log.Error(err, "Postgres Deployment  setup failed")
 		return *result, err
 	}
+	log.Info("creationg for indexer svc")
+	result, err = r.createIndexerService(req, r.IndexerService(instance), instance)
+	if result != nil {
+		log.Error(err, "Indexer Service  setup failed")
+		return *result, err
+	}
+	result, err = r.createAPIService(req, r.APIService(instance), instance)
+	if result != nil {
+		log.Error(err, "API Service  setup failed")
+		return *result, err
+	}
+	result, err = r.createCollectorDeployment(req, r.CollectorDeployment(instance), instance)
+	if result != nil {
+		log.Error(err, "Collector Deployment  setup failed")
+		return *result, err
+	}
+	result, err = r.createIndexerDeployment(req, r.IndexerDeployment(instance), instance)
+	if result != nil {
+		log.Error(err, "Indexer Deployment  setup failed")
+		return *result, err
+	}
+	result, err = r.createAPIDeployment(req, r.APIDeployment(instance), instance)
+	if result != nil {
+		log.Error(err, "API Deployment  setup failed")
+		return *result, err
+	}
 
 	return ctrl.Result{}, nil
 }

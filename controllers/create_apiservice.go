@@ -14,14 +14,14 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
-func (r *OCMSearchReconciler) createPGService(request reconcile.Request,
+func (r *OCMSearchReconciler) createAPIService(request reconcile.Request,
 	service *corev1.Service,
 	instance *cachev1.OCMSearch,
 ) (*reconcile.Result, error) {
 
 	found := &corev1.Service{}
 	err := r.Get(context.TODO(), types.NamespacedName{
-		Name:      service.Name,
+		Name:      "search-api",
 		Namespace: instance.Namespace,
 	}, found)
 	if err != nil && errors.IsNotFound(err) {
@@ -39,26 +39,26 @@ func (r *OCMSearchReconciler) createPGService(request reconcile.Request,
 	return nil, nil
 }
 
-func (r *OCMSearchReconciler) PGService(instance *cachev1.OCMSearch) *corev1.Service {
+func (r *OCMSearchReconciler) APIService(instance *cachev1.OCMSearch) *corev1.Service {
 
 	svc := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "search-postgres",
-			Namespace: instance.GetNamespace(),
+			Name:        "search-api",
+			Namespace:   instance.GetNamespace(),
+			Annotations: map[string]string{"service.beta.openshift.io/serving-cert-secret-name": "search-api-certs"},
 		},
 	}
 	svc.Spec.Ports = append(svc.Spec.Ports, corev1.ServicePort{})
 
-	svc.Spec.Ports[0].Name = "search-postgres"
-	svc.Spec.Ports[0].Port = 5432
-	svc.Spec.Ports[0].TargetPort = intstr.IntOrString{IntVal: 5432}
+	svc.Spec.Ports[0].Name = "search-api"
+	svc.Spec.Ports[0].Port = 4010
+	svc.Spec.Ports[0].TargetPort = intstr.IntOrString{IntVal: 4010}
 	svc.Spec.Ports[0].Protocol = corev1.ProtocolTCP
-	svc.Spec.Selector = map[string]string{"name": "search-postgres"}
-	//svc.Spec.Type = corev1.ServiceTypeClusterIP
+	svc.Spec.Selector = map[string]string{"name": "search-api"}
 
 	err := controllerutil.SetControllerReference(instance, svc, r.Scheme)
 	if err != nil {
-		log.V(2).Info("Could not set control for search-postgres service")
+		log.V(2).Info("Could not set control for search-api service")
 	}
 	return svc
 }
