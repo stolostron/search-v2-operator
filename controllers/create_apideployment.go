@@ -73,7 +73,7 @@ func (r *OCMSearchReconciler) APIDeployment(instance *cachev1.OCMSearch) *appsv1
 			newSecretEnvVar("DB_USER", "database-user", "search-postgres"),
 			newSecretEnvVar("DB_PASS", "database-password", "search-postgres"),
 			newSecretEnvVar("DB_NAME", "database-name", "search-postgres"),
-			newEnvVar("DB_HOST", "search-postgres"+instance.Namespace+"svc"),
+			newEnvVar("DB_HOST", "search-postgres."+instance.Namespace+".svc"),
 		},
 		VolumeMounts: []corev1.VolumeMount{
 			{
