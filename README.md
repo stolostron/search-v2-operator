@@ -24,7 +24,7 @@ Building search-v2-operator in local machine:
            Name the secret as `search-pull-secret`
 
    ### Step 5) Login to you Openshift cluster , and run the bundle
-           operator-sdk run bundle $BUNDLE_IMG 
+           operator-sdk run bundle $BUNDLE_IMG --pull-secret-name search-pull-secret
 
    ### Step 6) Once the operator is installed , edit the search-v2-operator service account to include your ImagePullSecret
 
