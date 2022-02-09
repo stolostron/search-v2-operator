@@ -2,7 +2,7 @@
 
 Building search-v2-operator in local machine:
 
-   *Step 0)* Download and install operator-sdk client version  >= v1.15
+   ##Step 0) Download and install operator-sdk client version  >= v1.15
            https://sdk.operatorframework.io/docs/installation/
 
    Step 1) Build the operator and push to quay 
