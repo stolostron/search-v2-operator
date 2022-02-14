@@ -138,7 +138,7 @@ spec:
                 - --leader-elect
                 command:
                 - /manager
-                image: quay.io/xrajesh/search-v2-operator:v0.0.18
+                image: quay.io/stolostron/search-v2-operator:2.5.0-PR3-b4965278f55d6b2defbc49ca99364369b71a5655
                 livenessProbe:
                   httpGet:
                     path: /healthz
