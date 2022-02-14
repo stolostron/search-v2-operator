@@ -76,7 +76,6 @@ func (r *OCMSearchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		log.Error(err, "Postgres Deployment  setup failed")
 		return *result, err
 	}
-	log.Info("creationg for indexer svc")
 	result, err = r.createIndexerService(req, r.IndexerService(instance), instance)
 	if result != nil {
 		log.Error(err, "Indexer Service  setup failed")
