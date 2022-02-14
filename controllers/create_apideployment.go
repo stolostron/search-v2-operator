@@ -66,8 +66,7 @@ func (r *OCMSearchReconciler) APIDeployment(instance *cachev1.OCMSearch) *appsv1
 		},
 	}
 	indexerContainer := corev1.Container{
-		Name: "search-api",
-		//Image: "registry.redhat.io/rhscl/postgresql-13-rhel7:1-31.1638430360",
+		Name:  "search-api",
 		Image: image_sha,
 		Env: []corev1.EnvVar{
 			newSecretEnvVar("DB_USER", "database-user", "search-postgres"),

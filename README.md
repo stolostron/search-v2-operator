@@ -12,6 +12,8 @@ Building search-v2-operator in local machine:
    ### Step 2) Update the operator version in bundle clusterserviceversion to use the image built in step (1)
            Update the file search-v2-operator/bundle/manifests/search-v2-operator.clusterserviceversion.yaml in the container named manager to use use the image above.
 
+           Note : If you want to replace any PR images for any of the search components , you can update in search-v2-operator.clusterserviceversion.yaml file by replacing the tag.
+
    ### Step 3) Build the bundle image and push to quay
            export BUNDLE_IMG=quay.io/<your_id>/search-v2-operator-bundle:v0.0.1
            make bundle-build bundle-push 

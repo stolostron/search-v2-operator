@@ -65,8 +65,7 @@ func (r *OCMSearchReconciler) PGDeployment(instance *cachev1.OCMSearch) *appsv1.
 		},
 	}
 	postgresContainer := corev1.Container{
-		Name: "search-posgres",
-		//Image: "registry.redhat.io/rhscl/postgresql-13-rhel7:1-31.1638430360",
+		Name:  "search-posgres",
 		Image: image_sha,
 		Ports: []corev1.ContainerPort{
 			{
