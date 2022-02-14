@@ -16,7 +16,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
-func (r *OCMSearchReconciler) createPGDeployment(request reconcile.Request,
+func (r *OCMSearchReconciler) createCollectorDeployment(request reconcile.Request,
 	deploy *appsv1.Deployment,
 	instance *cachev1.OCMSearch,
 ) (*reconcile.Result, error) {
@@ -41,16 +41,16 @@ func (r *OCMSearchReconciler) createPGDeployment(request reconcile.Request,
 	return nil, nil
 }
 
-func (r *OCMSearchReconciler) PGDeployment(instance *cachev1.OCMSearch) *appsv1.Deployment {
+func (r *OCMSearchReconciler) CollectorDeployment(instance *cachev1.OCMSearch) *appsv1.Deployment {
 
-	image_sha := os.Getenv("POSTGRES_IMAGE")
-	log.V(2).Info("Using postgres image ", image_sha)
+	image_sha := os.Getenv("COLLECTOR_IMAGE")
+	log.V(2).Info("Using collector image ", image_sha)
 	deploymentLabels := map[string]string{
-		"name": "search-postgres",
+		"name": "search-collector",
 	}
 	deployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "search-postgres",
+			Name:      "search-collector",
 			Namespace: instance.Namespace,
 		},
 		Spec: appsv1.DeploymentSpec{
@@ -64,48 +64,41 @@ func (r *OCMSearchReconciler) PGDeployment(instance *cachev1.OCMSearch) *appsv1.
 			},
 		},
 	}
-	postgresContainer := corev1.Container{
-		Name:  "search-posgres",
+	indexerContainer := corev1.Container{
+		Name:  "search-collector",
 		Image: image_sha,
-		Ports: []corev1.ContainerPort{
-			{
-				Name:          "search-postgres",
-				ContainerPort: 5432,
-				Protocol:      corev1.ProtocolTCP,
-			},
-		},
 		Env: []corev1.EnvVar{
-			newSecretEnvVar("POSTGRESQL_USER", "database-user", "search-postgres"),
-			newSecretEnvVar("POSTGRESQL_PASSWORD", "database-password", "search-postgres"),
-			newSecretEnvVar("POSTGRESQL_DATABASE", "database-name", "search-postgres"),
+			newEnvVar("DEPLOYED_IN_HUB", "true"),
+			newEnvVar("CLUSTER_NAME", "local-cluster"),
+			newEnvVar("AGGREGATOR_URL", "https://search-indexer."+instance.Namespace+".svc:3010"),
 		},
 		VolumeMounts: []corev1.VolumeMount{
 			{
-				Name:      "postgresdb",
-				MountPath: "/var/lib/pgsql/data",
+				Name:      "search-indexer-certs",
+				MountPath: "/sslcert",
 			},
 		},
 		Resources: corev1.ResourceRequirements{
 			Requests: corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("100m"),
-				corev1.ResourceMemory: resource.MustParse("400Mi"),
+				corev1.ResourceCPU:    resource.MustParse("20m"),
+				corev1.ResourceMemory: resource.MustParse("100Mi"),
 			},
 		},
 		ReadinessProbe: &corev1.Probe{
-			InitialDelaySeconds: 5,
+			InitialDelaySeconds: 15,
 			TimeoutSeconds:      1,
 			Handler: corev1.Handler{
 				Exec: &corev1.ExecAction{
-					Command: []string{"/usr/libexec/check-container"},
+					Command: []string{"ls"},
 				},
 			},
 		},
 		LivenessProbe: &corev1.Probe{
-			InitialDelaySeconds: 120,
-			TimeoutSeconds:      10,
+			InitialDelaySeconds: 20,
+			TimeoutSeconds:      1,
 			Handler: corev1.Handler{
 				Exec: &corev1.ExecAction{
-					Command: []string{"/usr/libexec/check-container", "--live"},
+					Command: []string{"ls"},
 				},
 			},
 		},
@@ -113,35 +106,31 @@ func (r *OCMSearchReconciler) PGDeployment(instance *cachev1.OCMSearch) *appsv1.
 
 	volumes := []corev1.Volume{
 		{
-			Name: "postgresdb",
+			Name: "search-indexer-certs",
 			VolumeSource: corev1.VolumeSource{
-				EmptyDir: &corev1.EmptyDirVolumeSource{},
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: "search-indexer-certs",
+				},
 			},
 		},
 	}
 	var replicas int32 = 1
 	deployment.Spec.Replicas = &replicas
 
-	deployment.Spec.Template.Spec.Containers = []corev1.Container{postgresContainer}
+	deployment.Spec.Template.Spec.Containers = []corev1.Container{indexerContainer}
 	deployment.Spec.Template.Spec.Volumes = volumes
+	deployment.Spec.Template.Spec.ServiceAccountName = "search-v2-operator"
 
 	err := controllerutil.SetControllerReference(instance, deployment, r.Scheme)
 	if err != nil {
-		log.V(2).Info("Could not set control for search-postgres deployment")
+		log.V(2).Info("Could not set control for search-collector deployment")
 	}
 	return deployment
 }
 
-func newSecretEnvVar(name, key, secretName string) corev1.EnvVar {
+func newEnvVar(name, value string) corev1.EnvVar {
 	return corev1.EnvVar{
-		Name: name,
-		ValueFrom: &corev1.EnvVarSource{
-			SecretKeyRef: &corev1.SecretKeySelector{
-				Key: key,
-				LocalObjectReference: corev1.LocalObjectReference{
-					Name: secretName,
-				},
-			},
-		},
+		Name:  name,
+		Value: value,
 	}
 }
