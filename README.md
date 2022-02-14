@@ -17,7 +17,7 @@ Building search-v2-operator in local machine:
            make bundle-build bundle-push 
 
    ### Step 4) Create the Image pull secret  to pull image from quay
-           go to https://quay.io/user/<your_id>?tab=settings replacing tpouyer with your username
+           go to https://quay.io/user/<your_id>?tab=settings replacing <your_id>  with your username
            click on Generate Encrypted Password
            enter your quay.io password
            select Kubernetes Secret from left-hand menu  
