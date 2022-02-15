@@ -29,15 +29,29 @@ If you want to replace any PR images for any of the search components , you can 
            click on Generate Encrypted Password
            enter your quay.io password
            select Kubernetes Secret from left-hand menu  
-           Name the secret as `search-pull-secret`
+           Download yaml file and rename secret as  `search-pull-secret`
+           oc apply -f <your_secret.yaml>
+           Verify secrets presence by running ` oc get secret | grep search-pull-secret`
+           
 
    ### Step 5) Login to you Openshift cluster , and run the bundle
            operator-sdk run bundle $BUNDLE_IMG --pull-secret-name search-pull-secret
 
-   ### Step 6) Once the operator is installed , edit the search-v2-operator service account to include your 
+   ### Step 6) Verify the pods
+           Review the output bundle installation is completed sucessfully
+           oc get pods | grep search-v2-operator
+
+   ### Step 7) Once the operator is installed , edit the search-v2-operator service account to include your 
            oc patch serviceaccount search-v2-operator -p '{"imagePullSecrets": [{"name": "search-pull-secret"}]}'
 
-   ### Step 7) Apply the empty CR to create the search components
+   ### Step 8) Apply the empty CR to create the search components
            oc apply -f config/samples/cache_v1_ocmsearch.yaml
+
+  ### Step 9) Verify for following search pods running
+              search-api
+              search-collector
+              search-indexer
+              search-postgres
+                       
                             
                   
