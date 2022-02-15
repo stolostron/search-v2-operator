@@ -16,9 +16,9 @@ This step is only required if you made code changes to search-v2-operator runtim
 
            
 
-        ## Running search-v2-operator in your cluster:     
+### **Running search-v2-operator in your cluster:**     
 
-        If you want to replace any PR images for any of the search components , you can update in search-v2-operator.clusterserviceversion.yaml file by replacing the tag.
+If you want to replace any PR images for any of the search components , you can update in search-v2-operator.clusterserviceversion.yaml file by replacing the tag.
 
    ### 4. Build the bundle image and push to quay
            export BUNDLE_IMG=quay.io/<your_id>/search-v2-operator-bundle:v0.0.1
