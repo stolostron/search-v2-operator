@@ -101,6 +101,16 @@ func (r *OCMSearchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		log.Error(err, "API Deployment  setup failed")
 		return *result, err
 	}
+	result, err = r.createIndexerConfigmap(req, r.IndexerConfigmap(instance), instance)
+	if result != nil {
+		log.Error(err, "Indexer configmap  setup failed")
+		return *result, err
+	}
+	result, err = r.createSearchCACert(req, r.SearchCACert(instance), instance)
+	if result != nil {
+		log.Error(err, "Search CACert  setup failed")
+		return *result, err
+	}
 
 	return ctrl.Result{}, nil
 }

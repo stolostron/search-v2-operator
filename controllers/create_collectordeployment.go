@@ -45,9 +45,8 @@ func (r *OCMSearchReconciler) CollectorDeployment(instance *cachev1.OCMSearch) *
 
 	image_sha := os.Getenv("COLLECTOR_IMAGE")
 	log.V(2).Info("Using collector image ", image_sha)
-	deploymentLabels := map[string]string{
-		"name": "search-collector",
-	}
+	deploymentLabels := getLabels("search-collector")
+
 	deployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "search-collector",
