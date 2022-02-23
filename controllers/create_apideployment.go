@@ -46,7 +46,7 @@ func (r *OCMSearchReconciler) APIDeployment(instance *cachev1.OCMSearch) *appsv1
 
 	image_sha := os.Getenv("API_IMAGE")
 	log.V(2).Info("Using api image ", image_sha)
-	deploymentLabels := getLabels("search-api")
+	deploymentLabels := generateLabels("name", "search-api")
 
 	deployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{

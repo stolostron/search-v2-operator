@@ -45,7 +45,7 @@ func (r *OCMSearchReconciler) CollectorDeployment(instance *cachev1.OCMSearch) *
 
 	image_sha := os.Getenv("COLLECTOR_IMAGE")
 	log.V(2).Info("Using collector image ", image_sha)
-	deploymentLabels := getLabels("search-collector")
+	deploymentLabels := generateLabels("name", "search-collector")
 
 	deployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
@@ -122,7 +122,7 @@ func (r *OCMSearchReconciler) CollectorDeployment(instance *cachev1.OCMSearch) *
 
 	err := controllerutil.SetControllerReference(instance, deployment, r.Scheme)
 	if err != nil {
-		log.V(2).Info("Could not set control for search-collector deployment")
+		log.V(2).Info("Could not set control for search-collector deployment", err)
 	}
 	return deployment
 }

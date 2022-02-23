@@ -46,7 +46,7 @@ func (r *OCMSearchReconciler) IndexerDeployment(instance *cachev1.OCMSearch) *ap
 
 	image_sha := os.Getenv("INDEXER_IMAGE")
 	log.V(2).Info("Using indexer image ", image_sha)
-	deploymentLabels := getLabels("search-indexer")
+	deploymentLabels := generateLabels("name", "search-indexer")
 
 	deployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{

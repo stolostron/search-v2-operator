@@ -45,7 +45,7 @@ func (r *OCMSearchReconciler) PGDeployment(instance *cachev1.OCMSearch) *appsv1.
 
 	image_sha := os.Getenv("POSTGRES_IMAGE")
 	log.V(2).Info("Using postgres image ", image_sha)
-	deploymentLabels := getLabels("search-postgres")
+	deploymentLabels := generateLabels("name", "search-postgres")
 
 	deployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{

@@ -41,10 +41,12 @@ func (r *OCMSearchReconciler) createIndexerConfigmap(request reconcile.Request,
 func (r *OCMSearchReconciler) IndexerConfigmap(instance *cachev1.OCMSearch) *corev1.ConfigMap {
 
 	ns := instance.GetNamespace()
+	deploymentLabels := generateLabels("config", "acm-proxyserver")
 	cm := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "search-indexer",
 			Namespace: ns,
+			Labels:    deploymentLabels,
 		},
 	}
 	data := map[string]string{}
