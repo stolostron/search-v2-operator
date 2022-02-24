@@ -86,4 +86,24 @@ func TestSearch_controller(t *testing.T) {
 		t.Fatalf("Failed to get secret %s: %v", "search-postgres", err)
 	}
 
+	//check for configmap
+	configmap1 := &corev1.ConfigMap{}
+	err = cl.Get(context.TODO(), types.NamespacedName{
+		Name: "search-ca-crt",
+	}, configmap1)
+
+	if err != nil {
+		t.Fatalf("Failed to get configmap %s: %v", "search-ca-crt", err)
+	}
+
+	//check for configmap
+	configmap2 := &corev1.ConfigMap{}
+	err = cl.Get(context.TODO(), types.NamespacedName{
+		Name: "search-indexer",
+	}, configmap2)
+
+	if err != nil {
+		t.Fatalf("Failed to get configmap %s: %v", "search-indexer", err)
+	}
+
 }

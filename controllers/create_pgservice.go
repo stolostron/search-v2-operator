@@ -54,7 +54,6 @@ func (r *OCMSearchReconciler) PGService(instance *cachev1.OCMSearch) *corev1.Ser
 	svc.Spec.Ports[0].TargetPort = intstr.IntOrString{IntVal: 5432}
 	svc.Spec.Ports[0].Protocol = corev1.ProtocolTCP
 	svc.Spec.Selector = map[string]string{"name": "search-postgres"}
-	//svc.Spec.Type = corev1.ServiceTypeClusterIP
 
 	err := controllerutil.SetControllerReference(instance, svc, r.Scheme)
 	if err != nil {
