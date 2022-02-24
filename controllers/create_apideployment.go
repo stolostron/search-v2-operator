@@ -17,6 +17,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
+const apiName = "search-api"
+
 func (r *OCMSearchReconciler) createAPIDeployment(request reconcile.Request,
 	deploy *appsv1.Deployment,
 	instance *cachev1.OCMSearch,
@@ -46,11 +48,11 @@ func (r *OCMSearchReconciler) APIDeployment(instance *cachev1.OCMSearch) *appsv1
 
 	image_sha := os.Getenv("API_IMAGE")
 	log.V(2).Info("Using api image ", image_sha)
-	deploymentLabels := generateLabels("name", "search-api")
+	deploymentLabels := generateLabels("name", apiName)
 
 	deployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "search-api",
+			Name:      apiName,
 			Namespace: instance.Namespace,
 		},
 		Spec: appsv1.DeploymentSpec{
@@ -65,7 +67,7 @@ func (r *OCMSearchReconciler) APIDeployment(instance *cachev1.OCMSearch) *appsv1
 		},
 	}
 	indexerContainer := corev1.Container{
-		Name:  "search-api",
+		Name:  apiName,
 		Image: image_sha,
 		Env: []corev1.EnvVar{
 			newSecretEnvVar("DB_USER", "database-user", "search-postgres"),

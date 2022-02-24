@@ -2,9 +2,9 @@
 package controllers
 
 func generateLabels(key, val string) map[string]string {
-	all_vals := map[string]string{
+	allLabels := map[string]string{
 		"component": "search-v2-operator",
 	}
-	all_vals[key] = val
-	return all_vals
+	allLabels[key] = val
+	return allLabels
 }

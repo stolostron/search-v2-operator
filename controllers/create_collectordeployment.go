@@ -16,6 +16,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
+const collectorName = "search-collector"
+
 func (r *OCMSearchReconciler) createCollectorDeployment(request reconcile.Request,
 	deploy *appsv1.Deployment,
 	instance *cachev1.OCMSearch,
@@ -45,11 +47,11 @@ func (r *OCMSearchReconciler) CollectorDeployment(instance *cachev1.OCMSearch) *
 
 	image_sha := os.Getenv("COLLECTOR_IMAGE")
 	log.V(2).Info("Using collector image ", image_sha)
-	deploymentLabels := generateLabels("name", "search-collector")
+	deploymentLabels := generateLabels("name", collectorName)
 
 	deployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "search-collector",
+			Name:      collectorName,
 			Namespace: instance.Namespace,
 		},
 		Spec: appsv1.DeploymentSpec{
@@ -64,7 +66,7 @@ func (r *OCMSearchReconciler) CollectorDeployment(instance *cachev1.OCMSearch) *
 		},
 	}
 	indexerContainer := corev1.Container{
-		Name:  "search-collector",
+		Name:  collectorName,
 		Image: image_sha,
 		Env: []corev1.EnvVar{
 			newEnvVar("DEPLOYED_IN_HUB", "true"),

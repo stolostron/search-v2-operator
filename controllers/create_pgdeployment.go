@@ -16,6 +16,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
+const postgresName = "search-postgres"
+
 func (r *OCMSearchReconciler) createPGDeployment(request reconcile.Request,
 	deploy *appsv1.Deployment,
 	instance *cachev1.OCMSearch,
@@ -45,11 +47,11 @@ func (r *OCMSearchReconciler) PGDeployment(instance *cachev1.OCMSearch) *appsv1.
 
 	image_sha := os.Getenv("POSTGRES_IMAGE")
 	log.V(2).Info("Using postgres image ", image_sha)
-	deploymentLabels := generateLabels("name", "search-postgres")
+	deploymentLabels := generateLabels("name", postgresName)
 
 	deployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "search-postgres",
+			Name:      postgresName,
 			Namespace: instance.Namespace,
 		},
 		Spec: appsv1.DeploymentSpec{
@@ -64,7 +66,7 @@ func (r *OCMSearchReconciler) PGDeployment(instance *cachev1.OCMSearch) *appsv1.
 		},
 	}
 	postgresContainer := corev1.Container{
-		Name:  "search-posgres",
+		Name:  postgresName,
 		Image: image_sha,
 		Ports: []corev1.ContainerPort{
 			{
