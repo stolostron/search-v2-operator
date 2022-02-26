@@ -60,8 +60,23 @@ func (r *OCMSearchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		}
 		return reconcile.Result{}, err
 	}
+	result, err := r.createSearchServiceAccount(req, r.SearchServiceAccount(instance), instance)
+	if result != nil {
+		log.Error(err, "SearchServiceAccount  setup failed")
+		return *result, err
+	}
+	result, err = r.createRoles(req, r.Role(instance), instance)
+	if result != nil {
+		log.Error(err, "Role  setup failed")
+		return *result, err
+	}
+	result, err = r.createRoleBinding(req, r.RoleBinding(instance), instance)
+	if result != nil {
+		log.Error(err, "RoleBinding  setup failed")
+		return *result, err
+	}
 
-	result, err := r.createPGSecret(req, r.PGSecret(instance), instance)
+	result, err = r.createPGSecret(req, r.PGSecret(instance), instance)
 	if result != nil {
 		log.Error(err, "Postgres Secret  setup failed")
 		return *result, err

@@ -8,3 +8,17 @@ func generateLabels(key, val string) map[string]string {
 	allLabels[key] = val
 	return allLabels
 }
+
+func getServiceAccountName() string {
+	return "search-serviceaccount"
+}
+
+func getImagePullSecret() string {
+	return "search-pull-secret"
+}
+func getRoleName() string {
+	return "search"
+}
+func getRoleBindingName() string {
+	return "search"
+}

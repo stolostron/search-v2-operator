@@ -126,7 +126,7 @@ func (r *OCMSearchReconciler) IndexerDeployment(instance *cachev1.OCMSearch) *ap
 
 	deployment.Spec.Template.Spec.Containers = []corev1.Container{indexerContainer}
 	deployment.Spec.Template.Spec.Volumes = volumes
-	deployment.Spec.Template.Spec.ServiceAccountName = "search-v2-operator"
+	deployment.Spec.Template.Spec.ServiceAccountName = getServiceAccountName()
 
 	err := controllerutil.SetControllerReference(instance, deployment, r.Scheme)
 	if err != nil {

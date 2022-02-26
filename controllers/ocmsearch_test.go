@@ -11,6 +11,7 @@ import (
 	cachev1 "github.com/stolostron/search-v2-operator/api/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -104,6 +105,34 @@ func TestSearch_controller(t *testing.T) {
 
 	if err != nil {
 		t.Fatalf("Failed to get configmap %s: %v", "search-indexer", err)
+	}
+
+	//check for Service Account
+	serviceaccount := &corev1.ServiceAccount{}
+	err = cl.Get(context.TODO(), types.NamespacedName{
+		Name: getServiceAccountName(),
+	}, serviceaccount)
+	if err != nil {
+		t.Fatalf("Failed to get serviceaccount %s: %v", getServiceAccountName(), err)
+	}
+
+	//check for Role
+	role := &rbacv1.Role{}
+	err = cl.Get(context.TODO(), types.NamespacedName{
+		Name: getRoleName(),
+	}, role)
+	if err != nil {
+		t.Fatalf("Failed to get role %s: %v", getRoleName(), err)
+	}
+
+	//check for RoleBinding
+	rolebinding := &rbacv1.RoleBinding{}
+	err = cl.Get(context.TODO(), types.NamespacedName{
+		Name: getRoleBindingName(),
+	}, rolebinding)
+
+	if err != nil {
+		t.Fatalf("Failed to get serviceaccount %s: %v", getRoleBindingName(), err)
 	}
 
 }
