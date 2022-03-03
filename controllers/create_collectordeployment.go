@@ -120,7 +120,7 @@ func (r *OCMSearchReconciler) CollectorDeployment(instance *cachev1.OCMSearch) *
 
 	deployment.Spec.Template.Spec.Containers = []corev1.Container{indexerContainer}
 	deployment.Spec.Template.Spec.Volumes = volumes
-	deployment.Spec.Template.Spec.ServiceAccountName = "search-serviceaccount"
+	deployment.Spec.Template.Spec.ServiceAccountName = getServiceAccountName()
 
 	err := controllerutil.SetControllerReference(instance, deployment, r.Scheme)
 	if err != nil {

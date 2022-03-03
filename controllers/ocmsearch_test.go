@@ -32,7 +32,7 @@ func TestSearch_controller(t *testing.T) {
 	s := scheme.Scheme
 	err := cachev1.SchemeBuilder.AddToScheme(s)
 	if err != nil {
-		t.Fatalf("error adding scheme: (%v)", err)
+		t.Errorf("error adding scheme: (%v)", err)
 	}
 
 	objs := []runtime.Object{ocmsearch}
@@ -51,7 +51,7 @@ func TestSearch_controller(t *testing.T) {
 	// trigger reconcile
 	_, err = r.Reconcile(context.TODO(), req)
 	if err != nil {
-		t.Fatalf("reconcile: (%v)", err)
+		t.Errorf("reconcile: (%v)", err)
 	}
 
 	//wait for update status
@@ -74,7 +74,7 @@ func TestSearch_controller(t *testing.T) {
 	}, service)
 
 	if err != nil {
-		t.Fatalf("Failed to get service %s: %v", "search-postgres", err)
+		t.Errorf("Failed to get service %s: %v", "search-postgres", err)
 	}
 
 	//check for secret
@@ -94,7 +94,7 @@ func TestSearch_controller(t *testing.T) {
 	}, configmap1)
 
 	if err != nil {
-		t.Fatalf("Failed to get configmap %s: %v", "search-ca-crt", err)
+		t.Errorf("Failed to get configmap %s: %v", "search-ca-crt", err)
 	}
 
 	//check for configmap
@@ -113,7 +113,7 @@ func TestSearch_controller(t *testing.T) {
 		Name: getServiceAccountName(),
 	}, serviceaccount)
 	if err != nil {
-		t.Fatalf("Failed to get serviceaccount %s: %v", getServiceAccountName(), err)
+		t.Errorf("Failed to get serviceaccount %s: %v", getServiceAccountName(), err)
 	}
 
 	//check for Role
@@ -122,7 +122,7 @@ func TestSearch_controller(t *testing.T) {
 		Name: getRoleName(),
 	}, role)
 	if err != nil {
-		t.Fatalf("Failed to get role %s: %v", getRoleName(), err)
+		t.Errorf("Failed to get role %s: %v", getRoleName(), err)
 	}
 
 	//check for RoleBinding
@@ -132,7 +132,7 @@ func TestSearch_controller(t *testing.T) {
 	}, rolebinding)
 
 	if err != nil {
-		t.Fatalf("Failed to get serviceaccount %s: %v", getRoleBindingName(), err)
+		t.Errorf("Failed to get serviceaccount %s: %v", getRoleBindingName(), err)
 	}
 
 }
