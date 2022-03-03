@@ -65,14 +65,14 @@ func (r *OCMSearchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		log.Error(err, "SearchServiceAccount  setup failed")
 		return *result, err
 	}
-	result, err = r.createRoles(req, r.Role(instance), instance)
+	result, err = r.createRoles(req, r.ClusterRole(instance), instance)
 	if result != nil {
-		log.Error(err, "Role  setup failed")
+		log.Error(err, "ClusterRole  setup failed")
 		return *result, err
 	}
-	result, err = r.createRoleBinding(req, r.RoleBinding(instance), instance)
+	result, err = r.createRoleBinding(req, r.ClusterRoleBinding(instance), instance)
 	if result != nil {
-		log.Error(err, "RoleBinding  setup failed")
+		log.Error(err, "ClusterRoleBinding  setup failed")
 		return *result, err
 	}
 

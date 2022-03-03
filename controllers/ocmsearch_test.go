@@ -117,7 +117,7 @@ func TestSearch_controller(t *testing.T) {
 	}
 
 	//check for Role
-	role := &rbacv1.Role{}
+	role := &rbacv1.ClusterRole{}
 	err = cl.Get(context.TODO(), types.NamespacedName{
 		Name: getRoleName(),
 	}, role)
@@ -126,7 +126,7 @@ func TestSearch_controller(t *testing.T) {
 	}
 
 	//check for RoleBinding
-	rolebinding := &rbacv1.RoleBinding{}
+	rolebinding := &rbacv1.ClusterRoleBinding{}
 	err = cl.Get(context.TODO(), types.NamespacedName{
 		Name: getRoleBindingName(),
 	}, rolebinding)

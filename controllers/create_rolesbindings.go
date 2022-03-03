@@ -13,13 +13,13 @@ import (
 )
 
 func (r *OCMSearchReconciler) createRoles(request reconcile.Request,
-	role *rbacv1.Role,
+	role *rbacv1.ClusterRole,
 	instance *cachev1.OCMSearch,
 ) (*reconcile.Result, error) {
 
-	found := &rbacv1.Role{}
+	found := &rbacv1.ClusterRole{}
 	err := r.Get(context.TODO(), types.NamespacedName{
-		Name:      role.Name,
+		Name:      getRoleName(),
 		Namespace: instance.Namespace,
 	}, found)
 	if err != nil && errors.IsNotFound(err) {
@@ -38,13 +38,13 @@ func (r *OCMSearchReconciler) createRoles(request reconcile.Request,
 }
 
 func (r *OCMSearchReconciler) createRoleBinding(request reconcile.Request,
-	rolebinding *rbacv1.RoleBinding,
+	rolebinding *rbacv1.ClusterRoleBinding,
 	instance *cachev1.OCMSearch,
 ) (*reconcile.Result, error) {
 
-	found := &rbacv1.RoleBinding{}
+	found := &rbacv1.ClusterRoleBinding{}
 	err := r.Get(context.TODO(), types.NamespacedName{
-		Name:      rolebinding.Name,
+		Name:      getRoleBindingName(),
 		Namespace: instance.Namespace,
 	}, found)
 	if err != nil && errors.IsNotFound(err) {
@@ -62,10 +62,10 @@ func (r *OCMSearchReconciler) createRoleBinding(request reconcile.Request,
 	return nil, nil
 }
 
-func (r *OCMSearchReconciler) Role(instance *cachev1.OCMSearch) *rbacv1.Role {
-	return &rbacv1.Role{
+func (r *OCMSearchReconciler) ClusterRole(instance *cachev1.OCMSearch) *rbacv1.ClusterRole {
+	return &rbacv1.ClusterRole{
 		TypeMeta: metav1.TypeMeta{
-			Kind:       "Role",
+			Kind:       "ClusterRole",
 			APIVersion: rbacv1.SchemeGroupVersion.String(),
 		},
 		ObjectMeta: metav1.ObjectMeta{
@@ -76,10 +76,10 @@ func (r *OCMSearchReconciler) Role(instance *cachev1.OCMSearch) *rbacv1.Role {
 	}
 }
 
-func (r *OCMSearchReconciler) RoleBinding(instance *cachev1.OCMSearch) *rbacv1.RoleBinding {
-	return &rbacv1.RoleBinding{
+func (r *OCMSearchReconciler) ClusterRoleBinding(instance *cachev1.OCMSearch) *rbacv1.ClusterRoleBinding {
+	return &rbacv1.ClusterRoleBinding{
 		TypeMeta: metav1.TypeMeta{
-			Kind:       "RoleBinding",
+			Kind:       "ClusterRoleBinding",
 			APIVersion: rbacv1.SchemeGroupVersion.String(),
 		},
 		ObjectMeta: metav1.ObjectMeta{
@@ -87,7 +87,7 @@ func (r *OCMSearchReconciler) RoleBinding(instance *cachev1.OCMSearch) *rbacv1.R
 			Namespace: instance.GetNamespace(),
 		},
 		RoleRef: rbacv1.RoleRef{
-			Kind:     "Role",
+			Kind:     "ClusterRole",
 			Name:     getRoleName(),
 			APIGroup: rbacv1.GroupName,
 		},
