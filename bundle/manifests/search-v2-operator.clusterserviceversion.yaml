@@ -153,7 +153,7 @@ spec:
                 - name: COLLECTOR_IMAGE
                   value: 'quay.io/stolostron/search-collector:2.5.0-SNAPSHOT-2022-02-22-20-27-49'
                 - name: API_IMAGE
-                  value: 'quay.io/stolostron/search-v2-api:2.5.0-SNAPSHOT-2022-02-22-20-27-49'      
+                  value: 'quay.io/stolostron/search-v2-api:2.5.0-SNAPSHOT-2022-03-04-21-20-20'      
                 readinessProbe:
                   httpGet:
                     path: /readyz
