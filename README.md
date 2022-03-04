@@ -53,5 +53,5 @@ If you want to replace any PR images for any of the search components , you can 
               search-indexer
               search-postgres
                        
-                            
+  # Installing using Bundle Image                          
                   
