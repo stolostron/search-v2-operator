@@ -126,8 +126,7 @@ func (r *OCMSearchReconciler) APIDeployment(instance *cachev1.OCMSearch) *appsv1
 
 	deployment.Spec.Template.Spec.Containers = []corev1.Container{indexerContainer}
 	deployment.Spec.Template.Spec.Volumes = volumes
-	deployment.Spec.Template.Spec.ServiceAccountName = "search-v2-operator"
-
+	deployment.Spec.Template.Spec.ServiceAccountName = getServiceAccountName()
 	err := controllerutil.SetControllerReference(instance, deployment, r.Scheme)
 	if err != nil {
 		log.V(2).Info("Could not set control for search-api deployment")

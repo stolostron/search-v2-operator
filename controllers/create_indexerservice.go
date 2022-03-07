@@ -20,7 +20,6 @@ func (r *OCMSearchReconciler) createIndexerService(request reconcile.Request,
 ) (*reconcile.Result, error) {
 
 	found := &corev1.Service{}
-	log.Info("looking for indexer svc")
 	err := r.Get(context.TODO(), types.NamespacedName{
 		Name:      "search-indexer",
 		Namespace: instance.Namespace,
