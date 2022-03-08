@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1
+package v1alpha1
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -23,17 +23,17 @@ import (
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
-// OCMSearchSpec defines the desired state of OCMSearch
-type OCMSearchSpec struct {
+// SearchSpec defines the desired state of Search
+type SearchSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	// Foo is an example field of OCMSearch. Edit ocmsearch_types.go to remove/update
+	// Foo is an example field of Search. Edit search_types.go to remove/update
 	Foo string `json:"foo,omitempty"`
 }
 
-// OCMSearchStatus defines the observed state of OCMSearch
-type OCMSearchStatus struct {
+// SearchStatus defines the observed state of Search
+type SearchStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 }
@@ -41,24 +41,24 @@ type OCMSearchStatus struct {
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
 
-// OCMSearch is the Schema for the ocmsearches API
-type OCMSearch struct {
+// Search is the Schema for the searches API
+type Search struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   OCMSearchSpec   `json:"spec,omitempty"`
-	Status OCMSearchStatus `json:"status,omitempty"`
+	Spec   SearchSpec   `json:"spec,omitempty"`
+	Status SearchStatus `json:"status,omitempty"`
 }
 
 //+kubebuilder:object:root=true
 
-// OCMSearchList contains a list of OCMSearch
-type OCMSearchList struct {
+// SearchList contains a list of Search
+type SearchList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []OCMSearch `json:"items"`
+	Items           []Search `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&OCMSearch{}, &OCMSearchList{})
+	SchemeBuilder.Register(&Search{}, &SearchList{})
 }

@@ -4,7 +4,7 @@ package controllers
 import (
 	"context"
 
-	cachev1 "github.com/stolostron/search-v2-operator/api/v1"
+	searchv1alpha1 "github.com/stolostron/search-v2-operator/api/v1alpha1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -12,9 +12,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
-func (r *OCMSearchReconciler) createRoles(request reconcile.Request,
+func (r *SearchReconciler) createRoles(request reconcile.Request,
 	role *rbacv1.ClusterRole,
-	instance *cachev1.OCMSearch,
+	instance *searchv1alpha1.Search,
 ) (*reconcile.Result, error) {
 
 	found := &rbacv1.ClusterRole{}
@@ -37,9 +37,9 @@ func (r *OCMSearchReconciler) createRoles(request reconcile.Request,
 	return nil, nil
 }
 
-func (r *OCMSearchReconciler) createRoleBinding(request reconcile.Request,
+func (r *SearchReconciler) createRoleBinding(request reconcile.Request,
 	rolebinding *rbacv1.ClusterRoleBinding,
-	instance *cachev1.OCMSearch,
+	instance *searchv1alpha1.Search,
 ) (*reconcile.Result, error) {
 
 	found := &rbacv1.ClusterRoleBinding{}
@@ -62,7 +62,7 @@ func (r *OCMSearchReconciler) createRoleBinding(request reconcile.Request,
 	return nil, nil
 }
 
-func (r *OCMSearchReconciler) ClusterRole(instance *cachev1.OCMSearch) *rbacv1.ClusterRole {
+func (r *SearchReconciler) ClusterRole(instance *searchv1alpha1.Search) *rbacv1.ClusterRole {
 	return &rbacv1.ClusterRole{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "ClusterRole",
@@ -76,7 +76,7 @@ func (r *OCMSearchReconciler) ClusterRole(instance *cachev1.OCMSearch) *rbacv1.C
 	}
 }
 
-func (r *OCMSearchReconciler) ClusterRoleBinding(instance *cachev1.OCMSearch) *rbacv1.ClusterRoleBinding {
+func (r *SearchReconciler) ClusterRoleBinding(instance *searchv1alpha1.Search) *rbacv1.ClusterRoleBinding {
 	return &rbacv1.ClusterRoleBinding{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "ClusterRoleBinding",

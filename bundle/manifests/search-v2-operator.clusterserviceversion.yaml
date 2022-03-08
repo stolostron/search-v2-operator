@@ -5,10 +5,10 @@ metadata:
     alm-examples: |-
       [
         {
-          "apiVersion": "cache.open-cluster-management.io/v1",
-          "kind": "OCMSearch",
+          "apiVersion": "search.open-cluster-management.io/v1alpha1",
+          "kind": "Search",
           "metadata": {
-            "name": "search-v2-operator",
+            "name": "search-v2-operator"
             "namespace": "open-cluster-management"
           },
           "spec": null
@@ -23,13 +23,13 @@ spec:
   apiservicedefinitions: {}
   customresourcedefinitions:
     owned:
-    - description: OCMSearch is the Schema for the ocmsearches API
-      displayName: OCMSearch
-      kind: OCMSearch
-      name: ocmsearches.cache.open-cluster-management.io
-      version: v1
-  description: Operator to install OCM Search
-  displayName: search-v2-operator
+    - description: Search is the Schema for the searches API
+      displayName: Search
+      kind: Search
+      name: searches.search.open-cluster-management.io
+      version: v1alpha1
+  description: Installs search components and manages lifecycle
+  displayName: search-operator
   icon:
   - base64data: ""
     mediatype: ""
@@ -38,9 +38,9 @@ spec:
       clusterPermissions:
       - rules:
         - apiGroups:
-          - cache.open-cluster-management.io
+          - search.open-cluster-management.io
           resources:
-          - ocmsearches
+          - searches
           verbs:
           - create
           - delete
@@ -50,15 +50,15 @@ spec:
           - update
           - watch
         - apiGroups:
-          - cache.open-cluster-management.io
+          - search.open-cluster-management.io
           resources:
-          - ocmsearches/finalizers
+          - searches/finalizers
           verbs:
           - update
         - apiGroups:
-          - cache.open-cluster-management.io
+          - search.open-cluster-management.io
           resources:
-          - ocmsearches/status
+          - searches/status
           verbs:
           - get
           - patch

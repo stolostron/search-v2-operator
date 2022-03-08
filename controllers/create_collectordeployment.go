@@ -5,7 +5,7 @@ import (
 	"context"
 	"os"
 
-	cachev1 "github.com/stolostron/search-v2-operator/api/v1"
+	searchv1alpha1 "github.com/stolostron/search-v2-operator/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -18,9 +18,9 @@ import (
 
 const collectorName = "search-collector"
 
-func (r *OCMSearchReconciler) createCollectorDeployment(request reconcile.Request,
+func (r *SearchReconciler) createCollectorDeployment(request reconcile.Request,
 	deploy *appsv1.Deployment,
-	instance *cachev1.OCMSearch,
+	instance *searchv1alpha1.Search,
 ) (*reconcile.Result, error) {
 
 	found := &appsv1.Deployment{}
@@ -43,7 +43,7 @@ func (r *OCMSearchReconciler) createCollectorDeployment(request reconcile.Reques
 	return nil, nil
 }
 
-func (r *OCMSearchReconciler) CollectorDeployment(instance *cachev1.OCMSearch) *appsv1.Deployment {
+func (r *SearchReconciler) CollectorDeployment(instance *searchv1alpha1.Search) *appsv1.Deployment {
 
 	image_sha := os.Getenv("COLLECTOR_IMAGE")
 	log.V(2).Info("Using collector image ", image_sha)
