@@ -36,13 +36,361 @@ spec:
           spec:
             description: SearchSpec defines the desired state of Search
             properties:
-              foo:
-                description: Foo is an example field of Search. Edit search_types.go
-                  to remove/update
+              allowDenyResources:
+                description: Control list of Kubernetes resources indexed by search-collector
+                properties:
+                  allowedResources:
+                    additionalProperties:
+                      items:
+                        type: string
+                      type: array
+                    description: Allowed resources from collector
+                    type: object
+                  deniedResources:
+                    additionalProperties:
+                      items:
+                        type: string
+                      type: array
+                    description: Denied resources from collector
+                    type: object
+                type: object
+              customDbConfig:
+                description: Kubernetes secret name containing user provided db secret
+                  Secret contains connection url, certificates
                 type: string
+              dbConfig:
+                description: configmap name contains parameters to override default
+                  db parameters
+                type: string
+              dbStorage:
+                description: Storgeclass to be used by default db
+                properties:
+                  size:
+                    anyOf:
+                    - type: integer
+                    - type: string
+                    description: storage capacity
+                    pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                    x-kubernetes-int-or-string: true
+                  storageClassName:
+                    description: name of the storage class
+                    type: string
+                type: object
+              deployments:
+                description: Customize search deployments
+                properties:
+                  api:
+                    description: Configuration for api Deployment
+                    properties:
+                      imageOverride:
+                        description: Image_override
+                        type: string
+                      imagePullPolicy:
+                        description: ImagePullPolicy
+                        type: string
+                      imagePullSecret:
+                        description: ImagePullSecret
+                        type: string
+                      nodeSelector:
+                        additionalProperties:
+                          type: string
+                        description: NodeSelector to schedule on nodes with matching
+                          labels
+                        type: object
+                      proxyConfig:
+                        additionalProperties:
+                          type: string
+                        description: Proxy config , if remote collectors need to override
+                        type: object
+                      replicaCount:
+                        description: Number of pod instances
+                        type: integer
+                      resources:
+                        description: Compute Resources required by deployment
+                        properties:
+                          limits:
+                            additionalProperties:
+                              anyOf:
+                              - type: integer
+                              - type: string
+                              pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                              x-kubernetes-int-or-string: true
+                            description: 'Limits describes the maximum amount of compute
+                              resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                            type: object
+                          requests:
+                            additionalProperties:
+                              anyOf:
+                              - type: integer
+                              - type: string
+                              pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                              x-kubernetes-int-or-string: true
+                            description: 'Requests describes the minimum amount of
+                              compute resources required. If Requests is omitted for
+                              a container, it defaults to Limits if that is explicitly
+                              specified, otherwise to an implementation-defined value.
+                              More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                            type: object
+                        type: object
+                    type: object
+                  collector:
+                    description: Configuration for collector Deployment
+                    properties:
+                      imageOverride:
+                        description: Image_override
+                        type: string
+                      imagePullPolicy:
+                        description: ImagePullPolicy
+                        type: string
+                      imagePullSecret:
+                        description: ImagePullSecret
+                        type: string
+                      nodeSelector:
+                        additionalProperties:
+                          type: string
+                        description: NodeSelector to schedule on nodes with matching
+                          labels
+                        type: object
+                      proxyConfig:
+                        additionalProperties:
+                          type: string
+                        description: Proxy config , if remote collectors need to override
+                        type: object
+                      replicaCount:
+                        description: Number of pod instances
+                        type: integer
+                      resources:
+                        description: Compute Resources required by deployment
+                        properties:
+                          limits:
+                            additionalProperties:
+                              anyOf:
+                              - type: integer
+                              - type: string
+                              pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                              x-kubernetes-int-or-string: true
+                            description: 'Limits describes the maximum amount of compute
+                              resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                            type: object
+                          requests:
+                            additionalProperties:
+                              anyOf:
+                              - type: integer
+                              - type: string
+                              pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                              x-kubernetes-int-or-string: true
+                            description: 'Requests describes the minimum amount of
+                              compute resources required. If Requests is omitted for
+                              a container, it defaults to Limits if that is explicitly
+                              specified, otherwise to an implementation-defined value.
+                              More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                            type: object
+                        type: object
+                    type: object
+                  database:
+                    description: Configuration for DB Deployment
+                    properties:
+                      imageOverride:
+                        description: Image_override
+                        type: string
+                      imagePullPolicy:
+                        description: ImagePullPolicy
+                        type: string
+                      imagePullSecret:
+                        description: ImagePullSecret
+                        type: string
+                      nodeSelector:
+                        additionalProperties:
+                          type: string
+                        description: NodeSelector to schedule on nodes with matching
+                          labels
+                        type: object
+                      proxyConfig:
+                        additionalProperties:
+                          type: string
+                        description: Proxy config , if remote collectors need to override
+                        type: object
+                      replicaCount:
+                        description: Number of pod instances
+                        type: integer
+                      resources:
+                        description: Compute Resources required by deployment
+                        properties:
+                          limits:
+                            additionalProperties:
+                              anyOf:
+                              - type: integer
+                              - type: string
+                              pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                              x-kubernetes-int-or-string: true
+                            description: 'Limits describes the maximum amount of compute
+                              resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                            type: object
+                          requests:
+                            additionalProperties:
+                              anyOf:
+                              - type: integer
+                              - type: string
+                              pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                              x-kubernetes-int-or-string: true
+                            description: 'Requests describes the minimum amount of
+                              compute resources required. If Requests is omitted for
+                              a container, it defaults to Limits if that is explicitly
+                              specified, otherwise to an implementation-defined value.
+                              More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                            type: object
+                        type: object
+                    type: object
+                  indexer:
+                    description: Configuration for indexer Deployment
+                    properties:
+                      imageOverride:
+                        description: Image_override
+                        type: string
+                      imagePullPolicy:
+                        description: ImagePullPolicy
+                        type: string
+                      imagePullSecret:
+                        description: ImagePullSecret
+                        type: string
+                      nodeSelector:
+                        additionalProperties:
+                          type: string
+                        description: NodeSelector to schedule on nodes with matching
+                          labels
+                        type: object
+                      proxyConfig:
+                        additionalProperties:
+                          type: string
+                        description: Proxy config , if remote collectors need to override
+                        type: object
+                      replicaCount:
+                        description: Number of pod instances
+                        type: integer
+                      resources:
+                        description: Compute Resources required by deployment
+                        properties:
+                          limits:
+                            additionalProperties:
+                              anyOf:
+                              - type: integer
+                              - type: string
+                              pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                              x-kubernetes-int-or-string: true
+                            description: 'Limits describes the maximum amount of compute
+                              resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                            type: object
+                          requests:
+                            additionalProperties:
+                              anyOf:
+                              - type: integer
+                              - type: string
+                              pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                              x-kubernetes-int-or-string: true
+                            description: 'Requests describes the minimum amount of
+                              compute resources required. If Requests is omitted for
+                              a container, it defaults to Limits if that is explicitly
+                              specified, otherwise to an implementation-defined value.
+                              More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                            type: object
+                        type: object
+                    type: object
+                  remoteCollector:
+                    description: Configuration for addon installed collector Deployment
+                    properties:
+                      imageOverride:
+                        description: Image_override
+                        type: string
+                      imagePullPolicy:
+                        description: ImagePullPolicy
+                        type: string
+                      imagePullSecret:
+                        description: ImagePullSecret
+                        type: string
+                      nodeSelector:
+                        additionalProperties:
+                          type: string
+                        description: NodeSelector to schedule on nodes with matching
+                          labels
+                        type: object
+                      proxyConfig:
+                        additionalProperties:
+                          type: string
+                        description: Proxy config , if remote collectors need to override
+                        type: object
+                      replicaCount:
+                        description: Number of pod instances
+                        type: integer
+                      resources:
+                        description: Compute Resources required by deployment
+                        properties:
+                          limits:
+                            additionalProperties:
+                              anyOf:
+                              - type: integer
+                              - type: string
+                              pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                              x-kubernetes-int-or-string: true
+                            description: 'Limits describes the maximum amount of compute
+                              resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                            type: object
+                          requests:
+                            additionalProperties:
+                              anyOf:
+                              - type: integer
+                              - type: string
+                              pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                              x-kubernetes-int-or-string: true
+                            description: 'Requests describes the minimum amount of
+                              compute resources required. If Requests is omitted for
+                              a container, it defaults to Limits if that is explicitly
+                              specified, otherwise to an implementation-defined value.
+                              More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                            type: object
+                        type: object
+                    type: object
+                type: object
+              enableHA:
+                description: flag to turn on/off High Availability for search components
+                type: boolean
             type: object
           status:
             description: SearchStatus defines the observed state of Search
+            properties:
+              conditions:
+                items:
+                  properties:
+                    lastTransitionTime:
+                      description: Last time the condition transitioned
+                      format: date-time
+                      type: string
+                    message:
+                      description: Human readable message
+                      type: string
+                    reason:
+                      description: Reason for the condition's last transition.
+                      type: string
+                    status:
+                      type: string
+                    type:
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - status
+                  - type
+                  type: object
+                type: array
+              dbInUse:
+                description: Database used by search
+                type: string
+              searchHealth:
+                description: 'INSERT ADDITIONAL STATUS FIELD - define observed state
+                  of cluster Important: Run "make" to regenerate code after modifying
+                  this file Human readable health state'
+                type: string
+              storageInUse:
+                description: Storage used by database
+                type: string
             type: object
         type: object
     served: true
