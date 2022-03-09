@@ -50,7 +50,7 @@ func (r *SearchReconciler) IndexerConfigmap(instance *searchv1alpha1.Search) *co
 		},
 	}
 	data := map[string]string{}
-	data["service"] = ns + "/search-aggregator"
+	data["service"] = ns + "/search-indexer"
 	data["port"] = "3010"
 	data["path"] = "/aggregator/clusters/"
 	data["sub-resource"] = "/sync"
