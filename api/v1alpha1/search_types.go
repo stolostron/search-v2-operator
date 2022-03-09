@@ -31,29 +31,29 @@ type SearchSpec struct {
 	// Important: Run "make" to regenerate code after modifying this file
 
 	// +optional
-	// Kubernetes secret name containing user provided db secret
-	// Secret contains connection url, certificates
-	CustomDbConfig string `json:"customDbConfig,omitempty"`
-
-	// +optional
-	// Storgeclass to be used by default db
+	// Storgeclass Name to be used by default db
 	DBStorage StorageSpec `json:"dbStorage,omitempty"`
 
 	// +optional
-	//configmap name contains parameters to override default db parameters
+	//Configmap name contains parameters to override default db parameters
 	DbConfig string `json:"dbConfig,omitempty"`
 
 	// +optional
-	// Customize search deployments
+	// Customization for search deployments
 	Deployments SearchDeployments `json:"deployments,omitempty"`
 
 	// +optional
-	// flag to turn on/off High Availability for search components
-	EnableHA bool `json:"enableHA,omitempty"`
+	// Specifies deployment replication for improved availability. Options are: Basic and High (default)
+	AvailabilityConfig AvailabilityType `json:"availabilityConfig,omitempty"`
 
 	// +optional
 	// Control list of Kubernetes resources indexed by search-collector
 	AllowDenyResources FilterSpec `json:"allowDenyResources,omitempty"`
+
+	// +optional
+	// Kubernetes secret name containing user provided db secret
+	// Secret contains connection url, certificates
+	CustomDbConfig string `json:"customDbConfig,omitempty"`
 }
 
 type SearchDeployments struct {
@@ -80,7 +80,7 @@ type SearchDeployments struct {
 
 type DeploymentConfig struct {
 	// +optional
-	// Number of pod instances
+	// Number of pod instances for deployment
 	ReplicaCount int `json:"replicaCount,omitempty"`
 	// +optional
 	// Compute Resources required by deployment
@@ -117,11 +117,21 @@ type StorageSpec struct {
 type FilterSpec struct {
 	// +optional
 	// Allowed resources from collector
-	AllowedResources map[string][]string `json:"allowedResources,omitempty"`
+	AllowedResources ResourceListSpec `json:"allowedResources,omitempty"`
 
 	// +optional
 	// Denied resources from collector
-	DeniedResources map[string][]string `json:"deniedResources,omitempty"`
+	DeniedResources ResourceListSpec `json:"deniedResources,omitempty"`
+}
+
+type ResourceListSpec struct {
+	//API Group names to be filtered
+	APIGroups []string `json:"apiGroups,omitempty"`
+	//Resource names to be filtered
+	Resources []string `json:"resources,omitempty"`
+	// +optional
+	//Cluster Labels this filter to be applied
+	ClusterLabels []string `json:"clusterLabels,omitempty"`
 }
 
 // SearchStatus defines the observed state of Search
@@ -152,6 +162,16 @@ type SearchCondition struct {
 }
 type SearchConditionType string
 type SearchConditions []SearchCondition
+
+// AvailabilityType ...
+type AvailabilityType string
+
+const (
+	// HABasic stands up most app subscriptions with a replicaCount of 1
+	HABasic AvailabilityType = "Basic"
+	// HAHigh stands up most app subscriptions with a replicaCount of 2
+	HAHigh AvailabilityType = "High"
+)
 
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
