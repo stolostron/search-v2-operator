@@ -1,5 +1,35 @@
 # search-v2-operator
 
+## Installing search-v2-operator in openshift cluster:
+Install search-v2-operator in open-cluster-management namespace , after disabling search-operator (v1) by updating MulticlusterHub CR.
+
+   Prerequisite :  You will need operator sdk to install search operator bundle image . Download and install operator-sdk client version  >= v1.15
+           https://sdk.operatorframework.io/docs/installation/
+
+   ### 1. Create Image pull secret to pull images from quay (Hub cluster)
+           go to https://quay.io/user/<your_id>?tab=settings replacing <your_id>  with your username
+           click on Generate Encrypted Password
+           enter your quay.io password
+           select Kubernetes Secret from left-hand menu
+           Download yaml file and rename secret as  `search-pull-secret`
+           oc apply -f <your_secret.yaml>
+           Verify secrets presence by running ` oc get secret | grep search-pull-secret`
+
+   ### 2. Run the bundle
+           operator-sdk run bundle quay.io/stolostron/search-v2-operator:latest --pull-secret-name search-pull-secret
+
+           Wait for `OLM has successfully installed "search-v2-operator.v0.0.1"` message .
+           You can replace the latest tag with specific image tag from quay to test other images.
+
+
+   ### 3. Apply the empty CR to create the search components
+           oc apply -f config/samples/search_v1alpha1_search.yaml
+
+           Check if all the search pods are running , use ACM console to search.
+
+
+
+
 ## Building search-v2-operator in local machine:
 
 This step is only required if you made code changes to search-v2-operator runtime. You DO NOT need to run this steps if you only update the search components tag in search-v2-operator.clusterserviceversion.yaml . You can jump to step (4)
@@ -16,7 +46,7 @@ This step is only required if you made code changes to search-v2-operator runtim
 
            
 
-### **Running search-v2-operator in your cluster:**     
+### **Building search-v2-operator-bundle in your cluster:**
 
 If you want to replace any PR images for any of the search components , you can update in search-v2-operator.clusterserviceversion.yaml file by replacing the tag.
 
@@ -41,17 +71,15 @@ If you want to replace any PR images for any of the search components , you can 
            Review the output bundle installation is completed sucessfully
            oc get pods | grep search-v2-operator
 
-   ### 8. Once the operator is installed, edit the search-v2-operator service account to include your pull-secret
-           oc patch serviceaccount search-v2-operator -p '{"imagePullSecrets": [{"name": "search-pull-secret"}]}'
 
-   ### 9. Apply the empty CR to create the search components
-           oc apply -f config/samples/cache_v1_ocmsearch.yaml
+   ### 8. Apply the empty CR to create the search components
+           oc apply -f config/samples/search_v1alpha1_search.yaml
 
-  ### 10. Verify for following search pods are running
+  ###  9. Verify for following search pods are running
               search-api
               search-collector
               search-indexer
               search-postgres
                        
-  # Installing using Bundle Image                          
+                         
                   
