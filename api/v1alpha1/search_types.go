@@ -114,9 +114,9 @@ type FilterSpec struct {
 
 type ResourceListSpec struct {
 	//API Group names to be filtered
-	APIGroups []string `json:"apiGroups,omitempty"`
+	APIGroups []string `json:"apiGroups"`
 	//Resource names to be filtered
-	Resources []string `json:"resources,omitempty"`
+	Resources []string `json:"resources"`
 	// +optional
 	//Cluster Labels this filter to be applied
 	ClusterLabels metav1.LabelSelector `json:"clusterLabels,omitempty"`
@@ -127,13 +127,13 @@ type SearchStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 	// Human readable health state
-	Health string `json:"health,omitempty"`
+	Health string `json:"health"`
 
 	// Database used by search
-	DB string `json:"db,omitempty"`
+	DB string `json:"db"`
 
 	// Storage used by database
-	StorageInUse string `json:"storageInUse,omitempty"`
+	StorageInUse string `json:"storageInUse"`
 
 	// +optional
 	Conditions []SearchCondition `json:"conditions,omitempty"`
