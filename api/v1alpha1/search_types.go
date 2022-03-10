@@ -38,8 +38,8 @@ type SearchSpec struct {
 
 	// +optional
 	// Kubernetes secret name containing user provided db secret
-	// Secret contains connection url, certificates
-	CustomDbConfig string `json:"customDbConfig,omitempty"`
+	// Secret should contain connection parameters [db_host, db_port, db_user, db_password, db_name, ca_cert]
+	ExternalDBInstance string `json:"externalDBInstance,omitempty"`
 }
 
 type SearchDeployments struct {
