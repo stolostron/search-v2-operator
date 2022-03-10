@@ -1,18 +1,4 @@
-/*
-Copyright 2022.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
+// Copyright Contributors to the Open Cluster Management project
 
 package v1alpha1
 
@@ -82,9 +68,11 @@ type DeploymentConfig struct {
 	// +optional
 	// Number of pod instances for deployment
 	ReplicaCount int `json:"replicaCount,omitempty"`
+
 	// +optional
 	// Compute Resources required by deployment
 	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
+
 	//Image_override
 	ImageOverride string `json:"imageOverride,omitempty"`
 
@@ -117,11 +105,11 @@ type StorageSpec struct {
 type FilterSpec struct {
 	// +optional
 	// Allowed resources from collector
-	AllowedResources ResourceListSpec `json:"allowedResources,omitempty"`
+	AllowedResources []ResourceListSpec `json:"allowedResources,omitempty"`
 
 	// +optional
 	// Denied resources from collector
-	DeniedResources ResourceListSpec `json:"deniedResources,omitempty"`
+	DeniedResources []ResourceListSpec `json:"deniedResources,omitempty"`
 }
 
 type ResourceListSpec struct {
@@ -131,7 +119,7 @@ type ResourceListSpec struct {
 	Resources []string `json:"resources,omitempty"`
 	// +optional
 	//Cluster Labels this filter to be applied
-	ClusterLabels []string `json:"clusterLabels,omitempty"`
+	ClusterLabels metav1.LabelSelector `json:"clusterLabels,omitempty"`
 }
 
 // SearchStatus defines the observed state of Search
@@ -139,31 +127,39 @@ type SearchStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 	// Human readable health state
-	SearchHealth string `json:"searchHealth,omitempty"`
+	Health string `json:"health,omitempty"`
+
 	// Database used by search
-	DBInUse string `json:"dbInUse,omitempty"`
+	DB string `json:"db,omitempty"`
+
 	// Storage used by database
 	StorageInUse string `json:"storageInUse,omitempty"`
+
 	// +optional
-	Conditions SearchConditions `json:"conditions,omitempty"`
+	Conditions []SearchCondition `json:"conditions,omitempty"`
 }
 
 type SearchCondition struct {
-	Type   SearchConditionType    `json:"type"`
+	Type SearchConditionType `json:"type"`
+
 	Status corev1.ConditionStatus `json:"status"`
+
 	// Last time the condition transitioned
 	LastTransitionTime metav1.Time `json:"lastTransitionTime"`
+
 	// +optional
 	// Reason for the condition's last transition.
 	Reason string `json:"reason,omitempty"`
+
 	// +optional
 	// Human readable message
 	Message string `json:"message,omitempty" `
 }
-type SearchConditionType string
-type SearchConditions []SearchCondition
 
-// AvailabilityType ...
+// SearchConditionType
+type SearchConditionType string
+
+// AvailabilityType
 type AvailabilityType string
 
 const (

@@ -41,42 +41,126 @@ spec:
                 properties:
                   allowedResources:
                     description: Allowed resources from collector
-                    properties:
-                      apiGroups:
-                        description: API Group names to be filtered
-                        items:
-                          type: string
-                        type: array
-                      clusterLabels:
-                        description: Cluster Labels this filter to be applied
-                        items:
-                          type: string
-                        type: array
-                      resources:
-                        description: Resource names to be filtered
-                        items:
-                          type: string
-                        type: array
-                    type: object
+                    items:
+                      properties:
+                        apiGroups:
+                          description: API Group names to be filtered
+                          items:
+                            type: string
+                          type: array
+                        clusterLabels:
+                          description: Cluster Labels this filter to be applied
+                          properties:
+                            matchExpressions:
+                              description: matchExpressions is a list of label selector
+                                requirements. The requirements are ANDed.
+                              items:
+                                description: A label selector requirement is a selector
+                                  that contains values, a key, and an operator that
+                                  relates the key and values.
+                                properties:
+                                  key:
+                                    description: key is the label key that the selector
+                                      applies to.
+                                    type: string
+                                  operator:
+                                    description: operator represents a key's relationship
+                                      to a set of values. Valid operators are In,
+                                      NotIn, Exists and DoesNotExist.
+                                    type: string
+                                  values:
+                                    description: values is an array of string values.
+                                      If the operator is In or NotIn, the values array
+                                      must be non-empty. If the operator is Exists
+                                      or DoesNotExist, the values array must be empty.
+                                      This array is replaced during a strategic merge
+                                      patch.
+                                    items:
+                                      type: string
+                                    type: array
+                                required:
+                                - key
+                                - operator
+                                type: object
+                              type: array
+                            matchLabels:
+                              additionalProperties:
+                                type: string
+                              description: matchLabels is a map of {key,value} pairs.
+                                A single {key,value} in the matchLabels map is equivalent
+                                to an element of matchExpressions, whose key field
+                                is "key", the operator is "In", and the values array
+                                contains only "value". The requirements are ANDed.
+                              type: object
+                          type: object
+                        resources:
+                          description: Resource names to be filtered
+                          items:
+                            type: string
+                          type: array
+                      type: object
+                    type: array
                   deniedResources:
                     description: Denied resources from collector
-                    properties:
-                      apiGroups:
-                        description: API Group names to be filtered
-                        items:
-                          type: string
-                        type: array
-                      clusterLabels:
-                        description: Cluster Labels this filter to be applied
-                        items:
-                          type: string
-                        type: array
-                      resources:
-                        description: Resource names to be filtered
-                        items:
-                          type: string
-                        type: array
-                    type: object
+                    items:
+                      properties:
+                        apiGroups:
+                          description: API Group names to be filtered
+                          items:
+                            type: string
+                          type: array
+                        clusterLabels:
+                          description: Cluster Labels this filter to be applied
+                          properties:
+                            matchExpressions:
+                              description: matchExpressions is a list of label selector
+                                requirements. The requirements are ANDed.
+                              items:
+                                description: A label selector requirement is a selector
+                                  that contains values, a key, and an operator that
+                                  relates the key and values.
+                                properties:
+                                  key:
+                                    description: key is the label key that the selector
+                                      applies to.
+                                    type: string
+                                  operator:
+                                    description: operator represents a key's relationship
+                                      to a set of values. Valid operators are In,
+                                      NotIn, Exists and DoesNotExist.
+                                    type: string
+                                  values:
+                                    description: values is an array of string values.
+                                      If the operator is In or NotIn, the values array
+                                      must be non-empty. If the operator is Exists
+                                      or DoesNotExist, the values array must be empty.
+                                      This array is replaced during a strategic merge
+                                      patch.
+                                    items:
+                                      type: string
+                                    type: array
+                                required:
+                                - key
+                                - operator
+                                type: object
+                              type: array
+                            matchLabels:
+                              additionalProperties:
+                                type: string
+                              description: matchLabels is a map of {key,value} pairs.
+                                A single {key,value} in the matchLabels map is equivalent
+                                to an element of matchExpressions, whose key field
+                                is "key", the operator is "In", and the values array
+                                contains only "value". The requirements are ANDed.
+                              type: object
+                          type: object
+                        resources:
+                          description: Resource names to be filtered
+                          items:
+                            type: string
+                          type: array
+                      type: object
+                    type: array
                 type: object
               availabilityConfig:
                 description: 'Specifies deployment replication for improved availability.
@@ -398,6 +482,7 @@ spec:
                     status:
                       type: string
                     type:
+                      description: SearchConditionType
                       type: string
                   required:
                   - lastTransitionTime
@@ -405,10 +490,10 @@ spec:
                   - type
                   type: object
                 type: array
-              dbInUse:
+              db:
                 description: Database used by search
                 type: string
-              searchHealth:
+              health:
                 description: 'INSERT ADDITIONAL STATUS FIELD - define observed state
                   of cluster Important: Run "make" to regenerate code after modifying
                   this file Human readable health state'
