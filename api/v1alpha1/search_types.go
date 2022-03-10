@@ -8,8 +8,27 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
-// NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
+// AvailabilityType
+type AvailabilityType string
+
+const (
+	// HABasic stands up most app subscriptions with a replicaCount of 1
+	HABasic AvailabilityType = "Basic"
+	// HAHigh stands up most app subscriptions with a replicaCount of 2
+	HAHigh AvailabilityType = "High"
+)
+
+//+kubebuilder:object:root=true
+//+kubebuilder:subresource:status
+
+// Search is the Schema for the searches API
+type Search struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+
+	Spec   SearchSpec   `json:"spec,omitempty"`
+	Status SearchStatus `json:"status,omitempty"`
+}
 
 // SearchSpec defines the desired state of Search
 type SearchSpec struct {
@@ -136,49 +155,7 @@ type SearchStatus struct {
 	StorageInUse string `json:"storageInUse"`
 
 	// +optional
-	Conditions []SearchCondition `json:"conditions,omitempty"`
-}
-
-type SearchCondition struct {
-	Type SearchConditionType `json:"type"`
-
-	Status corev1.ConditionStatus `json:"status"`
-
-	// Last time the condition transitioned
-	LastTransitionTime metav1.Time `json:"lastTransitionTime"`
-
-	// +optional
-	// Reason for the condition's last transition.
-	Reason string `json:"reason,omitempty"`
-
-	// +optional
-	// Human readable message
-	Message string `json:"message,omitempty" `
-}
-
-// SearchConditionType
-type SearchConditionType string
-
-// AvailabilityType
-type AvailabilityType string
-
-const (
-	// HABasic stands up most app subscriptions with a replicaCount of 1
-	HABasic AvailabilityType = "Basic"
-	// HAHigh stands up most app subscriptions with a replicaCount of 2
-	HAHigh AvailabilityType = "High"
-)
-
-//+kubebuilder:object:root=true
-//+kubebuilder:subresource:status
-
-// Search is the Schema for the searches API
-type Search struct {
-	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata,omitempty"`
-
-	Spec   SearchSpec   `json:"spec,omitempty"`
-	Status SearchStatus `json:"status,omitempty"`
+	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }
 
 //+kubebuilder:object:root=true

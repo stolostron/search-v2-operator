@@ -149,11 +149,11 @@ spec:
                 - name: POSTGRES_IMAGE
                   value: 'registry.redhat.io/rhscl/postgresql-13-rhel7:1-31.1638430360'
                 - name: INDEXER_IMAGE
-                  value: 'quay.io/stolostron/search-indexer:2.5.0-SNAPSHOT-2022-02-22-20-27-49'
+                  value: 'quay.io/stolostron/search-indexer:2.5.0-SNAPSHOT-2022-03-10-19-11-58'
                 - name: COLLECTOR_IMAGE
-                  value: 'quay.io/stolostron/search-collector:2.5.0-SNAPSHOT-2022-02-22-20-27-49'
+                  value: 'quay.io/stolostron/search-collector:2.5.0-SNAPSHOT-2022-03-10-19-11-58'
                 - name: API_IMAGE
-                  value: 'quay.io/stolostron/search-v2-api:2.5.0-SNAPSHOT-2022-03-04-21-20-20'      
+                  value: 'quay.io/stolostron/search-v2-api:2.5.0-SNAPSHOT-2022-03-10-19-11-58'      
                 readinessProbe:
                   httpGet:
                     path: /readyz
