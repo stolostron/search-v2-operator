@@ -10,13 +10,13 @@ spec:
   apiservicedefinitions: {}
   customresourcedefinitions:
     owned:
-    - description: OCMSearch is the Schema for the ocmsearches API
-      displayName: OCMSearch
-      kind: OCMSearch
-      name: ocmsearches.cache.open-cluster-management.io
-      version: v1
-  description: Operator to install ACM Search
-  displayName: search-v2-operator
+    - description: Search is the Schema for the searches API
+      displayName: Search
+      kind: Search
+      name: searches.search.open-cluster-management.io
+      version: v1alpha1
+  description: Installs search components and manages lifecycle
+  displayName: search-operator
   icon:
   - base64data: ""
     mediatype: ""
@@ -35,7 +35,11 @@ spec:
     type: AllNamespaces
   keywords:
   - search
+  - Advanced Cluster Management
+  - Open Cluster Management
+  - stolostron
   - acm
+  - ocm
   links:
   - name: Search V2 Operator
     url: https://search-v2-operator.domain

@@ -13,4 +13,4 @@ kind: Kustomization
 images:
 - name: controller
   newName: quay.io/stolostron/search-v2-operator
-  newTag: 2.5.0-PR1-d2438c739260ace488ee634a5ba1b1c316ffa955
+  newTag: latest

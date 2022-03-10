@@ -6,7 +6,7 @@ import (
 	"crypto/rand"
 	"math/big"
 
-	cachev1 "github.com/stolostron/search-v2-operator/api/v1"
+	searchv1alpha1 "github.com/stolostron/search-v2-operator/api/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -15,9 +15,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
-func (r *OCMSearchReconciler) createPGSecret(request reconcile.Request,
+func (r *SearchReconciler) createPGSecret(request reconcile.Request,
 	secret *corev1.Secret,
-	instance *cachev1.OCMSearch,
+	instance *searchv1alpha1.Search,
 ) (*reconcile.Result, error) {
 
 	found := &corev1.Secret{}
@@ -40,7 +40,7 @@ func (r *OCMSearchReconciler) createPGSecret(request reconcile.Request,
 	return nil, nil
 }
 
-func (r *OCMSearchReconciler) PGSecret(instance *cachev1.OCMSearch) *corev1.Secret {
+func (r *SearchReconciler) PGSecret(instance *searchv1alpha1.Search) *corev1.Secret {
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "search-postgres",

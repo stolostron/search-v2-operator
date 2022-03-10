@@ -1,0 +1,6 @@
+apiVersion: search.open-cluster-management.io/v1alpha1
+kind: Search
+metadata:
+  name: search-v2-operator 
+spec:
+  # Add fields here

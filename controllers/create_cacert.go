@@ -4,7 +4,7 @@ package controllers
 import (
 	"context"
 
-	cachev1 "github.com/stolostron/search-v2-operator/api/v1"
+	searchv1alpha1 "github.com/stolostron/search-v2-operator/api/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -13,9 +13,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
-func (r *OCMSearchReconciler) createSearchCACert(request reconcile.Request,
+func (r *SearchReconciler) createSearchCACert(request reconcile.Request,
 	cm *corev1.ConfigMap,
-	instance *cachev1.OCMSearch,
+	instance *searchv1alpha1.Search,
 ) (*reconcile.Result, error) {
 
 	found := &corev1.ConfigMap{}
@@ -38,7 +38,7 @@ func (r *OCMSearchReconciler) createSearchCACert(request reconcile.Request,
 	return nil, nil
 }
 
-func (r *OCMSearchReconciler) SearchCACert(instance *cachev1.OCMSearch) *corev1.ConfigMap {
+func (r *SearchReconciler) SearchCACert(instance *searchv1alpha1.Search) *corev1.ConfigMap {
 
 	ns := instance.GetNamespace()
 	annotations := map[string]string{}

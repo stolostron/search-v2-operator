@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	cachev1 "github.com/stolostron/search-v2-operator/api/v1"
+	searchv1alpha1 "github.com/stolostron/search-v2-operator/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -24,22 +24,22 @@ func TestSearch_controller(t *testing.T) {
 	var (
 		name = "search-v2-operator"
 	)
-	ocmsearch := &cachev1.OCMSearch{
-		TypeMeta:   metav1.TypeMeta{Kind: "OCMSearch"},
+	search := &searchv1alpha1.Search{
+		TypeMeta:   metav1.TypeMeta{Kind: "Search"},
 		ObjectMeta: metav1.ObjectMeta{Name: name},
-		Spec:       cachev1.OCMSearchSpec{},
+		Spec:       searchv1alpha1.SearchSpec{},
 	}
 	s := scheme.Scheme
-	err := cachev1.SchemeBuilder.AddToScheme(s)
+	err := searchv1alpha1.SchemeBuilder.AddToScheme(s)
 	if err != nil {
 		t.Errorf("error adding scheme: (%v)", err)
 	}
 
-	objs := []runtime.Object{ocmsearch}
+	objs := []runtime.Object{search}
 	// Create a fake client to mock API calls.
 	cl := fake.NewClientBuilder().WithRuntimeObjects(objs...).Build()
 
-	r := &OCMSearchReconciler{Client: cl, Scheme: s}
+	r := &SearchReconciler{Client: cl, Scheme: s}
 
 	// Mock request to simulate Reconcile() being called on an event for a watched resource .
 	req := ctrl.Request{
