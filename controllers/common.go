@@ -2,13 +2,17 @@
 package controllers
 
 import (
+	"context"
 	"os"
 
 	searchv1alpha1 "github.com/stolostron/search-v2-operator/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
 const (
@@ -32,6 +36,29 @@ func getServiceAccountName() string {
 
 func getImagePullSecretName() string {
 	return "search-pull-secret"
+}
+
+func getNodeSelector(deploymentName string, instance *searchv1alpha1.Search) map[string]string {
+	var result map[string]string
+	switch deploymentName {
+	case apiDeploymentName:
+		if instance.Spec.Deployments.API.NodeSelector != nil {
+			return instance.Spec.Deployments.API.NodeSelector
+		}
+	case collectorDeploymentName:
+		if instance.Spec.Deployments.Collector.NodeSelector != nil {
+			return instance.Spec.Deployments.Collector.NodeSelector
+		}
+	case indexerDeploymentName:
+		if instance.Spec.Deployments.Indexer.NodeSelector != nil {
+			return instance.Spec.Deployments.Indexer.NodeSelector
+		}
+	case postgresDeploymentName:
+		if instance.Spec.Deployments.Database.NodeSelector != nil {
+			return instance.Spec.Deployments.Database.NodeSelector
+		}
+	}
+	return result
 }
 
 func getImagePullPolicy(deploymentName string, instance *searchv1alpha1.Search) corev1.PullPolicy {
@@ -134,31 +161,34 @@ func getResourceRequirements(deploymentName string, instance *searchv1alpha1.Sea
 
 func getRequests(deployment string, instance *searchv1alpha1.Search) corev1.ResourceList {
 	var cpu, memory resource.Quantity
+	cpu = resource.MustParse(resoureMap[deployment]["CPURequest"])
+	memory = resource.MustParse(resoureMap[deployment]["MemoryRequest"])
+	if !isResourcesCustomized(deployment, instance) {
+		return corev1.ResourceList{
+			corev1.ResourceCPU:    cpu,
+			corev1.ResourceMemory: memory,
+		}
+	}
+
 	switch deployment {
 	case apiDeploymentName:
-		cpu = resource.MustParse(resoureMap[apiDeploymentName]["CPURequest"])
 		if instance.Spec.Deployments.API.Resources.Requests.Cpu() != nil {
 			cpu = *instance.Spec.Deployments.API.Resources.Requests.Cpu()
 		}
-		memory = resource.MustParse(resoureMap[apiDeploymentName]["MemoryRequest"])
 		if instance.Spec.Deployments.API.Resources.Requests.Memory() != nil {
 			memory = *instance.Spec.Deployments.API.Resources.Requests.Memory()
 		}
 	case collectorDeploymentName:
-		cpu = resource.MustParse(resoureMap[collectorDeploymentName]["CPURequest"])
 		if instance.Spec.Deployments.Collector.Resources.Requests.Cpu() != nil {
 			cpu = *instance.Spec.Deployments.Collector.Resources.Requests.Cpu()
 		}
-		memory = resource.MustParse(resoureMap[collectorDeploymentName]["MemoryRequest"])
 		if instance.Spec.Deployments.Collector.Resources.Requests.Memory() != nil {
 			memory = *instance.Spec.Deployments.Collector.Resources.Requests.Memory()
 		}
 	case indexerDeploymentName:
-		cpu = resource.MustParse(resoureMap[indexerDeploymentName]["CPURequest"])
 		if instance.Spec.Deployments.Indexer.Resources.Requests.Cpu() != nil {
 			cpu = *instance.Spec.Deployments.Indexer.Resources.Requests.Cpu()
 		}
-		memory = resource.MustParse(resoureMap[indexerDeploymentName]["MemoryRequest"])
 		if instance.Spec.Deployments.Indexer.Resources.Requests.Memory() != nil {
 			memory = *instance.Spec.Deployments.Indexer.Resources.Requests.Memory()
 		}
@@ -182,12 +212,17 @@ func getRequests(deployment string, instance *searchv1alpha1.Search) corev1.Reso
 
 func getLimits(deployment string, instance *searchv1alpha1.Search) corev1.ResourceList {
 	var cpu, memory resource.Quantity
+	memory = resource.MustParse(resoureMap[deployment]["MemoryLimit"])
+	if !isResourcesCustomized(deployment, instance) {
+		return corev1.ResourceList{
+			corev1.ResourceMemory: memory,
+		}
+	}
 	switch deployment {
 	case apiDeploymentName:
 		if instance.Spec.Deployments.API.Resources.Requests.Cpu() != nil {
 			cpu = *instance.Spec.Deployments.API.Resources.Requests.Cpu()
 		}
-		memory = resource.MustParse(resoureMap[apiDeploymentName]["MemoryLimit"])
 		if instance.Spec.Deployments.API.Resources.Requests.Memory() != nil {
 			memory = *instance.Spec.Deployments.API.Resources.Requests.Memory()
 		}
@@ -195,7 +230,6 @@ func getLimits(deployment string, instance *searchv1alpha1.Search) corev1.Resour
 		if instance.Spec.Deployments.Collector.Resources.Requests.Cpu() != nil {
 			cpu = *instance.Spec.Deployments.Collector.Resources.Requests.Cpu()
 		}
-		memory = resource.MustParse(resoureMap[collectorDeploymentName]["MemoryLimit"])
 		if instance.Spec.Deployments.Collector.Resources.Requests.Memory() != nil {
 			memory = *instance.Spec.Deployments.Collector.Resources.Requests.Memory()
 		}
@@ -203,7 +237,6 @@ func getLimits(deployment string, instance *searchv1alpha1.Search) corev1.Resour
 		if instance.Spec.Deployments.Indexer.Resources.Requests.Cpu() != nil {
 			cpu = *instance.Spec.Deployments.Indexer.Resources.Requests.Cpu()
 		}
-		memory = resource.MustParse(resoureMap[indexerDeploymentName]["MemoryLimit"])
 		if instance.Spec.Deployments.Indexer.Resources.Requests.Memory() != nil {
 			memory = *instance.Spec.Deployments.Indexer.Resources.Requests.Memory()
 		}
@@ -212,7 +245,6 @@ func getLimits(deployment string, instance *searchv1alpha1.Search) corev1.Resour
 		if instance.Spec.Deployments.Database.Resources.Requests.Cpu() != nil {
 			cpu = *instance.Spec.Deployments.Database.Resources.Requests.Cpu()
 		}
-		memory = resource.MustParse(resoureMap[postgresDeploymentName]["MemoryLimit"])
 		if instance.Spec.Deployments.Database.Resources.Requests.Memory() != nil {
 			memory = *instance.Spec.Deployments.Database.Resources.Requests.Memory()
 		}
@@ -272,4 +304,143 @@ func getImageSha(deploymentName string, instance *searchv1alpha1.Search) string 
 	}
 	log.V(2).Info("Unknown deployment %s ", deploymentName)
 	return ""
+}
+
+func hasDeployments(instance *searchv1alpha1.Search) bool {
+	return instance.Spec.Deployments.DeepCopy() != nil
+
+}
+
+func isDeploymentCustomized(deploymentName string, instance *searchv1alpha1.Search) bool {
+	if !hasDeployments(instance) {
+		return false
+	}
+	switch deploymentName {
+	case apiDeploymentName:
+		if instance.Spec.Deployments.API.DeepCopy() != nil {
+			return true
+		}
+	case collectorDeploymentName:
+		if instance.Spec.Deployments.Collector.DeepCopy() != nil {
+			return true
+		}
+	case indexerDeploymentName:
+		if instance.Spec.Deployments.Indexer.DeepCopy() != nil {
+			return true
+		}
+	case postgresDeploymentName:
+		if instance.Spec.Deployments.Database.DeepCopy() != nil {
+			return true
+		}
+	}
+	return false
+}
+
+func isResourcesCustomized(deploymentName string, instance *searchv1alpha1.Search) bool {
+	if !isDeploymentCustomized(deploymentName, instance) {
+		return false
+	}
+	switch deploymentName {
+	case apiDeploymentName:
+		if instance.Spec.Deployments.API.Resources != nil {
+			return true
+		}
+	case collectorDeploymentName:
+		if instance.Spec.Deployments.Collector.Resources != nil {
+			return true
+		}
+	case indexerDeploymentName:
+		if instance.Spec.Deployments.Indexer.Resources != nil {
+			return true
+		}
+	case postgresDeploymentName:
+		if instance.Spec.Deployments.Database.Resources != nil {
+			return true
+		}
+	}
+	return false
+}
+
+func (r *SearchReconciler) createOrUpdateConfigMap(ctx context.Context, cm *corev1.ConfigMap) (*reconcile.Result, error) {
+	found := &corev1.ConfigMap{}
+	err := r.Get(context.TODO(), types.NamespacedName{
+		Name:      cm.Name,
+		Namespace: cm.Namespace,
+	}, found)
+	if err != nil && errors.IsNotFound(err) {
+		err = r.Create(context.TODO(), cm)
+		if err != nil {
+			log.Error(err, "Could not create %s configmap", cm.Name)
+			return &reconcile.Result{}, err
+		}
+	}
+	if err := r.Update(context.TODO(), cm); err != nil {
+		log.Error(err, "Could not update %s configmap", cm.Name)
+		return &reconcile.Result{}, err
+	}
+	log.V(2).Info("Created %s configmap", cm.Name)
+	return nil, nil
+}
+
+func (r *SearchReconciler) createOrUpdateDeployment(ctx context.Context, deploy *appsv1.Deployment) (*reconcile.Result, error) {
+	found := &appsv1.Deployment{}
+	err := r.Get(context.TODO(), types.NamespacedName{
+		Name:      deploy.Name,
+		Namespace: deploy.Namespace,
+	}, found)
+	if err != nil && errors.IsNotFound(err) {
+		err = r.Create(context.TODO(), deploy)
+		if err != nil {
+			log.Error(err, "Could not create %s deployment", deploy.Name)
+			return &reconcile.Result{}, err
+		}
+	}
+	if err := r.Update(context.TODO(), deploy); err != nil {
+		log.Error(err, "Could not update %s deployment", deploy.Name)
+		return &reconcile.Result{}, err
+	}
+	log.V(2).Info("Created %s deployment", deploy.Name)
+	return nil, nil
+}
+
+func (r *SearchReconciler) createOrUpdateService(ctx context.Context, svc *corev1.Service) (*reconcile.Result, error) {
+	found := &corev1.Service{}
+	err := r.Get(context.TODO(), types.NamespacedName{
+		Name:      svc.Name,
+		Namespace: svc.Namespace,
+	}, found)
+	if err != nil && errors.IsNotFound(err) {
+		err = r.Create(context.TODO(), svc)
+		if err != nil {
+			log.Error(err, "Could not create %s service", svc.Name)
+			return &reconcile.Result{}, err
+		}
+	}
+	if err := r.Update(context.TODO(), svc); err != nil {
+		log.Error(err, "Could not update %s service", svc.Name)
+		return &reconcile.Result{}, err
+	}
+	log.V(2).Info("Created %s service", svc.Name)
+	return nil, nil
+}
+
+func (r *SearchReconciler) createOrUpdateSecret(ctx context.Context, secret *corev1.Secret) (*reconcile.Result, error) {
+	found := &corev1.Secret{}
+	err := r.Get(context.TODO(), types.NamespacedName{
+		Name:      secret.Name,
+		Namespace: secret.Namespace,
+	}, found)
+	if err != nil && errors.IsNotFound(err) {
+		err = r.Create(context.TODO(), secret)
+		if err != nil {
+			log.Error(err, "Could not create %s secret", secret.Name)
+			return &reconcile.Result{}, err
+		}
+	}
+	if err := r.Update(context.TODO(), secret); err != nil {
+		log.Error(err, "Could not update %s secret", secret.Name)
+		return &reconcile.Result{}, err
+	}
+	log.V(2).Info("Created %s secret", secret.Name)
+	return nil, nil
 }

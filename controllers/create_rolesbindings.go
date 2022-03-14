@@ -13,27 +13,27 @@ import (
 )
 
 func (r *SearchReconciler) createRoles(request reconcile.Request,
-	role *rbacv1.ClusterRole,
+	crole *rbacv1.ClusterRole,
 	instance *searchv1alpha1.Search,
 ) (*reconcile.Result, error) {
 
 	found := &rbacv1.ClusterRole{}
 	err := r.Get(context.TODO(), types.NamespacedName{
 		Name:      getRoleName(),
-		Namespace: instance.Namespace,
+		Namespace: crole.Namespace,
 	}, found)
 	if err != nil && errors.IsNotFound(err) {
-
-		err = r.Create(context.TODO(), role)
+		err = r.Create(context.TODO(), crole)
 		if err != nil {
+			log.Error(err, "Could not create %s clusterrole", crole.Name)
 			return &reconcile.Result{}, err
-		} else {
-			return nil, nil
 		}
-	} else if err != nil {
+	}
+	if err := r.Update(context.TODO(), crole); err != nil {
+		log.Error(err, "Could not update %s clusterrole", crole.Name)
 		return &reconcile.Result{}, err
 	}
-
+	log.V(2).Info("Created %s clusterrole", crole.Name)
 	return nil, nil
 }
 
@@ -45,20 +45,20 @@ func (r *SearchReconciler) createRoleBinding(request reconcile.Request,
 	found := &rbacv1.ClusterRoleBinding{}
 	err := r.Get(context.TODO(), types.NamespacedName{
 		Name:      getRoleBindingName(),
-		Namespace: instance.Namespace,
+		Namespace: rolebinding.Namespace,
 	}, found)
 	if err != nil && errors.IsNotFound(err) {
-
 		err = r.Create(context.TODO(), rolebinding)
 		if err != nil {
+			log.Error(err, "Could not create %s clusterrolebinding", rolebinding.Name)
 			return &reconcile.Result{}, err
-		} else {
-			return nil, nil
 		}
-	} else if err != nil {
+	}
+	if err := r.Update(context.TODO(), rolebinding); err != nil {
+		log.Error(err, "Could not update %s clusterrolebinding", rolebinding.Name)
 		return &reconcile.Result{}, err
 	}
-
+	log.V(2).Info("Created %s clusterrolebinding", rolebinding.Name)
 	return nil, nil
 }
 

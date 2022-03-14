@@ -21,20 +21,20 @@ func (r *SearchReconciler) createSearchServiceAccount(request reconcile.Request,
 	found := &corev1.ServiceAccount{}
 	err := r.Get(context.TODO(), types.NamespacedName{
 		Name:      sa.Name,
-		Namespace: instance.Namespace,
+		Namespace: sa.Namespace,
 	}, found)
 	if err != nil && errors.IsNotFound(err) {
-
 		err = r.Create(context.TODO(), sa)
 		if err != nil {
+			log.Error(err, "Could not create %s serviceaccount", sa.Name)
 			return &reconcile.Result{}, err
-		} else {
-			return nil, nil
 		}
-	} else if err != nil {
+	}
+	if err := r.Update(context.TODO(), sa); err != nil {
+		log.Error(err, "Could not update %s serviceaccount", sa.Name)
 		return &reconcile.Result{}, err
 	}
-
+	log.V(2).Info("Created %s serviceaccount", sa.Name)
 	return nil, nil
 }
 

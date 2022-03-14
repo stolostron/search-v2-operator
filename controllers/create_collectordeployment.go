@@ -7,8 +7,6 @@ import (
 	searchv1alpha1 "github.com/stolostron/search-v2-operator/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
@@ -17,8 +15,8 @@ func (r *SearchReconciler) createCollectorDeployment(request reconcile.Request,
 	deploy *appsv1.Deployment,
 	instance *searchv1alpha1.Search,
 ) (*reconcile.Result, error) {
-
-	found := &appsv1.Deployment{}
+	return r.createOrUpdateDeployment(context.TODO(), deploy)
+	/*found := &appsv1.Deployment{}
 	err := r.Get(context.TODO(), types.NamespacedName{
 		Name:      deploy.Name,
 		Namespace: request.Namespace,
@@ -27,6 +25,7 @@ func (r *SearchReconciler) createCollectorDeployment(request reconcile.Request,
 
 		err = r.Create(context.TODO(), deploy)
 		if err != nil {
+			log.Error(err, "Could not create %s deployment", deploy.Name)
 			return &reconcile.Result{}, err
 		} else {
 			return nil, nil
@@ -36,6 +35,7 @@ func (r *SearchReconciler) createCollectorDeployment(request reconcile.Request,
 	}
 
 	return nil, nil
+	*/
 }
 
 func (r *SearchReconciler) CollectorDeployment(instance *searchv1alpha1.Search) *appsv1.Deployment {
@@ -95,6 +95,9 @@ func (r *SearchReconciler) CollectorDeployment(instance *searchv1alpha1.Search) 
 	deployment.Spec.Template.Spec.Volumes = volumes
 	deployment.Spec.Template.Spec.ServiceAccountName = getServiceAccountName()
 	deployment.Spec.Template.Spec.ImagePullSecrets = getImagePullSecret(deploymentName, instance)
+	if getNodeSelector(deploymentName, instance) != nil {
+		deployment.Spec.Template.Spec.NodeSelector = getNodeSelector(deploymentName, instance)
+	}
 	err := controllerutil.SetControllerReference(instance, deployment, r.Scheme)
 	if err != nil {
 		log.V(2).Info("Could not set control for search-collector deployment", err)

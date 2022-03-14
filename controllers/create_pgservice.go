@@ -6,9 +6,7 @@ import (
 
 	searchv1alpha1 "github.com/stolostron/search-v2-operator/api/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -18,8 +16,8 @@ func (r *SearchReconciler) createPGService(request reconcile.Request,
 	service *corev1.Service,
 	instance *searchv1alpha1.Search,
 ) (*reconcile.Result, error) {
-
-	found := &corev1.Service{}
+	return r.createOrUpdateService(context.TODO(), service)
+	/*found := &corev1.Service{}
 	err := r.Get(context.TODO(), types.NamespacedName{
 		Name:      service.Name,
 		Namespace: instance.Namespace,
@@ -28,6 +26,7 @@ func (r *SearchReconciler) createPGService(request reconcile.Request,
 
 		err = r.Create(context.TODO(), service)
 		if err != nil {
+			log.Error(err, "Could not create %s service", service.Name)
 			return &reconcile.Result{}, err
 		} else {
 			return nil, nil
@@ -37,6 +36,7 @@ func (r *SearchReconciler) createPGService(request reconcile.Request,
 	}
 
 	return nil, nil
+	*/
 }
 
 func (r *SearchReconciler) PGService(instance *searchv1alpha1.Search) *corev1.Service {
