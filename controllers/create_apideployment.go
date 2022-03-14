@@ -3,21 +3,16 @@ package controllers
 
 import (
 	"context"
-	"os"
 
 	searchv1alpha1 "github.com/stolostron/search-v2-operator/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/resource"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
-
-const apiName = "search-api"
 
 func (r *SearchReconciler) createAPIDeployment(request reconcile.Request,
 	deploy *appsv1.Deployment,
@@ -45,29 +40,13 @@ func (r *SearchReconciler) createAPIDeployment(request reconcile.Request,
 }
 
 func (r *SearchReconciler) APIDeployment(instance *searchv1alpha1.Search) *appsv1.Deployment {
-
-	image_sha := os.Getenv("API_IMAGE")
+	deploymentName := apiDeploymentName
+	image_sha := getImageSha(deploymentName, instance)
 	log.V(2).Info("Using api image ", image_sha)
-	deploymentLabels := generateLabels("name", apiName)
 
-	deployment := &appsv1.Deployment{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      apiName,
-			Namespace: instance.Namespace,
-		},
-		Spec: appsv1.DeploymentSpec{
-			Selector: &metav1.LabelSelector{
-				MatchLabels: deploymentLabels,
-			},
-			Template: corev1.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: deploymentLabels,
-				},
-			},
-		},
-	}
-	indexerContainer := corev1.Container{
-		Name:  apiName,
+	deployment := getDeployment(deploymentName, instance)
+	apiContainer := corev1.Container{
+		Name:  deploymentName,
 		Image: image_sha,
 		Env: []corev1.EnvVar{
 			newSecretEnvVar("DB_USER", "database-user", "search-postgres"),
@@ -79,12 +58,6 @@ func (r *SearchReconciler) APIDeployment(instance *searchv1alpha1.Search) *appsv
 			{
 				Name:      "search-api-certs",
 				MountPath: "/sslcert",
-			},
-		},
-		Resources: corev1.ResourceRequirements{
-			Requests: corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("20m"),
-				corev1.ResourceMemory: resource.MustParse("100Mi"),
 			},
 		},
 		ReadinessProbe: &corev1.Probe{
@@ -110,7 +83,7 @@ func (r *SearchReconciler) APIDeployment(instance *searchv1alpha1.Search) *appsv
 			},
 		},
 	}
-
+	apiContainer.Resources = getResourceRequirements(apiDeploymentName, instance)
 	volumes := []corev1.Volume{
 		{
 			Name: "search-api-certs",
@@ -121,12 +94,14 @@ func (r *SearchReconciler) APIDeployment(instance *searchv1alpha1.Search) *appsv
 			},
 		},
 	}
-	var replicas int32 = 1
-	deployment.Spec.Replicas = &replicas
+	apiContainer.ImagePullPolicy = getImagePullPolicy(deploymentName, instance)
+	deployment.Spec.Replicas = getReplicaCount(deploymentName, instance)
 
-	deployment.Spec.Template.Spec.Containers = []corev1.Container{indexerContainer}
+	deployment.Spec.Template.Spec.Containers = []corev1.Container{apiContainer}
 	deployment.Spec.Template.Spec.Volumes = volumes
 	deployment.Spec.Template.Spec.ServiceAccountName = getServiceAccountName()
+	deployment.Spec.Template.Spec.ImagePullSecrets = getImagePullSecret(deploymentName, instance)
+
 	err := controllerutil.SetControllerReference(instance, deployment, r.Scheme)
 	if err != nil {
 		log.V(2).Info("Could not set control for search-api deployment")

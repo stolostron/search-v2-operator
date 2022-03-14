@@ -218,6 +218,7 @@ spec:
                         type: object
                       replicaCount:
                         description: Number of pod instances for deployment
+                        format: int32
                         type: integer
                       resources:
                         description: Compute Resources required by deployment
@@ -272,6 +273,7 @@ spec:
                         type: object
                       replicaCount:
                         description: Number of pod instances for deployment
+                        format: int32
                         type: integer
                       resources:
                         description: Compute Resources required by deployment
@@ -326,6 +328,7 @@ spec:
                         type: object
                       replicaCount:
                         description: Number of pod instances for deployment
+                        format: int32
                         type: integer
                       resources:
                         description: Compute Resources required by deployment
@@ -380,6 +383,7 @@ spec:
                         type: object
                       replicaCount:
                         description: Number of pod instances for deployment
+                        format: int32
                         type: integer
                       resources:
                         description: Compute Resources required by deployment
@@ -434,6 +438,7 @@ spec:
                         type: object
                       replicaCount:
                         description: Number of pod instances for deployment
+                        format: int32
                         type: integer
                       resources:
                         description: Compute Resources required by deployment

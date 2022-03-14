@@ -50,7 +50,7 @@ func (r *SearchReconciler) SearchServiceAccount(instance *searchv1alpha1.Search)
 			Namespace: instance.GetNamespace(),
 		},
 		ImagePullSecrets: []corev1.LocalObjectReference{{
-			Name: getImagePullSecret(),
+			Name: getImagePullSecretName(),
 		}},
 	}
 

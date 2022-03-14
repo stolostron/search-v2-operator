@@ -86,7 +86,7 @@ type SearchDeployments struct {
 type DeploymentConfig struct {
 	// +optional
 	// Number of pod instances for deployment
-	ReplicaCount int `json:"replicaCount,omitempty"`
+	ReplicaCount int32 `json:"replicaCount,omitempty"`
 
 	// +optional
 	// Compute Resources required by deployment
