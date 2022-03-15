@@ -2,42 +2,12 @@
 package controllers
 
 import (
-	"context"
-
 	searchv1alpha1 "github.com/stolostron/search-v2-operator/api/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
-
-func (r *SearchReconciler) createAPIService(request reconcile.Request,
-	service *corev1.Service,
-	instance *searchv1alpha1.Search,
-) (*reconcile.Result, error) {
-	return r.createOrUpdateService(context.TODO(), service)
-	/*
-		found := &corev1.Service{}
-		err := r.Get(context.TODO(), types.NamespacedName{
-			Name:      "search-search-api",
-			Namespace: instance.Namespace,
-		}, found)
-		if err != nil && errors.IsNotFound(err) {
-			err = r.Create(context.TODO(), service)
-			if err != nil {
-				log.Error(err, "Could not create search-search-api service")
-				return &reconcile.Result{}, err
-			}
-		}
-		if err := r.Update(context.TODO(), service); err != nil {
-			log.Error(err, "Could not update %s service", "search-search-api")
-			return &reconcile.Result{}, err
-		}
-		log.V(2).Info("Created %s service", "search-search-api")
-		return nil, nil
-	*/
-}
 
 func (r *SearchReconciler) APIService(instance *searchv1alpha1.Search) *corev1.Service {
 

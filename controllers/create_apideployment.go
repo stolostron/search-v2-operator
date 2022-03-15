@@ -2,40 +2,20 @@
 package controllers
 
 import (
-	"context"
-
 	searchv1alpha1 "github.com/stolostron/search-v2-operator/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
-func (r *SearchReconciler) createAPIDeployment(request reconcile.Request,
+/*func (r *SearchReconciler) createAPIDeployment(request reconcile.Request,
 	deploy *appsv1.Deployment,
 	instance *searchv1alpha1.Search,
 ) (*reconcile.Result, error) {
 	return r.createOrUpdateDeployment(context.TODO(), deploy)
-	/*found := &appsv1.Deployment{}
-	err := r.Get(context.TODO(), types.NamespacedName{
-		Name:      deploy.Name,
-		Namespace: request.Namespace,
-	}, found)
-	if err != nil && errors.IsNotFound(err) {
-		err = r.Create(context.TODO(), deploy)
-		if err != nil {
-			log.Error(err, "Could not create %s deployment", deploy.Name)
-			return &reconcile.Result{}, err
-		}
-	}
-	if err := r.Update(context.TODO(), deploy); err != nil {
-		log.Error(err, "Could not update %s deployment", deploy.Name)
-		return &reconcile.Result{}, err
-	}
-	log.V(2).Info("Created %s deployment", deploy.Name)
-	return nil, nil*/
-}
+
+}*/
 
 func (r *SearchReconciler) APIDeployment(instance *searchv1alpha1.Search) *appsv1.Deployment {
 	deploymentName := apiDeploymentName

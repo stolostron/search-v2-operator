@@ -2,41 +2,11 @@
 package controllers
 
 import (
-	"context"
-
 	searchv1alpha1 "github.com/stolostron/search-v2-operator/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
-
-func (r *SearchReconciler) createCollectorDeployment(request reconcile.Request,
-	deploy *appsv1.Deployment,
-	instance *searchv1alpha1.Search,
-) (*reconcile.Result, error) {
-	return r.createOrUpdateDeployment(context.TODO(), deploy)
-	/*found := &appsv1.Deployment{}
-	err := r.Get(context.TODO(), types.NamespacedName{
-		Name:      deploy.Name,
-		Namespace: request.Namespace,
-	}, found)
-	if err != nil && errors.IsNotFound(err) {
-
-		err = r.Create(context.TODO(), deploy)
-		if err != nil {
-			log.Error(err, "Could not create %s deployment", deploy.Name)
-			return &reconcile.Result{}, err
-		} else {
-			return nil, nil
-		}
-	} else if err != nil {
-		return &reconcile.Result{}, err
-	}
-
-	return nil, nil
-	*/
-}
 
 func (r *SearchReconciler) CollectorDeployment(instance *searchv1alpha1.Search) *appsv1.Deployment {
 	deploymentName := collectorDeploymentName

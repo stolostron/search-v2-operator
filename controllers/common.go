@@ -161,8 +161,8 @@ func getResourceRequirements(deploymentName string, instance *searchv1alpha1.Sea
 
 func getRequests(deployment string, instance *searchv1alpha1.Search) corev1.ResourceList {
 	var cpu, memory resource.Quantity
-	cpu = resource.MustParse(resoureMap[deployment]["CPURequest"])
-	memory = resource.MustParse(resoureMap[deployment]["MemoryRequest"])
+	cpu = resource.MustParse(defaultResoureMap[deployment]["CPURequest"])
+	memory = resource.MustParse(defaultResoureMap[deployment]["MemoryRequest"])
 	if !isResourcesCustomized(deployment, instance) {
 		return corev1.ResourceList{
 			corev1.ResourceCPU:    cpu,
@@ -194,11 +194,9 @@ func getRequests(deployment string, instance *searchv1alpha1.Search) corev1.Reso
 		}
 
 	case postgresDeploymentName:
-		cpu = resource.MustParse(resoureMap[postgresDeploymentName]["CPURequest"])
 		if instance.Spec.Deployments.Database.Resources.Requests.Cpu() != nil {
 			cpu = *instance.Spec.Deployments.Database.Resources.Requests.Cpu()
 		}
-		memory = resource.MustParse(resoureMap[postgresDeploymentName]["MemoryRequest"])
 		if instance.Spec.Deployments.Database.Resources.Requests.Memory() != nil {
 			memory = *instance.Spec.Deployments.Database.Resources.Requests.Memory()
 		}
@@ -212,7 +210,7 @@ func getRequests(deployment string, instance *searchv1alpha1.Search) corev1.Reso
 
 func getLimits(deployment string, instance *searchv1alpha1.Search) corev1.ResourceList {
 	var cpu, memory resource.Quantity
-	memory = resource.MustParse(resoureMap[deployment]["MemoryLimit"])
+	memory = resource.MustParse(defaultResoureMap[deployment]["MemoryLimit"])
 	if !isResourcesCustomized(deployment, instance) {
 		return corev1.ResourceList{
 			corev1.ResourceMemory: memory,
@@ -261,9 +259,14 @@ func getLimits(deployment string, instance *searchv1alpha1.Search) corev1.Resour
 }
 
 func getReplicaCount(deploymentName string, instance *searchv1alpha1.Search) *int32 {
+
 	count := int32(1)
+	if c, ok := defaultReplicaMap[deploymentName]; ok {
+		count = c
+	}
 	switch deploymentName {
 	case apiDeploymentName:
+
 		if instance.Spec.Deployments.API.ReplicaCount != 0 {
 			count = instance.Spec.Deployments.API.ReplicaCount
 		}

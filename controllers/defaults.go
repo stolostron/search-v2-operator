@@ -24,7 +24,8 @@ const (
 	default_Postgres_Replicas  = 1
 )
 
-var resoureMap map[string]map[string]string
+var defaultResoureMap map[string]map[string]string
+var defaultReplicaMap map[string]int32
 
 func init() {
 	log.Info("Initializing default values")
@@ -48,10 +49,16 @@ func init() {
 		"MemoryLimit":   default_Postgres_MemoryLimit,
 		"MemoryRequest": default_Postgres_MemoryRequest,
 	}
-	resoureMap = map[string]map[string]string{
+	defaultResoureMap = map[string]map[string]string{
 		apiDeploymentName:       apiResourceMap,
 		collectorDeploymentName: collectorResourceMap,
 		indexerDeploymentName:   indexerResourceMap,
 		postgresDeploymentName:  postgresResourceMap,
+	}
+	defaultReplicaMap = map[string]int32{
+		apiDeploymentName:       default_API_Replicas,
+		collectorDeploymentName: default_Collector_Replicas,
+		indexerDeploymentName:   default_Indexer_Replicas,
+		postgresDeploymentName:  default_Postgres_Replicas,
 	}
 }

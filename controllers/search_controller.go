@@ -76,53 +76,53 @@ func (r *SearchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		log.Error(err, "ClusterRoleBinding  setup failed")
 		return *result, err
 	}
-
-	result, err = r.createPGSecret(req, r.PGSecret(instance), instance)
+	result, err = r.createOrUpdateSecret(ctx, r.PGSecret(instance))
 	if result != nil {
 		log.Error(err, "Postgres Secret  setup failed")
 		return *result, err
 	}
-	result, err = r.createPGService(req, r.PGService(instance), instance)
+	result, err = r.createOrUpdateService(ctx, r.PGService(instance))
 	if result != nil {
 		log.Error(err, "Postgres Service  setup failed")
 		return *result, err
 	}
-	result, err = r.createPGDeployment(req, r.PGDeployment(instance), instance)
+	result, err = r.createOrUpdateDeployment(ctx, r.PGDeployment(instance))
 	if result != nil {
 		log.Error(err, "Postgres Deployment  setup failed")
 		return *result, err
 	}
-	result, err = r.createIndexerService(req, r.IndexerService(instance), instance)
+
+	result, err = r.createOrUpdateService(ctx, r.IndexerService(instance))
 	if result != nil {
 		log.Error(err, "Indexer Service  setup failed")
 		return *result, err
 	}
-	result, err = r.createAPIService(req, r.APIService(instance), instance)
+	result, err = r.createOrUpdateService(ctx, r.APIService(instance))
 	if result != nil {
 		log.Error(err, "API Service  setup failed")
 		return *result, err
 	}
-	result, err = r.createCollectorDeployment(req, r.CollectorDeployment(instance), instance)
+	result, err = r.createOrUpdateDeployment(ctx, r.CollectorDeployment(instance))
 	if result != nil {
 		log.Error(err, "Collector Deployment  setup failed")
 		return *result, err
 	}
-	result, err = r.createIndexerDeployment(req, r.IndexerDeployment(instance), instance)
+	result, err = r.createOrUpdateDeployment(ctx, r.IndexerDeployment(instance))
 	if result != nil {
 		log.Error(err, "Indexer Deployment  setup failed")
 		return *result, err
 	}
-	result, err = r.createAPIDeployment(req, r.APIDeployment(instance), instance)
+	result, err = r.createOrUpdateDeployment(ctx, r.APIDeployment(instance))
 	if result != nil {
 		log.Error(err, "API Deployment  setup failed")
 		return *result, err
 	}
-	result, err = r.createIndexerConfigmap(req, r.IndexerConfigmap(instance), instance)
+	result, err = r.createOrUpdateConfigMap(ctx, r.IndexerConfigmap(instance))
 	if result != nil {
 		log.Error(err, "Indexer configmap  setup failed")
 		return *result, err
 	}
-	result, err = r.createSearchCACert(req, r.SearchCACert(instance), instance)
+	result, err = r.createOrUpdateConfigMap(ctx, r.SearchCACert(instance))
 	if result != nil {
 		log.Error(err, "Search CACert  setup failed")
 		return *result, err
