@@ -25,13 +25,9 @@ func (r *SearchReconciler) createRoles(request reconcile.Request,
 	if err != nil && errors.IsNotFound(err) {
 		err = r.Create(context.TODO(), crole)
 		if err != nil {
-			log.Error(err, "Could not create %s clusterrole", crole.Name)
+			log.Error(err, "Could not create clusterrole")
 			return &reconcile.Result{}, err
 		}
-	}
-	if err := r.Update(context.TODO(), crole); err != nil {
-		log.Error(err, "Could not update %s clusterrole", crole.Name)
-		return &reconcile.Result{}, err
 	}
 	log.V(2).Info("Created %s clusterrole", crole.Name)
 	return nil, nil
@@ -50,13 +46,9 @@ func (r *SearchReconciler) createRoleBinding(request reconcile.Request,
 	if err != nil && errors.IsNotFound(err) {
 		err = r.Create(context.TODO(), rolebinding)
 		if err != nil {
-			log.Error(err, "Could not create %s clusterrolebinding", rolebinding.Name)
+			log.Error(err, "Could not create clusterrolebinding")
 			return &reconcile.Result{}, err
 		}
-	}
-	if err := r.Update(context.TODO(), rolebinding); err != nil {
-		log.Error(err, "Could not update %s clusterrolebinding", rolebinding.Name)
-		return &reconcile.Result{}, err
 	}
 	log.V(2).Info("Created %s clusterrolebinding", rolebinding.Name)
 	return nil, nil

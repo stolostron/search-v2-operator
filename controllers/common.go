@@ -370,13 +370,9 @@ func (r *SearchReconciler) createOrUpdateConfigMap(ctx context.Context, cm *core
 	if err != nil && errors.IsNotFound(err) {
 		err = r.Create(context.TODO(), cm)
 		if err != nil {
-			log.Error(err, "Could not create %s configmap", cm.Name)
+			log.Error(err, "Could not create configmap")
 			return &reconcile.Result{}, err
 		}
-	}
-	if err := r.Update(context.TODO(), cm); err != nil {
-		log.Error(err, "Could not update %s configmap", cm.Name)
-		return &reconcile.Result{}, err
 	}
 	log.V(2).Info("Created %s configmap", cm.Name)
 	return nil, nil
@@ -391,12 +387,12 @@ func (r *SearchReconciler) createOrUpdateDeployment(ctx context.Context, deploy 
 	if err != nil && errors.IsNotFound(err) {
 		err = r.Create(context.TODO(), deploy)
 		if err != nil {
-			log.Error(err, "Could not create %s deployment", deploy.Name)
+			log.Error(err, "Could not create deployment")
 			return &reconcile.Result{}, err
 		}
 	}
 	if err := r.Update(context.TODO(), deploy); err != nil {
-		log.Error(err, "Could not update %s deployment", deploy.Name)
+		log.Error(err, "Could not update deployment")
 		return &reconcile.Result{}, err
 	}
 	log.V(2).Info("Created %s deployment", deploy.Name)
@@ -412,13 +408,9 @@ func (r *SearchReconciler) createOrUpdateService(ctx context.Context, svc *corev
 	if err != nil && errors.IsNotFound(err) {
 		err = r.Create(context.TODO(), svc)
 		if err != nil {
-			log.Error(err, "Could not create %s service", svc.Name)
+			log.Error(err, "Could not create service")
 			return &reconcile.Result{}, err
 		}
-	}
-	if err := r.Update(context.TODO(), svc); err != nil {
-		log.Error(err, "Could not update %s service", svc.Name)
-		return &reconcile.Result{}, err
 	}
 	log.V(2).Info("Created %s service", svc.Name)
 	return nil, nil
@@ -433,13 +425,9 @@ func (r *SearchReconciler) createOrUpdateSecret(ctx context.Context, secret *cor
 	if err != nil && errors.IsNotFound(err) {
 		err = r.Create(context.TODO(), secret)
 		if err != nil {
-			log.Error(err, "Could not create %s secret", secret.Name)
+			log.Error(err, "Could not create secret")
 			return &reconcile.Result{}, err
 		}
-	}
-	if err := r.Update(context.TODO(), secret); err != nil {
-		log.Error(err, "Could not update %s secret", secret.Name)
-		return &reconcile.Result{}, err
 	}
 	log.V(2).Info("Created %s secret", secret.Name)
 	return nil, nil

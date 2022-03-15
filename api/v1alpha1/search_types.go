@@ -92,6 +92,7 @@ type DeploymentConfig struct {
 	// Compute Resources required by deployment
 	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
 
+	// +optional
 	//Image_override
 	ImageOverride string `json:"imageOverride,omitempty"`
 

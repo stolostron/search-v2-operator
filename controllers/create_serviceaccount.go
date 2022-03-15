@@ -26,13 +26,9 @@ func (r *SearchReconciler) createSearchServiceAccount(request reconcile.Request,
 	if err != nil && errors.IsNotFound(err) {
 		err = r.Create(context.TODO(), sa)
 		if err != nil {
-			log.Error(err, "Could not create %s serviceaccount", sa.Name)
+			log.Error(err, "Could not create serviceaccount")
 			return &reconcile.Result{}, err
 		}
-	}
-	if err := r.Update(context.TODO(), sa); err != nil {
-		log.Error(err, "Could not update %s serviceaccount", sa.Name)
-		return &reconcile.Result{}, err
 	}
 	log.V(2).Info("Created %s serviceaccount", sa.Name)
 	return nil, nil
