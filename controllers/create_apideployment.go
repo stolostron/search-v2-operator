@@ -9,14 +9,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
-/*func (r *SearchReconciler) createAPIDeployment(request reconcile.Request,
-	deploy *appsv1.Deployment,
-	instance *searchv1alpha1.Search,
-) (*reconcile.Result, error) {
-	return r.createOrUpdateDeployment(context.TODO(), deploy)
-
-}*/
-
 func (r *SearchReconciler) APIDeployment(instance *searchv1alpha1.Search) *appsv1.Deployment {
 	deploymentName := apiDeploymentName
 	image_sha := getImageSha(deploymentName, instance)
