@@ -210,32 +210,14 @@ func getImageSha(deploymentName string, instance *searchv1alpha1.Search) string 
 
 func hasDeployments(instance *searchv1alpha1.Search) bool {
 	return instance.Spec.Deployments.DeepCopy() != nil
-
 }
 
 func isDeploymentCustomized(deploymentName string, instance *searchv1alpha1.Search) bool {
 	if !hasDeployments(instance) {
 		return false
 	}
-	switch deploymentName {
-	case apiDeploymentName:
-		if instance.Spec.Deployments.API.DeepCopy() != nil {
-			return true
-		}
-	case collectorDeploymentName:
-		if instance.Spec.Deployments.Collector.DeepCopy() != nil {
-			return true
-		}
-	case indexerDeploymentName:
-		if instance.Spec.Deployments.Indexer.DeepCopy() != nil {
-			return true
-		}
-	case postgresDeploymentName:
-		if instance.Spec.Deployments.Database.DeepCopy() != nil {
-			return true
-		}
-	}
-	return false
+	deploymentConfig := getDeploymentConfig(deploymentName, instance)
+	return deploymentConfig.DeepCopy() != nil
 }
 
 func isResourcesCustomized(deploymentName string, instance *searchv1alpha1.Search) bool {
