@@ -18,7 +18,7 @@ const (
 	default_Postgres_MemoryLimit   = "4Gi"
 	default_Postgres_MemoryRequest = "128Mi"
 
-	default_API_Replicas       = 2
+	default_API_Replicas       = 1
 	default_Indexer_Replicas   = 1
 	default_Collector_Replicas = 1
 	default_Postgres_Replicas  = 1

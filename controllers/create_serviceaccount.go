@@ -13,18 +13,17 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
-func (r *SearchReconciler) createSearchServiceAccount(request reconcile.Request,
+func (r *SearchReconciler) createSearchServiceAccount(ctx context.Context,
 	sa *corev1.ServiceAccount,
-	instance *searchv1alpha1.Search,
 ) (*reconcile.Result, error) {
 
 	found := &corev1.ServiceAccount{}
-	err := r.Get(context.TODO(), types.NamespacedName{
+	err := r.Get(ctx, types.NamespacedName{
 		Name:      sa.Name,
 		Namespace: sa.Namespace,
 	}, found)
 	if err != nil && errors.IsNotFound(err) {
-		err = r.Create(context.TODO(), sa)
+		err = r.Create(ctx, sa)
 		if err != nil {
 			log.Error(err, "Could not create serviceaccount")
 			return &reconcile.Result{}, err

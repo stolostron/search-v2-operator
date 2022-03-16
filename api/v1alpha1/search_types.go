@@ -85,6 +85,7 @@ type SearchDeployments struct {
 
 type DeploymentConfig struct {
 	// +optional
+	// +kubebuilder:validation:Minimum:=0
 	// Number of pod instances for deployment
 	ReplicaCount int32 `json:"replicaCount,omitempty"`
 
