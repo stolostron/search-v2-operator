@@ -20,6 +20,8 @@ import (
 	"context"
 
 	searchv1alpha1 "github.com/stolostron/search-v2-operator/api/v1alpha1"
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -52,75 +54,75 @@ var log = logf.Log.WithName("searchoperator")
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.10.0/pkg/reconcile
 func (r *SearchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	instance := &searchv1alpha1.Search{}
-	err := r.Client.Get(context.TODO(), types.NamespacedName{Name: "search-v2-operator", Namespace: req.Namespace}, instance)
+	err := r.Client.Get(ctx, types.NamespacedName{Name: "search-v2-operator", Namespace: req.Namespace}, instance)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			return reconcile.Result{}, nil
 		}
 		return reconcile.Result{}, err
 	}
-	result, err := r.createSearchServiceAccount(req, r.SearchServiceAccount(instance), instance)
+	result, err := r.createSearchServiceAccount(ctx, r.SearchServiceAccount(instance))
 	if result != nil {
 		log.Error(err, "SearchServiceAccount  setup failed")
 		return *result, err
 	}
-	result, err = r.createRoles(req, r.ClusterRole(instance), instance)
+	result, err = r.createRoles(ctx, r.ClusterRole(instance))
 	if result != nil {
 		log.Error(err, "ClusterRole  setup failed")
 		return *result, err
 	}
-	result, err = r.createRoleBinding(req, r.ClusterRoleBinding(instance), instance)
+	result, err = r.createRoleBinding(ctx, r.ClusterRoleBinding(instance))
 	if result != nil {
 		log.Error(err, "ClusterRoleBinding  setup failed")
 		return *result, err
 	}
-
-	result, err = r.createPGSecret(req, r.PGSecret(instance), instance)
+	result, err = r.createSecret(ctx, r.PGSecret(instance))
 	if result != nil {
 		log.Error(err, "Postgres Secret  setup failed")
 		return *result, err
 	}
-	result, err = r.createPGService(req, r.PGService(instance), instance)
+	result, err = r.createOrUpdateService(ctx, r.PGService(instance))
 	if result != nil {
 		log.Error(err, "Postgres Service  setup failed")
 		return *result, err
 	}
-	result, err = r.createPGDeployment(req, r.PGDeployment(instance), instance)
+	result, err = r.createOrUpdateDeployment(ctx, r.PGDeployment(instance))
 	if result != nil {
 		log.Error(err, "Postgres Deployment  setup failed")
 		return *result, err
 	}
-	result, err = r.createIndexerService(req, r.IndexerService(instance), instance)
+
+	result, err = r.createOrUpdateService(ctx, r.IndexerService(instance))
 	if result != nil {
 		log.Error(err, "Indexer Service  setup failed")
 		return *result, err
 	}
-	result, err = r.createAPIService(req, r.APIService(instance), instance)
+	result, err = r.createOrUpdateService(ctx, r.APIService(instance))
 	if result != nil {
 		log.Error(err, "API Service  setup failed")
 		return *result, err
 	}
-	result, err = r.createCollectorDeployment(req, r.CollectorDeployment(instance), instance)
+	result, err = r.createOrUpdateDeployment(ctx, r.CollectorDeployment(instance))
 	if result != nil {
 		log.Error(err, "Collector Deployment  setup failed")
 		return *result, err
 	}
-	result, err = r.createIndexerDeployment(req, r.IndexerDeployment(instance), instance)
+	result, err = r.createOrUpdateDeployment(ctx, r.IndexerDeployment(instance))
 	if result != nil {
 		log.Error(err, "Indexer Deployment  setup failed")
 		return *result, err
 	}
-	result, err = r.createAPIDeployment(req, r.APIDeployment(instance), instance)
+	result, err = r.createOrUpdateDeployment(ctx, r.APIDeployment(instance))
 	if result != nil {
 		log.Error(err, "API Deployment  setup failed")
 		return *result, err
 	}
-	result, err = r.createIndexerConfigmap(req, r.IndexerConfigmap(instance), instance)
+	result, err = r.createConfigMap(ctx, r.IndexerConfigmap(instance))
 	if result != nil {
 		log.Error(err, "Indexer configmap  setup failed")
 		return *result, err
 	}
-	result, err = r.createSearchCACert(req, r.SearchCACert(instance), instance)
+	result, err = r.createConfigMap(ctx, r.SearchCACert(instance))
 	if result != nil {
 		log.Error(err, "Search CACert  setup failed")
 		return *result, err
@@ -133,5 +135,9 @@ func (r *SearchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 func (r *SearchReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&searchv1alpha1.Search{}).
+		Owns(&appsv1.Deployment{}).
+		Owns(&corev1.ConfigMap{}).
+		Owns(&corev1.Secret{}).
+		Owns(&corev1.Service{}).
 		Complete(r)
 }

@@ -13,28 +13,23 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
-func (r *SearchReconciler) createSearchServiceAccount(request reconcile.Request,
+func (r *SearchReconciler) createSearchServiceAccount(ctx context.Context,
 	sa *corev1.ServiceAccount,
-	instance *searchv1alpha1.Search,
 ) (*reconcile.Result, error) {
 
 	found := &corev1.ServiceAccount{}
-	err := r.Get(context.TODO(), types.NamespacedName{
+	err := r.Get(ctx, types.NamespacedName{
 		Name:      sa.Name,
-		Namespace: instance.Namespace,
+		Namespace: sa.Namespace,
 	}, found)
 	if err != nil && errors.IsNotFound(err) {
-
-		err = r.Create(context.TODO(), sa)
+		err = r.Create(ctx, sa)
 		if err != nil {
+			log.Error(err, "Could not create serviceaccount")
 			return &reconcile.Result{}, err
-		} else {
-			return nil, nil
 		}
-	} else if err != nil {
-		return &reconcile.Result{}, err
 	}
-
+	log.V(2).Info("Created %s serviceaccount", sa.Name)
 	return nil, nil
 }
 
@@ -50,7 +45,7 @@ func (r *SearchReconciler) SearchServiceAccount(instance *searchv1alpha1.Search)
 			Namespace: instance.GetNamespace(),
 		},
 		ImagePullSecrets: []corev1.LocalObjectReference{{
-			Name: getImagePullSecret(),
+			Name: getImagePullSecretName(),
 		}},
 	}
 

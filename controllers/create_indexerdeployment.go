@@ -2,72 +2,21 @@
 package controllers
 
 import (
-	"context"
-	"os"
-
 	searchv1alpha1 "github.com/stolostron/search-v2-operator/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/resource"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
-const indexerName = "search-indexer"
-
-func (r *SearchReconciler) createIndexerDeployment(request reconcile.Request,
-	deploy *appsv1.Deployment,
-	instance *searchv1alpha1.Search,
-) (*reconcile.Result, error) {
-
-	found := &appsv1.Deployment{}
-	err := r.Get(context.TODO(), types.NamespacedName{
-		Name:      deploy.Name,
-		Namespace: request.Namespace,
-	}, found)
-	if err != nil && errors.IsNotFound(err) {
-
-		err = r.Create(context.TODO(), deploy)
-		if err != nil {
-			return &reconcile.Result{}, err
-		} else {
-			return nil, nil
-		}
-	} else if err != nil {
-		return &reconcile.Result{}, err
-	}
-
-	return nil, nil
-}
-
 func (r *SearchReconciler) IndexerDeployment(instance *searchv1alpha1.Search) *appsv1.Deployment {
-
-	image_sha := os.Getenv("INDEXER_IMAGE")
+	deploymentName := indexerDeploymentName
+	image_sha := getImageSha(deploymentName, instance)
 	log.V(2).Info("Using indexer image ", image_sha)
-	deploymentLabels := generateLabels("name", indexerName)
 
-	deployment := &appsv1.Deployment{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      indexerName,
-			Namespace: instance.Namespace,
-		},
-		Spec: appsv1.DeploymentSpec{
-			Selector: &metav1.LabelSelector{
-				MatchLabels: deploymentLabels,
-			},
-			Template: corev1.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: deploymentLabels,
-				},
-			},
-		},
-	}
+	deployment := getDeployment(deploymentName, instance)
 	indexerContainer := corev1.Container{
-		Name:  indexerName,
+		Name:  deploymentName,
 		Image: image_sha,
 		Env: []corev1.EnvVar{
 			newSecretEnvVar("DB_USER", "database-user", "search-postgres"),
@@ -79,12 +28,6 @@ func (r *SearchReconciler) IndexerDeployment(instance *searchv1alpha1.Search) *a
 			{
 				Name:      "search-indexer-certs",
 				MountPath: "/sslcert",
-			},
-		},
-		Resources: corev1.ResourceRequirements{
-			Requests: corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("20m"),
-				corev1.ResourceMemory: resource.MustParse("100Mi"),
 			},
 		},
 		ReadinessProbe: &corev1.Probe{
@@ -110,7 +53,7 @@ func (r *SearchReconciler) IndexerDeployment(instance *searchv1alpha1.Search) *a
 			},
 		},
 	}
-
+	indexerContainer.Resources = getResourceRequirements(deploymentName, instance)
 	volumes := []corev1.Volume{
 		{
 			Name: "search-indexer-certs",
@@ -121,13 +64,16 @@ func (r *SearchReconciler) IndexerDeployment(instance *searchv1alpha1.Search) *a
 			},
 		},
 	}
-	var replicas int32 = 1
-	deployment.Spec.Replicas = &replicas
+	indexerContainer.ImagePullPolicy = getImagePullPolicy(deploymentName, instance)
+	deployment.Spec.Replicas = getReplicaCount(deploymentName, instance)
 
 	deployment.Spec.Template.Spec.Containers = []corev1.Container{indexerContainer}
 	deployment.Spec.Template.Spec.Volumes = volumes
 	deployment.Spec.Template.Spec.ServiceAccountName = getServiceAccountName()
-
+	deployment.Spec.Template.Spec.ImagePullSecrets = getImagePullSecret(deploymentName, instance)
+	if getNodeSelector(deploymentName, instance) != nil {
+		deployment.Spec.Template.Spec.NodeSelector = getNodeSelector(deploymentName, instance)
+	}
 	err := controllerutil.SetControllerReference(instance, deployment, r.Scheme)
 	if err != nil {
 		log.V(2).Info("Could not set control for search-indexer deployment")

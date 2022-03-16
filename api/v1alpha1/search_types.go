@@ -85,13 +85,15 @@ type SearchDeployments struct {
 
 type DeploymentConfig struct {
 	// +optional
+	// +kubebuilder:validation:Minimum:=1
 	// Number of pod instances for deployment
-	ReplicaCount int `json:"replicaCount,omitempty"`
+	ReplicaCount int32 `json:"replicaCount,omitempty"`
 
 	// +optional
 	// Compute Resources required by deployment
 	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
 
+	// +optional
 	//Image_override
 	ImageOverride string `json:"imageOverride,omitempty"`
 

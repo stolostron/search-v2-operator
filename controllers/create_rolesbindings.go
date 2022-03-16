@@ -12,53 +12,45 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
-func (r *SearchReconciler) createRoles(request reconcile.Request,
-	role *rbacv1.ClusterRole,
-	instance *searchv1alpha1.Search,
+func (r *SearchReconciler) createRoles(ctx context.Context,
+	crole *rbacv1.ClusterRole,
 ) (*reconcile.Result, error) {
 
 	found := &rbacv1.ClusterRole{}
-	err := r.Get(context.TODO(), types.NamespacedName{
+	err := r.Get(ctx, types.NamespacedName{
 		Name:      getRoleName(),
-		Namespace: instance.Namespace,
+		Namespace: crole.Namespace,
 	}, found)
 	if err != nil && errors.IsNotFound(err) {
-
-		err = r.Create(context.TODO(), role)
+		err = r.Create(ctx, crole)
 		if err != nil {
+			log.Error(err, "Could not create clusterrole")
 			return &reconcile.Result{}, err
-		} else {
-			return nil, nil
 		}
-	} else if err != nil {
-		return &reconcile.Result{}, err
 	}
-
+	log.V(2).Info("Created %s clusterrole", crole.Name)
+	log.V(9).Info("Created  clusterrole %+v", crole)
 	return nil, nil
 }
 
-func (r *SearchReconciler) createRoleBinding(request reconcile.Request,
+func (r *SearchReconciler) createRoleBinding(ctx context.Context,
 	rolebinding *rbacv1.ClusterRoleBinding,
-	instance *searchv1alpha1.Search,
 ) (*reconcile.Result, error) {
 
 	found := &rbacv1.ClusterRoleBinding{}
-	err := r.Get(context.TODO(), types.NamespacedName{
+	err := r.Get(ctx, types.NamespacedName{
 		Name:      getRoleBindingName(),
-		Namespace: instance.Namespace,
+		Namespace: rolebinding.Namespace,
 	}, found)
 	if err != nil && errors.IsNotFound(err) {
-
-		err = r.Create(context.TODO(), rolebinding)
+		err = r.Create(ctx, rolebinding)
 		if err != nil {
+			log.Error(err, "Could not create clusterrolebinding")
 			return &reconcile.Result{}, err
-		} else {
-			return nil, nil
 		}
-	} else if err != nil {
-		return &reconcile.Result{}, err
 	}
-
+	log.V(2).Info("Created %s clusterrolebinding", rolebinding.Name)
+	log.V(2).Info("Created %s clusterrolebinding %+v", rolebinding)
 	return nil, nil
 }
 
