@@ -286,7 +286,7 @@ func (r *SearchReconciler) createOrUpdateDeployment(ctx context.Context, deploy 
 	return nil, nil
 }
 
-func (r *SearchReconciler) createOrUpdateService(ctx context.Context, svc *corev1.Service) (*reconcile.Result, error) {
+func (r *SearchReconciler) createService(ctx context.Context, svc *corev1.Service) (*reconcile.Result, error) {
 	found := &corev1.Service{}
 	err := r.Get(ctx, types.NamespacedName{
 		Name:      svc.Name,
@@ -303,12 +303,6 @@ func (r *SearchReconciler) createOrUpdateService(ctx context.Context, svc *corev
 			return nil, nil
 		}
 	}
-	if err := r.Update(ctx, svc); err != nil {
-		log.Error(err, "Could not update service")
-		return &reconcile.Result{}, err
-	}
-	log.V(2).Info("Updated %s service", svc.Name)
-	log.V(9).Info("Updated service %+v", svc)
 	return nil, nil
 }
 

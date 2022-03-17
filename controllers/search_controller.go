@@ -81,7 +81,7 @@ func (r *SearchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		log.Error(err, "Postgres Secret  setup failed")
 		return *result, err
 	}
-	result, err = r.createOrUpdateService(ctx, r.PGService(instance))
+	result, err = r.createService(ctx, r.PGService(instance))
 	if result != nil {
 		log.Error(err, "Postgres Service  setup failed")
 		return *result, err
@@ -92,12 +92,12 @@ func (r *SearchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return *result, err
 	}
 
-	result, err = r.createOrUpdateService(ctx, r.IndexerService(instance))
+	result, err = r.createService(ctx, r.IndexerService(instance))
 	if result != nil {
 		log.Error(err, "Indexer Service  setup failed")
 		return *result, err
 	}
-	result, err = r.createOrUpdateService(ctx, r.APIService(instance))
+	result, err = r.createService(ctx, r.APIService(instance))
 	if result != nil {
 		log.Error(err, "API Service  setup failed")
 		return *result, err
