@@ -152,11 +152,11 @@ func getLimits(deployment string, instance *searchv1alpha1.Search) corev1.Resour
 	}
 	deploymentConfig := getDeploymentConfig(deployment, instance)
 
-	if deploymentConfig.Resources.Requests.Cpu() != nil {
-		cpu = *deploymentConfig.Resources.Requests.Cpu()
+	if deploymentConfig.Resources.Limits.Cpu() != nil {
+		cpu = *deploymentConfig.Resources.Limits.Cpu()
 	}
-	if deploymentConfig.Resources.Requests.Memory() != nil {
-		memory = *deploymentConfig.Resources.Requests.Memory()
+	if deploymentConfig.Resources.Limits.Memory() != nil {
+		memory = *deploymentConfig.Resources.Limits.Memory()
 	}
 	if cpu.String() == "<nil>" {
 		return corev1.ResourceList{
