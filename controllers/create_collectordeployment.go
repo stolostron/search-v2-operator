@@ -21,6 +21,7 @@ func (r *SearchReconciler) CollectorDeployment(instance *searchv1alpha1.Search) 
 			newEnvVar("DEPLOYED_IN_HUB", "true"),
 			newEnvVar("CLUSTER_NAME", "local-cluster"),
 			newEnvVar("AGGREGATOR_URL", "https://search-indexer."+instance.Namespace+".svc:3010"),
+			newEnvVar("POD_NAMESPACE", instance.Namespace),
 		},
 		VolumeMounts: []corev1.VolumeMount{
 			{
