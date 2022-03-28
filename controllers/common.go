@@ -274,7 +274,7 @@ func (r *SearchReconciler) createOrUpdateDeployment(ctx context.Context, deploy 
 				log.Error(err, "Could not create deployment")
 				return &reconcile.Result{}, err
 			}
-			log.V(2).Info("Created %s deployment", deploy.Name)
+			log.Info("Created %s deployment", deploy.Name)
 			log.V(9).Info("Created deployment %+v", deploy)
 			return nil, nil
 		}
@@ -286,7 +286,7 @@ func (r *SearchReconciler) createOrUpdateDeployment(ctx context.Context, deploy 
 			log.Error(err, "Could not update deployment")
 			return nil, nil
 		}
-		log.V(2).Info("Updated %s deployment ", deploy.Name)
+		log.Info("Updated %s deployment ", deploy.Name)
 		log.V(9).Info("Updated deployment %+v", deploy)
 	}
 	return nil, nil
@@ -305,7 +305,7 @@ func (r *SearchReconciler) createService(ctx context.Context, svc *corev1.Servic
 				log.Error(err, "Could not create service")
 				return &reconcile.Result{}, err
 			}
-			log.V(2).Info("Created %s service", svc.Name)
+			log.Info("Created %s service", svc.Name)
 			log.V(9).Info("Created service %+v", svc)
 			return nil, nil
 		}
@@ -328,8 +328,7 @@ func (r *SearchReconciler) createSecret(ctx context.Context, secret *corev1.Secr
 				log.Error(err, "Could not create secret")
 				return &reconcile.Result{}, err
 			}
-			log.V(2).Info("Created %s secret", secret.Name)
-			log.V(9).Info("Created secret %+v", secret)
+			log.Info("Created %s secret", secret.Name)
 			return nil, nil
 		}
 		log.Error(err, "Could not get secret")
