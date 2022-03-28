@@ -8,6 +8,7 @@ import (
 	searchv1alpha1 "github.com/stolostron/search-v2-operator/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -266,23 +267,28 @@ func (r *SearchReconciler) createOrUpdateDeployment(ctx context.Context, deploy 
 		Name:      deploy.Name,
 		Namespace: deploy.Namespace,
 	}, found)
-	if err != nil && errors.IsNotFound(err) {
-		err = r.Create(ctx, deploy)
-		if err != nil {
-			log.Error(err, "Could not create deployment")
-			return &reconcile.Result{}, err
-		} else {
+	if err != nil {
+		if errors.IsNotFound(err) {
+			err = r.Create(ctx, deploy)
+			if err != nil {
+				log.Error(err, "Could not create deployment")
+				return &reconcile.Result{}, err
+			}
 			log.V(2).Info("Created %s deployment", deploy.Name)
 			log.V(9).Info("Created deployment %+v", deploy)
 			return nil, nil
 		}
-	}
-	if err := r.Update(ctx, deploy); err != nil {
-		log.Error(err, "Could not update deployment")
+		log.Error(err, "Could not get deployment")
 		return &reconcile.Result{}, err
 	}
-	log.V(2).Info("Updated %s deployment", deploy.Name)
-	log.V(9).Info("Updated deployment %+v", deploy)
+	if !DeploymentEquals(found, deploy) {
+		if err := r.Update(ctx, deploy); err != nil {
+			log.Error(err, "Could not update deployment")
+			return nil, nil
+		}
+		log.V(2).Info("Updated %s deployment ", deploy.Name)
+		log.V(9).Info("Updated deployment %+v", deploy)
+	}
 	return nil, nil
 }
 
@@ -292,16 +298,19 @@ func (r *SearchReconciler) createService(ctx context.Context, svc *corev1.Servic
 		Name:      svc.Name,
 		Namespace: svc.Namespace,
 	}, found)
-	if err != nil && errors.IsNotFound(err) {
-		err = r.Create(ctx, svc)
-		if err != nil {
-			log.Error(err, "Could not create service")
-			return &reconcile.Result{}, err
-		} else {
+	if err != nil {
+		if errors.IsNotFound(err) {
+			err = r.Create(ctx, svc)
+			if err != nil {
+				log.Error(err, "Could not create service")
+				return &reconcile.Result{}, err
+			}
 			log.V(2).Info("Created %s service", svc.Name)
 			log.V(9).Info("Created service %+v", svc)
 			return nil, nil
 		}
+		log.Error(err, "Could not get service")
+		return &reconcile.Result{}, err
 	}
 	return nil, nil
 }
@@ -312,14 +321,24 @@ func (r *SearchReconciler) createSecret(ctx context.Context, secret *corev1.Secr
 		Name:      secret.Name,
 		Namespace: secret.Namespace,
 	}, found)
-	if err != nil && errors.IsNotFound(err) {
-		err = r.Create(ctx, secret)
-		if err != nil {
-			log.Error(err, "Could not create secret")
-			return &reconcile.Result{}, err
+	if err != nil {
+		if errors.IsNotFound(err) {
+			err = r.Create(ctx, secret)
+			if err != nil {
+				log.Error(err, "Could not create secret")
+				return &reconcile.Result{}, err
+			}
+			log.V(2).Info("Created %s secret", secret.Name)
+			log.V(9).Info("Created secret %+v", secret)
+			return nil, nil
 		}
+		log.Error(err, "Could not get secret")
+		return &reconcile.Result{}, err
 	}
-	log.V(2).Info("Created %s secret", secret.Name)
-	log.V(9).Info("Created secret %+v", secret)
 	return nil, nil
+
+}
+
+func DeploymentEquals(current, new *appsv1.Deployment) bool {
+	return equality.Semantic.DeepEqual(current.Spec, new.Spec)
 }
