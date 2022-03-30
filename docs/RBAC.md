@@ -1,23 +1,26 @@
 # Role Based Access Control (RBAC)
 
-**IMPORTANT This document describes the desired imlpementation for Odessey (search v2) and it must be reviewed after completing the implementation.**
+**This document describes the desired imlpementation for Odessey (search v2) and it must be reviewed after completing the implementation.**
 
-The API must enforce that results only show resources that the user has been authorized to access.  We collect and index data using a service account with wide cluster access. The database contains all resources, when querying from the API we must match the permissions of the account used for the request.
+The API must enforce that results for each user only contain resources that they are authorized to access. The search service collects and index data using a service account with wide cluster access. The database contains all resources, when querying from the API we must filter the results to match the access of the user (or service account) making the request.
 
 ## Access to the search API
 <!-- NOTE this feature is new for V2 -->
 The API itself is protected by Kubernetes. Users must be given a role that allows access to search.
 [What are the default ACM roles? acm-viewer or acm-admin]
 
-## Enforcing RBAC on search results
+## Enforcing RBAC on results
 
-The search index collects data from the Hub and managed clusters. RBAC is enforced differently for these 2 types.
+The API will authenticate the user (or service account) and will impersonate the user to obtain their access rules.
 
-### A. RBAC for resources in the Hub
+RBAC is enforced differently for resources in the hub vs. managed clusters. Let's discuss both senarios separately.
 
-Users must see **exactly** the same resources they would see when using kubectl, oc cli, or the kubernetes API on the ACM Hub cluster. 
+### A. RBAC for resources in the Hub cluster
 
-> Use [SelfSubjectAccessReview API](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.23/#selfsubjectaccessreview-v1-authorization-k8s-io) to obtain the user's authorization rules for cluster-scoped resources.
+Users must see **exactly** the same resources they would see when using kubectl, oc cli, or the kubernetes API on the OpenShift cluster hosting the ACM Hub. 
+
+**Implementation details:**
+>Use [SelfSubjectAccessReview API](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.23/#selfsubjectaccessreview-v1-authorization-k8s-io) to obtain the user's authorization rules for cluster-scoped resources.
 > 
 > Use [SelfSubjectRulesReview API](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.23/#selfsubjectrulesreview-v1-authorization-k8s-io) to obtain the user's authorization rules for resources in a given namespace.
 >
@@ -35,8 +38,10 @@ Users must see **exactly** the same resources they would see when using kubectl,
 
 ### B. RBAC for resources in the managed clusters
 
-We will follow ACM capabilities for resources in managed clusters. Currently access is granted per cluster giving the user access to all resources in the cluster.
+We will match ACM capabilities for access to resources in managed clusters.
+As of ACM 2.5, access is granted per managed cluster which gives the user access to all resources in the cluster (except secrets).
 
+**Implementation details:**
 > Use `ManagedClusterInfo` api to get all the clusters visible to the user.
 >
 > Then we will use the [SelfSubjectRulesReview API](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.23/#selfsubjectrulesreview-v1-authorization-k8s-io) to find if the user is authorized to create the `ManagedClusterView` in the cluster's namespace.
