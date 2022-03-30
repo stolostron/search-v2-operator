@@ -15,7 +15,6 @@ import (
 func (r *SearchReconciler) createClusterManagementAddOn(ctx context.Context,
 	instance *searchv1alpha1.Search,
 ) (*reconcile.Result, error) {
-
 	found := &addonv1alpha1.ClusterManagementAddOn{}
 	err := r.Get(ctx, types.NamespacedName{
 		Name:      "search-collector",
@@ -29,6 +28,11 @@ func (r *SearchReconciler) createClusterManagementAddOn(ctx context.Context,
 			return &reconcile.Result{}, err
 		}
 		log.Info("Created %s ClusterManagementAddOn", cma.Name)
+		return nil, nil
+	}
+	if err != nil {
+		log.Error(err, "Error getting ClusterManagementAddOn")
+		return &reconcile.Result{}, err
 	}
 	return nil, nil
 }

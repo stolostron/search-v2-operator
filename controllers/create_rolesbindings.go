@@ -123,6 +123,11 @@ func getRules() []rbacv1.PolicyRule {
 			Verbs:     []string{"*"},
 		},
 		{
+			APIGroups: []string{"coordination.k8s.io"},
+			Resources: []string{"leases"},
+			Verbs:     []string{"create", "get", "list", "watch", "patch", "update"},
+		},
+		{
 			APIGroups: []string{"apps"},
 			Resources: []string{"deployments"},
 			Verbs:     []string{"*"},

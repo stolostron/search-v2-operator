@@ -39,7 +39,7 @@ var ChartFS embed.FS
 
 const ChartDir = "manifests/chart"
 
-var SearchCollectorImage string = os.Getenv("SEARCH_COLLECTOR_IMAGE_NAME")
+var SearchCollectorImage string = os.Getenv("COLLECTOR_IMAGE")
 
 type GlobalValues struct {
 	ImagePullPolicy corev1.PullPolicy `json:"imagePullPolicy,"`
