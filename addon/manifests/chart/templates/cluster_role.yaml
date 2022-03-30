@@ -1,0 +1,42 @@
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ .Values.org }}:{{ template "search.fullname" . }}
+  labels:
+    component: "search"
+rules:
+- apiGroups: ["*"]
+  resources: ["*"]
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  verbs:
+  - create
+- apiGroups:
+  - ""
+  resourceNames:
+  - search-collector-addon-lease.agent.open-cluster-management.io 
+  - search-collector*
+  resources:
+  - configmaps
+  verbs:
+  - patch
+  - update
+  - delete
+- apiGroups:
+  - coordination.k8s.io
+  resources:
+  - leases
+  verbs:
+  - get
+  - list
+  - patch
+  - update
+  - watch
+  - create

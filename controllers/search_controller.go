@@ -71,6 +71,16 @@ func (r *SearchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		log.Error(err, "ClusterRole  setup failed")
 		return *result, err
 	}
+	result, err = r.createRoles(ctx, r.AddonClusterRole(instance))
+	if result != nil {
+		log.Error(err, "AddonClusterRole  setup failed")
+		return *result, err
+	}
+	result, err = r.createClusterManagementAddOn(ctx, instance)
+	if result != nil {
+		log.Error(err, "ClusterManagementAddOn  setup failed")
+		return *result, err
+	}
 	result, err = r.createRoleBinding(ctx, r.ClusterRoleBinding(instance))
 	if result != nil {
 		log.Error(err, "ClusterRoleBinding  setup failed")

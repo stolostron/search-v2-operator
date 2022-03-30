@@ -73,6 +73,11 @@ func getRoleName() string {
 func getRoleBindingName() string {
 	return "search"
 }
+
+func getAddonRoleName() string {
+	return "open-cluster-management:addons:search-collector"
+}
+
 func getDeployment(deploymentName string, instance *searchv1alpha1.Search) *appsv1.Deployment {
 	deploymentLabels := generateLabels("name", deploymentName)
 	return &appsv1.Deployment{

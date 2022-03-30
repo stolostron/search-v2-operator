@@ -31,6 +31,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
+	"github.com/stolostron/search-v2-operator/addon"
 	searchv1alpha1 "github.com/stolostron/search-v2-operator/api/v1alpha1"
 	"github.com/stolostron/search-v2-operator/controllers"
 	//+kubebuilder:scaffold:imports
@@ -74,6 +75,7 @@ func main() {
 		Namespace:              os.Getenv("WATCH_NAMESPACE"),
 		LeaderElectionID:       "b648e39a.open-cluster-management.io",
 	})
+
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
 		os.Exit(1)
@@ -97,8 +99,23 @@ func main() {
 		os.Exit(1)
 	}
 
+	ctx := ctrl.SetupSignalHandler()
+
+	kubeConfig, err := ctrl.GetConfig()
+	if err != nil {
+		setupLog.Error(err, "unable to get kubeConfig", "controller", "SearchOperator")
+		os.Exit(1)
+	}
+	addonMgr, err := addon.NewAddonManager(kubeConfig)
+	if err != nil {
+		setupLog.Error(err, "unable to create a new  addon manager", "controller", "SearchOperator")
+	} else {
+		setupLog.Info("starting search addon manager")
+		go addonMgr.Start(ctx)
+	}
+
 	setupLog.Info("starting manager")
-	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
+	if err := mgr.Start(ctx); err != nil {
 		setupLog.Error(err, "problem running manager")
 		os.Exit(1)
 	}
