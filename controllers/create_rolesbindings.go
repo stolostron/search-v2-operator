@@ -27,9 +27,9 @@ func (r *SearchReconciler) createRoles(ctx context.Context,
 			log.Error(err, "Could not create clusterrole "+crole.Name)
 			return &reconcile.Result{}, err
 		}
+		log.Info("Created clusterrole" + crole.Name)
+		log.V(9).Info("Created  clusterrole %+v", crole)
 	}
-	log.Info("Created clusterrole" + crole.Name)
-	log.V(9).Info("Created  clusterrole %+v", crole)
 	return nil, nil
 }
 
@@ -48,9 +48,9 @@ func (r *SearchReconciler) createRoleBinding(ctx context.Context,
 			log.Error(err, "Could not create clusterrolebinding"+rolebinding.Name)
 			return &reconcile.Result{}, err
 		}
+		log.Info("Created clusterrolebinding" + rolebinding.Name)
+		log.V(2).Info("Created %s clusterrolebinding %+v", rolebinding)
 	}
-	log.Info("Created clusterrolebinding" + rolebinding.Name)
-	log.V(2).Info("Created %s clusterrolebinding %+v", rolebinding)
 	return nil, nil
 }
 
