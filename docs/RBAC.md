@@ -1,12 +1,13 @@
-# Enforcing RBAC by Oddysey (Search v2)
+# Role Based Access Control (RBAC)
 
-**IMPORTANT This document describes the desired imlpementation and it must be reviewed after completing the implementation.**
+**IMPORTANT This document describes the desired imlpementation for Odessey (search v2) and it must be reviewed after completing the implementation.**
 
 The API must enforce that results only show resources that the user has been authorized to access.  We collect and index data using a service account with wide cluster access. The database contains all resources, when querying from the API we must match the permissions of the account used for the request.
 
 ## Access to the search API
 <!-- NOTE this feature is new for V2 -->
-The search API itself is protected by Kubernetes. Users must be given a role that allows access to search.  [??? acm-viewer or acm-admin]
+The API itself is protected by Kubernetes. Users must be given a role that allows access to search.
+[What are the default ACM roles? acm-viewer or acm-admin]
 
 ## Enforcing RBAC on search results
 
