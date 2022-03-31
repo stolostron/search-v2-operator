@@ -141,4 +141,14 @@ func TestSearch_controller(t *testing.T) {
 		t.Errorf("Failed to get serviceaccount %s: %v", getRoleBindingName(), err)
 	}
 
+	//check for ClusterManagementAddon
+	cma := &addonv1alpha1.ClusterManagementAddOn{}
+	err = cl.Get(context.TODO(), types.NamespacedName{
+		Name: getClusterManagementAddonName(),
+	}, cma)
+
+	if err != nil {
+		t.Errorf("Failed to get ClusterManagementAddOn %s: %v", getClusterManagementAddonName(), err)
+	}
+
 }

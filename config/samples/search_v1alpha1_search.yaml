@@ -3,4 +3,19 @@ kind: Search
 metadata:
   name: search-v2-operator 
 spec:
-  # Add fields here
+  deployments:
+    api:
+      replicaCount: 2
+      imageOverride: quay.io/stolostron/search-v2-api:2.5.0-SNAPSHOT-2022-03-28-16-03-59
+    indexer:
+      imageOverride: quay.io/stolostron/search-indexer:2.5.0-SNAPSHOT-2022-03-28-16-03-59
+      resources:
+        limits:
+          cpu: "50m" 
+          memory: "2Gi"
+        requests:
+          cpu: "25m"
+          memory: "64Mi"
+    collector:
+      imageOverride: quay.io/stolostron/search-collector:2.5.0-SNAPSHOT-2022-03-28-16-03-59
+      imagePullPolicy: IfNotPresent 

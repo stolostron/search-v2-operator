@@ -17,7 +17,7 @@ func (r *SearchReconciler) createClusterManagementAddOn(ctx context.Context,
 ) (*reconcile.Result, error) {
 	found := &addonv1alpha1.ClusterManagementAddOn{}
 	err := r.Get(ctx, types.NamespacedName{
-		Name:      "search-collector",
+		Name:      getClusterManagementAddonName(),
 		Namespace: instance.Namespace,
 	}, found)
 	if err != nil && errors.IsNotFound(err) {
@@ -40,7 +40,7 @@ func (r *SearchReconciler) createClusterManagementAddOn(ctx context.Context,
 func newClusterManagementAddOn(instance *searchv1alpha1.Search) *addonv1alpha1.ClusterManagementAddOn {
 	return &addonv1alpha1.ClusterManagementAddOn{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "search-collector",
+			Name:      getClusterManagementAddonName(),
 			Namespace: instance.GetNamespace(),
 		},
 		Spec: addonv1alpha1.ClusterManagementAddOnSpec{

@@ -43,7 +43,7 @@ func newAddon(name, cluster, installNamespace string, annotationValues string) *
 			Name:      name,
 			Namespace: cluster,
 		},
-		Spec: *&addonapiv1alpha1.ManagedClusterAddOnSpec{
+		Spec: addonapiv1alpha1.ManagedClusterAddOnSpec{
 			InstallNamespace: installNamespace,
 		},
 	}

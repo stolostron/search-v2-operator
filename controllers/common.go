@@ -39,6 +39,10 @@ func getImagePullSecretName() string {
 	return "search-pull-secret"
 }
 
+func getClusterManagementAddonName() string {
+	return "search-collector"
+}
+
 func getNodeSelector(deploymentName string, instance *searchv1alpha1.Search) map[string]string {
 	deploymentConfig := getDeploymentConfig(deploymentName, instance)
 	if deploymentConfig.NodeSelector != nil {
