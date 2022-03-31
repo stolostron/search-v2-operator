@@ -2,12 +2,13 @@
 
 **This document describes the desired imlpementation for Odessey (search v2) and it must be reviewed after completing the implementation.**
 
-We must enforce that results for each user only contain resources that they are authorized to access. The search service collects data using a service account with wide cluster access and stores all resources in the database. The search-api is responsible for querying the database and filter the results to match the access of the user (or service account).
+The search service collects data using a service account with wide cluster access and stores all resources in the database. The API must enforce that results for each user (or service account) only contain resources that they are authorized to access.
 
-## Access to the search API
+## Access to the API
 <!-- This feature is new for V2 -->
 The API itself is protected by RBAC. Users must be given a role that allows access to search.
-[TODO: The default ACM admin and Viewer roles should include this by default.]
+
+The default ACM admin and viewer roles should include access to the search API by default. [TODO: Describe the roles and what is added.]
 
 > TODO: Implementation options.
 > 1. Management Ingress? No, this will be deprecated.
@@ -17,24 +18,24 @@ The API itself is protected by RBAC. Users must be given a role that allows acce
 
 ## Enforcing RBAC on results
 
-The API will authenticate the user (or service account) and will impersonate the user to obtain their access rules.
+The API authenticates the user (or service account) and impersonates the user to obtain their access rules.
 
 ```
 DISCUSSION: What is the correct way to impersonate the user? Currently we are using their token, but it's better if the request is made "by search on behalf of user" 
 ```
 
-RBAC is enforced differently for resources in the hub vs. managed clusters. Let's discuss both senarios separately.
+We have 2 different scenarios for (1) resources in the hub and (2) resources in managed clusters.
 
-### A. RBAC for resources in the Hub cluster
+### A. Resources in the Hub cluster
 
 Users must see **exactly** the same resources they are able to list using kubectl, oc cli, or the kubernetes API on the OpenShift cluster hosting the ACM Hub.
 
-User must have `list` authorization to the resource.
+The user must have `list` authorization to the resource.
 
 <!-- NOTE: Including resource name is new for V2, this was missed in the V1 implementation. -->
 Resources must match namespace, apigroup, kind, and name (if a list of names is configured).
 
-**Implementation details:**
+**Implementation details**
 >Use [SelfSubjectAccessReview API](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.23/#selfsubjectaccessreview-v1-authorization-k8s-io) to obtain the user's authorization rules for cluster-scoped resources.
 > 
 > Use [SelfSubjectRulesReview API](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.23/#selfsubjectrulesreview-v1-authorization-k8s-io) to obtain the user's authorization rules for resources in a given namespace.
