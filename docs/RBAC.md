@@ -21,7 +21,11 @@ The default ACM admin and viewer roles should include access to the search API b
 The API authenticates the user (or service account) and impersonates the user to obtain their access rules.
 
 ```
-DISCUSSION: What is the correct way to impersonate the user? Currently we are using their token, but it's better if the request is made "by search on behalf of user" 
+DISCUSSION: 
+What is the correct way to impersonate the user?
+Currently, we are just using their token, which isn't ideal.
+The request should made "by search on behalf of user". 
+I expect this to be similar to authorizing an app on Github to take actions on my behalf.
 ```
 
 We have 2 different scenarios for (1) resources in the hub and (2) resources in managed clusters.
@@ -43,15 +47,15 @@ Resources must match namespace, apigroup, kind, and name (if a list of names is 
 > [Cache](#Cache) the results and use to [Querying the database](#Queryingthedatabase) as described in the correcponding sections of this document.
 
 
-### B. RBAC for resources in the managed clusters
+### B. Resources in managed clusters
 
-We will match ACM capabilities for access to resources in managed clusters.
+We match ACM capabilities for access to resources in managed clusters.
 As of ACM 2.5, view access is granted per managed cluster, which gives the user access to all resources in the cluster (except secrets).
 
 **Implementation details:**
 > Use `ManagedClusterInfo` api to get all the clusters visible to the user.
 >
-> Then we will use the [SelfSubjectRulesReview API](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.23/#selfsubjectrulesreview-v1-authorization-k8s-io) to find if the user is authorized to create the `ManagedClusterView` in each cluster namespace.
+> Then we use the [SelfSubjectRulesReview API](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.23/#selfsubjectrulesreview-v1-authorization-k8s-io) to find if the user is authorized to create the `ManagedClusterView` in each cluster namespace.
 >
 > [Cache](#Cache) the results and use to [Querying the database](#Queryingthedatabase) as described in the correcponding sections of this document.
 
@@ -60,7 +64,7 @@ As of ACM 2.5, view access is granted per managed cluster, which gives the user 
 
 It is expensive to build the user's authorization rules from the API. It requires a large number of requests because the APIs are scoped to a single resource or namespace. We must cache these results to minimize the impact on the Kubernetes API server.
 
-Data will be cached within the API pod (golang). The Kubernetes Service load balancer is configured with `SessionAffinity: ClusterIP` so requests from a given user are always sent to the same API pod instance.  This configuration eliminates the need for a shared cache.
+Data is cached within the API pod (golang). The Kubernetes Service load balancer is configured with `SessionAffinity: ClusterIP` so requests from a given user are always sent to the same API pod instance.  This configuration eliminates the need for a shared cache.
 
 The default time-to-live (TTL) is 10 minutes. Each incoming request from the user resets the cache expiration.
 
@@ -85,7 +89,7 @@ We watch the Kubernetes resources used for RBAC and invalidate the cache when an
 
 ## Querying the database
 
-Once we have the access rules for the user, we will use the data to query the database.
+Once we have the access rules for the user, we use the data to query the database.
 
 **Implementation options:**
 > 1. Use a WHERE clause.
