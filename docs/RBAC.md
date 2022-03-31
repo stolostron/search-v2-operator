@@ -1,6 +1,7 @@
 # Role Based Access Control (RBAC)
 
-**This document describes the desired imlpementation for Odessey (search v2) and it must be reviewed after completing the implementation.**
+### Status: DRAFT
+**This feature is not fully implemented. This document describes the desired imlpementation for Odessey (search v2).**
 
 The search service collects data using a service account with wide cluster access and stores all resources in the database. The API must enforce that results for each user (or service account) only contain resources that they are authorized to access.
 
