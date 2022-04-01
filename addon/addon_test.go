@@ -1,9 +1,6 @@
 package addon
 
 import (
-	"fmt"
-	"io/ioutil"
-	"os"
 	"testing"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -17,7 +14,6 @@ import (
 	"open-cluster-management.io/addon-framework/pkg/agent"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
-	"sigs.k8s.io/yaml"
 )
 
 var (
@@ -67,26 +63,6 @@ func newAgentAddon(t *testing.T) agent.AgentAddon {
 
 	}
 	return agentAddon
-}
-
-func output(t *testing.T, name string, objects ...runtime.Object) {
-	tmpDir, err := os.MkdirTemp("./", name)
-	if err != nil {
-		t.Fatalf("failed to create temp %v", err)
-	}
-
-	for i, o := range objects {
-		data, err := yaml.Marshal(o)
-		if err != nil {
-			t.Fatalf("failed yaml marshal %v", err)
-		}
-
-		err = ioutil.WriteFile(fmt.Sprintf("%v/%v-%v.yaml", tmpDir, i, o.GetObjectKind().GroupVersionKind().Kind), data, 0644)
-		if err != nil {
-			t.Fatalf("failed to Marshal object.%v", err)
-		}
-
-	}
 }
 
 func TestManifest(t *testing.T) {
@@ -141,8 +117,6 @@ func TestManifest(t *testing.T) {
 				}
 			}
 
-			// output is for debug
-			// output(t, test.name, objects...)
 		})
 	}
 }
