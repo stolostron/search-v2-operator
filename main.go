@@ -17,6 +17,7 @@ limitations under the License.
 package main
 
 import (
+	"context"
 	"flag"
 	"os"
 
@@ -104,7 +105,15 @@ func main() {
 	}
 
 	ctx := ctrl.SetupSignalHandler()
+	go startAddon(ctx)
+	setupLog.Info("starting manager")
+	if err := mgr.Start(ctx); err != nil {
+		setupLog.Error(err, "problem running manager")
+		os.Exit(1)
+	}
+}
 
+func startAddon(ctx context.Context) {
 	kubeConfig, err := ctrl.GetConfig()
 	if err != nil {
 		setupLog.Error(err, "unable to get kubeConfig", "controller", "SearchOperator")
@@ -115,11 +124,9 @@ func main() {
 		setupLog.Error(err, "unable to create a new  addon manager", "controller", "SearchOperator")
 	} else {
 		setupLog.Info("starting search addon manager")
-		addonMgr.Start(ctx)
-	}
-	setupLog.Info("starting manager")
-	if err := mgr.Start(ctx); err != nil {
-		setupLog.Error(err, "problem running manager")
-		os.Exit(1)
+		err = addonMgr.Start(ctx)
+		if err != nil {
+			setupLog.Error(err, "unable to start a new  addon manager", "controller", "SearchOperator")
+		}
 	}
 }
