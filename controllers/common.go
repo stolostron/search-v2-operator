@@ -39,6 +39,10 @@ func getImagePullSecretName() string {
 	return "search-pull-secret"
 }
 
+func getClusterManagementAddonName() string {
+	return "search-collector"
+}
+
 func getNodeSelector(deploymentName string, instance *searchv1alpha1.Search) map[string]string {
 	deploymentConfig := getDeploymentConfig(deploymentName, instance)
 	if deploymentConfig.NodeSelector != nil {
@@ -73,6 +77,11 @@ func getRoleName() string {
 func getRoleBindingName() string {
 	return "search"
 }
+
+func getAddonRoleName() string {
+	return "open-cluster-management:addons:search-collector"
+}
+
 func getDeployment(deploymentName string, instance *searchv1alpha1.Search) *appsv1.Deployment {
 	deploymentLabels := generateLabels("name", deploymentName)
 	return &appsv1.Deployment{
@@ -274,7 +283,7 @@ func (r *SearchReconciler) createOrUpdateDeployment(ctx context.Context, deploy 
 				log.Error(err, "Could not create deployment")
 				return &reconcile.Result{}, err
 			}
-			log.Info("Created %s deployment", deploy.Name)
+			log.Info("Created  deployment" + deploy.Name)
 			log.V(9).Info("Created deployment %+v", deploy)
 			return nil, nil
 		}
@@ -286,7 +295,6 @@ func (r *SearchReconciler) createOrUpdateDeployment(ctx context.Context, deploy 
 			log.Error(err, "Could not update deployment")
 			return nil, nil
 		}
-		log.Info("Updated %s deployment ", deploy.Name)
 		log.V(9).Info("Updated deployment %+v", deploy)
 	}
 	return nil, nil
@@ -305,7 +313,7 @@ func (r *SearchReconciler) createService(ctx context.Context, svc *corev1.Servic
 				log.Error(err, "Could not create service")
 				return &reconcile.Result{}, err
 			}
-			log.Info("Created %s service", svc.Name)
+			log.Info("Created service" + svc.Name)
 			log.V(9).Info("Created service %+v", svc)
 			return nil, nil
 		}
@@ -328,7 +336,7 @@ func (r *SearchReconciler) createSecret(ctx context.Context, secret *corev1.Secr
 				log.Error(err, "Could not create secret")
 				return &reconcile.Result{}, err
 			}
-			log.Info("Created %s secret", secret.Name)
+			log.Info("Created secret" + secret.Name)
 			return nil, nil
 		}
 		log.Error(err, "Could not get secret")

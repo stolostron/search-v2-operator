@@ -17,6 +17,7 @@ limitations under the License.
 package main
 
 import (
+	"context"
 	"flag"
 	"os"
 
@@ -24,15 +25,17 @@ import (
 	// to ensure that exec-entrypoint and run can make use of them.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
+	"github.com/cloudflare/cfssl/log"
+	"github.com/stolostron/search-v2-operator/addon"
+	searchv1alpha1 "github.com/stolostron/search-v2-operator/api/v1alpha1"
+	"github.com/stolostron/search-v2-operator/controllers"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
-
-	searchv1alpha1 "github.com/stolostron/search-v2-operator/api/v1alpha1"
-	"github.com/stolostron/search-v2-operator/controllers"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -74,9 +77,13 @@ func main() {
 		Namespace:              os.Getenv("WATCH_NAMESPACE"),
 		LeaderElectionID:       "b648e39a.open-cluster-management.io",
 	})
+
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
 		os.Exit(1)
+	}
+	if err := addonv1alpha1.AddToScheme(mgr.GetScheme()); err != nil {
+		log.Error(err, "unable to add to scheme, search addon will be unavailable")
 	}
 
 	if err = (&controllers.SearchReconciler{
@@ -97,9 +104,29 @@ func main() {
 		os.Exit(1)
 	}
 
+	ctx := ctrl.SetupSignalHandler()
+	go startAddon(ctx)
 	setupLog.Info("starting manager")
-	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
+	if err := mgr.Start(ctx); err != nil {
 		setupLog.Error(err, "problem running manager")
 		os.Exit(1)
+	}
+}
+
+func startAddon(ctx context.Context) {
+	kubeConfig, err := ctrl.GetConfig()
+	if err != nil {
+		setupLog.Error(err, "unable to get kubeConfig", "controller", "SearchOperator")
+		os.Exit(1)
+	}
+	addonMgr, err := addon.NewAddonManager(kubeConfig)
+	if err != nil {
+		setupLog.Error(err, "unable to create a new  addon manager", "controller", "SearchOperator")
+	} else {
+		setupLog.Info("starting search addon manager")
+		err = addonMgr.Start(ctx)
+		if err != nil {
+			setupLog.Error(err, "unable to start a new  addon manager", "controller", "SearchOperator")
+		}
 	}
 }

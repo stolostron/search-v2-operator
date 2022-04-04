@@ -32,7 +32,7 @@ func (r *SearchReconciler) CollectorDeployment(instance *searchv1alpha1.Search) 
 		ReadinessProbe: &corev1.Probe{
 			InitialDelaySeconds: 15,
 			TimeoutSeconds:      1,
-			Handler: corev1.Handler{
+			ProbeHandler: corev1.ProbeHandler{
 				Exec: &corev1.ExecAction{
 					Command: []string{"ls"},
 				},
@@ -41,7 +41,7 @@ func (r *SearchReconciler) CollectorDeployment(instance *searchv1alpha1.Search) 
 		LivenessProbe: &corev1.Probe{
 			InitialDelaySeconds: 20,
 			TimeoutSeconds:      1,
-			Handler: corev1.Handler{
+			ProbeHandler: corev1.ProbeHandler{
 				Exec: &corev1.ExecAction{
 					Command: []string{"ls"},
 				},

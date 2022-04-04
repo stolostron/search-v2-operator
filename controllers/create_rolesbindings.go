@@ -18,18 +18,18 @@ func (r *SearchReconciler) createRoles(ctx context.Context,
 
 	found := &rbacv1.ClusterRole{}
 	err := r.Get(ctx, types.NamespacedName{
-		Name:      getRoleName(),
+		Name:      crole.Name,
 		Namespace: crole.Namespace,
 	}, found)
 	if err != nil && errors.IsNotFound(err) {
 		err = r.Create(ctx, crole)
 		if err != nil {
-			log.Error(err, "Could not create clusterrole")
+			log.Error(err, "Could not create clusterrole "+crole.Name)
 			return &reconcile.Result{}, err
 		}
+		log.Info("Created clusterrole" + crole.Name)
+		log.V(9).Info("Created  clusterrole %+v", crole)
 	}
-	log.V(2).Info("Created %s clusterrole", crole.Name)
-	log.V(9).Info("Created  clusterrole %+v", crole)
 	return nil, nil
 }
 
@@ -39,18 +39,18 @@ func (r *SearchReconciler) createRoleBinding(ctx context.Context,
 
 	found := &rbacv1.ClusterRoleBinding{}
 	err := r.Get(ctx, types.NamespacedName{
-		Name:      getRoleBindingName(),
+		Name:      rolebinding.Name,
 		Namespace: rolebinding.Namespace,
 	}, found)
 	if err != nil && errors.IsNotFound(err) {
 		err = r.Create(ctx, rolebinding)
 		if err != nil {
-			log.Error(err, "Could not create clusterrolebinding")
+			log.Error(err, "Could not create clusterrolebinding"+rolebinding.Name)
 			return &reconcile.Result{}, err
 		}
+		log.Info("Created clusterrolebinding" + rolebinding.Name)
+		log.V(2).Info("Created %s clusterrolebinding %+v", rolebinding)
 	}
-	log.V(2).Info("Created %s clusterrolebinding", rolebinding.Name)
-	log.V(2).Info("Created %s clusterrolebinding %+v", rolebinding)
 	return nil, nil
 }
 
@@ -87,6 +87,20 @@ func (r *SearchReconciler) ClusterRoleBinding(instance *searchv1alpha1.Search) *
 	}
 }
 
+func (r *SearchReconciler) AddonClusterRole(instance *searchv1alpha1.Search) *rbacv1.ClusterRole {
+	return &rbacv1.ClusterRole{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "ClusterRole",
+			APIVersion: rbacv1.SchemeGroupVersion.String(),
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      getAddonRoleName(),
+			Namespace: instance.GetNamespace(),
+		},
+		Rules: getAddonRules(),
+	}
+}
+
 func getSubjects(namespace string) []rbacv1.Subject {
 	return []rbacv1.Subject{{
 		Kind:      "ServiceAccount",
@@ -109,9 +123,29 @@ func getRules() []rbacv1.PolicyRule {
 			Verbs:     []string{"*"},
 		},
 		{
+			APIGroups: []string{"coordination.k8s.io"},
+			Resources: []string{"leases"},
+			Verbs:     []string{"create", "get", "list", "watch", "patch", "update"},
+		},
+		{
 			APIGroups: []string{"apps"},
 			Resources: []string{"deployments"},
 			Verbs:     []string{"*"},
+		},
+	}
+}
+
+func getAddonRules() []rbacv1.PolicyRule {
+	return []rbacv1.PolicyRule{
+		{
+			APIGroups: []string{"proxy.open-cluster-management.io"},
+			Resources: []string{"clusterstatuses/aggregator"},
+			Verbs:     []string{"create"},
+		},
+		{
+			APIGroups: []string{"coordination.k8s.io"},
+			Resources: []string{"leases"},
+			Verbs:     []string{"create", "get", "list", "watch", "patch", "update"},
 		},
 	}
 }
