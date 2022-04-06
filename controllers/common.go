@@ -43,6 +43,17 @@ func getClusterManagementAddonName() string {
 	return "search-collector"
 }
 
+func newMetadataEnvVar(name, key string) corev1.EnvVar {
+	return corev1.EnvVar{
+		Name: name,
+		ValueFrom: &corev1.EnvVarSource{
+			FieldRef: &corev1.ObjectFieldSelector{
+				FieldPath: key,
+			},
+		},
+	}
+}
+
 func getNodeSelector(deploymentName string, instance *searchv1alpha1.Search) map[string]string {
 	deploymentConfig := getDeploymentConfig(deploymentName, instance)
 	if deploymentConfig.NodeSelector != nil {
