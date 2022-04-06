@@ -11,7 +11,7 @@ The API itself is protected by RBAC. Users must be given a role that allows acce
 
 The default ACM admin and viewer roles should include access to the search API by default. [TODO: Describe the roles and what is added.]
 
-> **TODO: Implementation options.**
+> **DISCUSSION:** Implementation options.
 > 1. Management Ingress? No, this will be deprecated.
 > 2. Kube API server extension?
 > 3. Admission webhook?
@@ -21,9 +21,7 @@ The default ACM admin and viewer roles should include access to the search API b
 
 The API authenticates the user (or service account) and impersonates the user to obtain their access rules.
 
-> DISCUSSION:
->
-> What is the correct way to impersonate the user? Currently, we are just using their token, which isn't ideal. The request should made "by search on behalf of user".
+> **DISCUSSION:** What's the correct way to impersonate the user? Currently, we are just using their token, which isn't ideal. The request should made "by search on behalf of user".
 > 
 > I expect this to be similar to authorizing an app on Github to take actions on my behalf.
 
@@ -85,7 +83,7 @@ We watch the Kubernetes resources used for RBAC and invalidate the cache when an
 
 Once we have the access rules for the user, we use the data to query the database.
 
-> **Implementation options**
+> **DISCUSSION:** Implementation options
 > 1. Use a WHERE clause.
 >    - This makes all queries long and complex. 
 >    - We are likely to hit limits for the query.
