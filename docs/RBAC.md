@@ -1,48 +1,50 @@
 # Role Based Access Control (RBAC)
 
-### Status: DRAFT
+### Status: DRAFT (April 7, 2022)
 **This feature is not fully implemented. This document describes the desired imlpementation for Odessey (search v2).**
 
 The search service collects data using a service account with wide cluster access and stores all resources in the database. The API must enforce that results for each user (or service account) only contain resources that they are authorized to access.
 
-## Access to the API
+## Access to the Search API
 <!-- This feature is new for V2 -->
 The API itself is protected by RBAC. Users must be given a role that allows access to search.
 
-The default ACM admin and viewer roles should include access to the search API by default. [TODO: Describe the roles and what is added.]
+The default ACM admin and viewer roles should include access to the search API by default. [TODO: Describe the roles and what needs to be added.]
 
 > **DISCUSSION:** Implementation options.
-> 1. Management Ingress? No, this will be deprecated.
-> 2. Kube API server extension?
-> 3. Admission webhook?
-> 4. Validation at the service? I want to avoid this if possible.
+> 1. Kube API server extension? This can add additional load to the kube API server.
+> 2. Validation at the service? 
 
 ## Enforcing RBAC on results
 
 The API authenticates the user (or service account) and impersonates the user to obtain their access rules.
 
-> **DISCUSSION:** What's the correct way to impersonate the user? Currently, we are just using their token, which isn't ideal. The request should made "by search on behalf of user".
+> Use the [TokenReview API](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.23/#tokenreview-v1-authentication-k8s-io) to validate the user token and obtain the UserInfo (username and groups).
 > 
-> I expect this to be similar to authorizing an app on Github to take actions on my behalf.
+> **DISCUSSION:** 
+> Use [User Impersonation](https://kubernetes.io/docs/reference/access-authn-authz/authentication/#user-impersonation) when sending API requests on behalf of the end user.
 
-We have 2 different scenarios for (1) resources in the hub and (2) resources in managed clusters.
+After authenticating the user, we'll obtain their authorization rules. We have to cover 2 different scenarios:
+    1. [Resources in the hub cluster](#hub-cluster)
+    2. [Resources in managed clusters](#managed-clusters)
 
-### 1. Resources in the hub cluster
+### 1. Hub cluster
 
 Users must see **exactly** the same resources they are able to list using kubectl, oc cli, or the kubernetes API on the OpenShift cluster hosting the ACM Hub.
 
-The user must have `list` authorization to the resource.
-
-<!-- NOTE: Including resource name is new for V2, this was missed in the V1 implementation. -->
-Resources must match namespace, apigroup, kind, and name (if a list of names is configured).
-
-> **Implementation details**
 > - Use [SelfSubjectAccessReview API](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.23/#selfsubjectaccessreview-v1-authorization-k8s-io) to obtain the user's authorization rules for cluster-scoped resources.
 > - Use [SelfSubjectRulesReview API](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.23/#selfsubjectrulesreview-v1-authorization-k8s-io) to obtain the user's authorization rules for resources in a given namespace.
 > - [Cache](#cache) the results and use to [Querying the database](#querying-the-database) as described in the correcponding sections of this document.
 
+Authorized resources will be matched using these attributes:
+- action - we'll only match resoces the user is authorized to `list`.
+- apigroup
+- kind
+- namespace - only applies for namespaced scoped resources.
+- name - only applies when a `resourceNames` list exists in a particular rule.
+<!-- NOTE: Name was missed in the V1 implementation. -->
 
-### 2. Resources in managed clusters
+### 2. Managed clusters
 
 We match ACM capabilities for access to resources in managed clusters.
 As of ACM 2.5, view access is granted per managed cluster, which gives the user access to all resources in the cluster (except secrets).
