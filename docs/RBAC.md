@@ -5,15 +5,19 @@
 
 The search service collects data using a service account with wide cluster access and stores all resources in the database. The Search API must enforce that results for each user (or service account) only contain resources that they are authorized to access.
 
-## [Swimlane diagram](https://swimlanes.io/#tVTLbtswELzrKxboJRFCCU4uheAacByg9aFBKye5BEFNUyubtUw6fNhIv75LSm7sJEZ6aC86kLuzszNDOekaLGCC3IgFDL+NobwcjpLk1qIBNti7KKDER4/WJcmPAtK0l8HQuwUqJwV3CJ460jRJ9qD6jBCWfoaMr2UBN3qJqsSNxG2SKO2wuEMj6ydw4eIM5ugiCkhV6zPgqgKxQLEETnO0kb+4k1pRNdg4I0uSFO73UMPQh5OFc2tb5HkYbBQ6tJnUeaWFzQ3WaFAJzOeo0BDtaq8ssMw3vez8Iv8QKZmIyjY9xp83JQps+dEyqU8PlqVVg2gF3KodX6w6rc4z+MwJwbxYxfgGLdTaHFVvxEkCOGm04M1pAaOoh4iHuzaSQdYFjOvuXFogccGvmdOsCtY8Vx41p/O2ZdS5A+PVGo3VKmAQ+9Yckn/e7kIfaWJe2rbWjwk29cTPfqJwQyHQ2tabf+SLJXTbovOIfujRH2l3FsELSmUg+r8YRRXeIfSuxRO+wS4YJHW0NElQ7aJ0kcF3j+YpGkLu8hm3+BfJKZFX8UlJ5dCsDbpd+oxedWOi6yTYFz8D0XhLhTCdTrWIsaUixSQ0kmLSN2i1NwIHwBi3n/ohGgO4Zwr6yg4eqItwvnLF51gdxxIGQ7a6ulFbdhdecgDq2q756nAMwcCrda86KYo35OninKY3l1dFmsI1EqmVNlSBjsvGAp9p72Cht7BF2MqmgcdXKKQcMaqkmsfjmPtaNi6+wLd+BCVa3zj7Gw==)
+## [Swimlane diagram (link)](https://swimlanes.io/#tVTLbtswELzrKxboJRFCCU4uheAacByg9aFBKye5BEFNUyubtUw6fNhIv75LSm7sJEZ6aC86kLuzszNDOekaLGCC3IgFDL+NobwcjpLk1qIBNti7KKDER4/WJcmPAtK0l8HQuwUqJwV3CJ460jRJ9qD6jBCWfoaMr2UBN3qJqsSNxG2SKO2wuEMj6ydw4eIM5ugiCkhV6zPgqgKxQLEETnO0kb+4k1pRNdg4I0uSFO73UMPQh5OFc2tb5HkYbBQ6tJnUeaWFzQ3WaFAJzOeo0BDtaq8ssMw3vez8Iv8QKZmIyjY9xp83JQps+dEyqU8PlqVVg2gF3KodX6w6rc4z+MwJwbxYxfgGLdTaHFVvxEkCOGm04M1pAaOoh4iHuzaSQdYFjOvuXFogccGvmdOsCtY8Vx41p/O2ZdS5A+PVGo3VKmAQ+9Yckn/e7kIfaWJe2rbWjwk29cTPfqJwQyHQ2tabf+SLJXTbovOIfujRH2l3FsELSmUg+r8YRRXeIfSuxRO+wS4YJHW0NElQ7aJ0kcF3j+YpGkLu8hm3+BfJKZFX8UlJ5dCsDbpd+oxedWOi6yTYFz8D0XhLhTCdTrWIsaUixSQ0kmLSN2i1NwIHwBi3n/ohGgO4Zwr6yg4eqItwvnLF51gdxxIGQ7a6ulFbdhdecgDq2q756nAMwcCrda86KYo35OninKY3l1dFmsI1EqmVNlSBjsvGAp9p72Cht7BF2MqmgcdXKKQcMaqkmsfjmPtaNi6+wLd+BCVa3zj7Gw==)
 
-<iframe
-  src="https://swimlanes.io/#tVTLbtswELzrKxboJRFCCU4uheAacByg9aFBKye5BEFNUyubtUw6fNhIv75LSm7sJEZ6aC86kLuzszNDOekaLGCC3IgFDL+NobwcjpLk1qIBNti7KKDER4/WJcmPAtK0l8HQuwUqJwV3CJ460jRJ9qD6jBCWfoaMr2UBN3qJqsSNxG2SKO2wuEMj6ydw4eIM5ugiCkhV6zPgqgKxQLEETnO0kb+4k1pRNdg4I0uSFO73UMPQh5OFc2tb5HkYbBQ6tJnUeaWFzQ3WaFAJzOeo0BDtaq8ssMw3vez8Iv8QKZmIyjY9xp83JQps+dEyqU8PlqVVg2gF3KodX6w6rc4z+MwJwbxYxfgGLdTaHFVvxEkCOGm04M1pAaOoh4iHuzaSQdYFjOvuXFogccGvmdOsCtY8Vx41p/O2ZdS5A+PVGo3VKmAQ+9Yckn/e7kIfaWJe2rbWjwk29cTPfqJwQyHQ2tabf+SLJXTbovOIfujRH2l3FsELSmUg+r8YRRXeIfSuxRO+wS4YJHW0NElQ7aJ0kcF3j+YpGkLu8hm3+BfJKZFX8UlJ5dCsDbpd+oxedWOi6yTYFz8D0XhLhTCdTrWIsaUixSQ0kmLSN2i1NwIHwBi3n/ohGgO4Zwr6yg4eqItwvnLF51gdxxIGQ7a6ulFbdhdecgDq2q756nAMwcCrda86KYo35OninKY3l1dFmsI1EqmVNlSBjsvGAp9p72Cht7BF2MqmgcdXKKQcMaqkmsfjmPtaNi6+wLd+BCVa3zj7Gw=="
-  style="width:100%; height:300px;"
-></iframe>
+```
+
+
+Please use the link to review.
+I'll paste the diagram here after review.
+
+
+```
 
 ## Access to the Search API
-<!-- This feature is new for V2. -->
+<!-- NEW IN V2. This feature is new for V2. -->
 The API itself is protected by RBAC. Users must be given a role that allows access to search.
 
 The default ACM admin and viewer roles should include access to the search API by default. [TODO: Describe the roles and what needs to be added.]
@@ -28,7 +32,7 @@ The Search API authenticates the user (or service account) and impersonates the 
 
 > Use the [TokenReview API](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.23/#tokenreview-v1-authentication-k8s-io) to validate the user token and obtain the UserInfo (username and groups).
 > 
-<!-- V1 doesn't use impersonation. -->
+<!-- CHANGE IN V2. In V1 we use the user's token directly, but impersonation is better. This change won't cause a semantic change in the API. -->
 > Use [User Impersonation](https://kubernetes.io/docs/reference/access-authn-authz/authentication/#user-impersonation) when sending API requests on behalf of the end user.
 
 After authenticating the user, we obtain their authorization rules. There's 2 different scenarios:
@@ -58,13 +62,14 @@ Resources are matched to the authorization rules using these attributes:
 - apigroup
 - kind
 - namespace - only applies for namespaced scoped resources.
+<!-- CHANGE IN V2. NOTE: V1 implementation doesn't consider resourceNames. -->
 - name - when a `resourceNames` list exists in a rule.
-<!-- NOTE: V1 implementation doesn't consider resourceNames. -->
+
 
 Finally, we use these rules to [query the database](#query-the-database)
 
 ### 2. Managed clusters
-<!-- This implementation is different from V1. -->
+<!-- CHANGE IN V2. In V1 we attempt to map the RBAC from the Hub's namespace to the managed cluster. That implementation had limitations and wasn't aligned with ACM. -->
 We match ACM capabilities for access to resources in managed clusters.
 As of ACM 2.5, view access is granted per managed cluster, which gives the user access to all resources in the cluster (except secrets).
 
