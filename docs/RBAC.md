@@ -1,9 +1,9 @@
 # Role Based Access Control (RBAC)
 
 ### Status: DRAFT (April 7, 2022)
-**This feature is not fully implemented. This document describes the desired imlpementation for Odessey (search v2).**
+**This feature is not fully implemented. This document describes the desired imlpementation for Odyssey (search v2).**
 
-The search service collects data using a service account with wide cluster access and stores all resources in the database. The API must enforce that results for each user (or service account) only contain resources that they are authorized to access.
+The search service collects data using a service account with wide cluster access and stores all resources in the database. The Search API must enforce that results for each user (or service account) only contain resources that they are authorized to access.
 
 ## Access to the Search API
 <!-- This feature is new for V2 -->
@@ -17,33 +17,32 @@ The default ACM admin and viewer roles should include access to the search API b
 
 ## Enforcing RBAC on results
 
-The API authenticates the user (or service account) and impersonates the user to obtain their access rules.
+The Search API authenticates the user (or service account) and impersonates the user to obtain their access rules.
 
 > Use the [TokenReview API](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.23/#tokenreview-v1-authentication-k8s-io) to validate the user token and obtain the UserInfo (username and groups).
 > 
-> **DISCUSSION:** 
 > Use [User Impersonation](https://kubernetes.io/docs/reference/access-authn-authz/authentication/#user-impersonation) when sending API requests on behalf of the end user.
 
-After authenticating the user, we'll obtain their authorization rules. We have to cover 2 different scenarios:
-    1. [Resources in the hub cluster](#hub-cluster)
-    2. [Resources in managed clusters](#managed-clusters)
+After authenticating the user, we obtain their authorization rules. There's 2 different scenarios:
+1. [Resources in the hub cluster](#hub-cluster)
+2. [Resources in managed clusters](#managed-clusters)
 
 ### 1. Hub cluster
 
-Users must see **exactly** the same resources they are able to list using kubectl, oc cli, or the kubernetes API on the OpenShift cluster hosting the ACM Hub.
+Users must see **exactly** the same resources they are able to list using kubectl, oc, or the kubernetes API on the OpenShift cluster hosting the ACM Hub.
 
-Collect all the authorization rules for the user and [cache](#cache) the results.
-> 1. Get all resources available in the cluster. [Can this be shared across all users?]
+We request all the authorization rules for the user and [cache](#cache) the results.
+> 1. Get all resources available in the cluster. This is shared across all users.
 >       - CLI: `oc api-resources`
 >       - API: See with `oc api-resources -v=6`
-> 2. For each cluster-scoped (namespace == false) resource, check if user has permission to list.
+> 2. For each cluster-scoped resource (namespace == false), check if user has permission to list.
 >       - CLI: `oc auth can-i list <resource> --as=<user>`
 >       - API: [SelfSubjectAccessReview](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.23/#selfsubjectaccessreview-v1-authorization-k8s-io) 
 > 3. Get all namespaces (projects) for the user.
 >       - CLI: `oc get namespaces --as=<user>`
 >       - API: [NamespaceList](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.23/#namespacelist-v1-core)
 > 4. For each namespace, obtain the user's authorization rules.
->       - CLI: There isn't an equicalent command, the closest is `oc auth can-i list <resource> -n <ns> --as=<user>`
+>       - CLI: There isn't an equivalent command, the closest is `oc auth can-i list <resource> -n <ns> --as=<user>`
 >       - API: [SelfSubjectRulesReview](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.23/#selfsubjectrulesreview-v1-authorization-k8s-io)
 
 Resources are matched to the authorization rules using these attributes:
@@ -51,8 +50,8 @@ Resources are matched to the authorization rules using these attributes:
 - apigroup
 - kind
 - namespace - only applies for namespaced scoped resources.
-- name - only applies when a `resourceNames` list exists in a particular rule.
-<!-- NOTE: Name was missed in the V1 implementation. -->
+- name - when a `resourceNames` list exists in a rule.
+<!-- NOTE: V1 implementation doesn't consider resourceNames. -->
 
 Finally, we use these rules to [query the database](#query-the-database)
 
