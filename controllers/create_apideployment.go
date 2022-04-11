@@ -33,7 +33,7 @@ func (r *SearchReconciler) APIDeployment(instance *searchv1alpha1.Search) *appsv
 		ReadinessProbe: &corev1.Probe{
 			InitialDelaySeconds: 5,
 			TimeoutSeconds:      1,
-			Handler: corev1.Handler{
+			ProbeHandler: corev1.ProbeHandler{
 				HTTPGet: &corev1.HTTPGetAction{
 					Port:   intstr.FromInt(4010),
 					Path:   "/readiness",
@@ -44,7 +44,7 @@ func (r *SearchReconciler) APIDeployment(instance *searchv1alpha1.Search) *appsv
 		LivenessProbe: &corev1.Probe{
 			InitialDelaySeconds: 30,
 			TimeoutSeconds:      1,
-			Handler: corev1.Handler{
+			ProbeHandler: corev1.ProbeHandler{
 				HTTPGet: &corev1.HTTPGetAction{
 					Port:   intstr.FromInt(4010),
 					Path:   "/liveness",

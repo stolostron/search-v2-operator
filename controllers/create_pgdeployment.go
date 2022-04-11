@@ -37,7 +37,7 @@ func (r *SearchReconciler) PGDeployment(instance *searchv1alpha1.Search) *appsv1
 		ReadinessProbe: &corev1.Probe{
 			InitialDelaySeconds: 5,
 			TimeoutSeconds:      1,
-			Handler: corev1.Handler{
+			ProbeHandler: corev1.ProbeHandler{
 				Exec: &corev1.ExecAction{
 					Command: []string{"/usr/libexec/check-container"},
 				},
@@ -46,7 +46,7 @@ func (r *SearchReconciler) PGDeployment(instance *searchv1alpha1.Search) *appsv1
 		LivenessProbe: &corev1.Probe{
 			InitialDelaySeconds: 120,
 			TimeoutSeconds:      10,
-			Handler: corev1.Handler{
+			ProbeHandler: corev1.ProbeHandler{
 				Exec: &corev1.ExecAction{
 					Command: []string{"/usr/libexec/check-container", "--live"},
 				},

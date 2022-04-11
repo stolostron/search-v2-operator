@@ -1,12 +1,11 @@
 approvers:
-  - jlpadilla
-  - xrajesh
-  - sherinv
   - anxhela21
-  - mqhackett
+  - jlpadilla
+  - sherinv
+  - xrajesh
 reviewers:
-  - jlpadilla
-  - xrajesh
-  - sherinv
   - anxhela21
-  - mqhackett
+  - jlpadilla
+  - sherinv
+  - xrajesh
+  - zlayne

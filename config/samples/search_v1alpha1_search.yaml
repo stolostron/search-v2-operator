@@ -3,4 +3,3 @@ kind: Search
 metadata:
   name: search-v2-operator 
 spec:
-  # Add fields here

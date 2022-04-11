@@ -16,6 +16,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
+	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
@@ -32,7 +33,12 @@ func TestSearch_controller(t *testing.T) {
 	s := scheme.Scheme
 	err := searchv1alpha1.SchemeBuilder.AddToScheme(s)
 	if err != nil {
-		t.Errorf("error adding scheme: (%v)", err)
+		t.Errorf("error adding search scheme: (%v)", err)
+	}
+
+	err = addonv1alpha1.AddToScheme(s)
+	if err != nil {
+		t.Errorf("error adding addon scheme: (%v)", err)
 	}
 
 	objs := []runtime.Object{search}
@@ -133,6 +139,16 @@ func TestSearch_controller(t *testing.T) {
 
 	if err != nil {
 		t.Errorf("Failed to get serviceaccount %s: %v", getRoleBindingName(), err)
+	}
+
+	//check for ClusterManagementAddon
+	cma := &addonv1alpha1.ClusterManagementAddOn{}
+	err = cl.Get(context.TODO(), types.NamespacedName{
+		Name: getClusterManagementAddonName(),
+	}, cma)
+
+	if err != nil {
+		t.Errorf("Failed to get ClusterManagementAddOn %s: %v", getClusterManagementAddonName(), err)
 	}
 
 }

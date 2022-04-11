@@ -23,6 +23,8 @@ func (r *SearchReconciler) IndexerDeployment(instance *searchv1alpha1.Search) *a
 			newSecretEnvVar("DB_PASS", "database-password", "search-postgres"),
 			newSecretEnvVar("DB_NAME", "database-name", "search-postgres"),
 			newEnvVar("DB_HOST", "search-postgres."+instance.Namespace+".svc"),
+			newEnvVar("POD_NAMESPACE", instance.Namespace),
+			newMetadataEnvVar("POD_NAME", "metadata.name"),
 		},
 		VolumeMounts: []corev1.VolumeMount{
 			{
@@ -33,7 +35,7 @@ func (r *SearchReconciler) IndexerDeployment(instance *searchv1alpha1.Search) *a
 		ReadinessProbe: &corev1.Probe{
 			InitialDelaySeconds: 15,
 			TimeoutSeconds:      30,
-			Handler: corev1.Handler{
+			ProbeHandler: corev1.ProbeHandler{
 				HTTPGet: &corev1.HTTPGetAction{
 					Port:   intstr.FromInt(3010),
 					Path:   "/readiness",
@@ -44,7 +46,7 @@ func (r *SearchReconciler) IndexerDeployment(instance *searchv1alpha1.Search) *a
 		LivenessProbe: &corev1.Probe{
 			InitialDelaySeconds: 20,
 			TimeoutSeconds:      30,
-			Handler: corev1.Handler{
+			ProbeHandler: corev1.ProbeHandler{
 				HTTPGet: &corev1.HTTPGetAction{
 					Port:   intstr.FromInt(3010),
 					Path:   "/liveness",

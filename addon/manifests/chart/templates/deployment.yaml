@@ -1,0 +1,77 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ template "search.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    component: "search"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      component: "search"
+  template:
+    metadata:
+      annotations:
+        target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
+      labels:
+        component: "search"
+    spec:
+      serviceAccountName: {{ template "search.fullname" . }}
+      containers:
+      {{- if not (or (.Capabilities.APIVersions.Has "operator.open-cluster-management.io/v1/MultiClusterHub") (.Capabilities.APIVersions.Has "operator.open-cluster-management.io/v1beta1/MultiClusterHub")) }}
+      - name: collector
+        image: "{{ .Values.global.imageOverrides.search_collector }}"
+        imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+        env:
+        - name: CLUSTER_NAME
+          value: "{{ .Values.clusterName }}"
+        - name: CLUSTER_NAMESPACE
+          value: "{{ .Values.clusterName }}"
+        - name: HUB_CONFIG
+          value: /hubconfig/kubeconfig
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        {{- if .Values.global.proxyConfig.HTTP_PROXY }}
+        - name: HTTP_PROXY
+          value: {{ .Values.global.proxyConfig.HTTP_PROXY }}
+        {{- end }}
+        {{- if .Values.global.proxyConfig.HTTPS_PROXY }}
+        - name: HTTPS_PROXY
+          value: {{ .Values.global.proxyConfig.HTTPS_PROXY }}
+        {{- end }}
+        {{- if .Values.global.proxyConfig.NO_PROXY }}
+        - name: NO_PROXY
+          value: {{ .Values.global.proxyConfig.NO_PROXY }}
+        {{- end }}
+        resources:
+          {{- toYaml .Values.resources | nindent 10 }}
+        livenessProbe: null
+        readinessProbe: null
+        volumeMounts:
+        - name: hub-config
+          mountPath: /hubconfig
+      volumes:
+      - name: hub-config
+        secret:
+          secretName: {{ .Values.hubKubeConfigSecret }}
+      {{- end }}
+      {{- with .Values.global.nodeSelector }}
+      nodeSelector:
+{{ toYaml . | indent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+{{ toYaml . | indent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+{{ toYaml . | indent 8 }}
+      {{- end }}
+      {{- if .Values.global.imagePullSecret }}
+      imagePullSecrets:
+      - name: "{{ .Values.global.imagePullSecret }}"
+      {{- end }}
