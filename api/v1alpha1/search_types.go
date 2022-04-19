@@ -75,10 +75,6 @@ type SearchDeployments struct {
 	// +optional
 	// Configuration for api Deployment
 	Query_API DeploymentConfig `json:"query_api,omitempty"`
-
-	// +optional
-	// Configuration for addon installed collector Deployment
-	RemoteCollector DeploymentConfig `json:"remoteCollector,omitempty"`
 }
 
 type DeploymentConfig struct {
