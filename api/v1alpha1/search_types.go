@@ -15,6 +15,7 @@ const (
 	// HABasic stands up most app subscriptions with a replicaCount of 1
 	HABasic AvailabilityType = "Basic"
 	// HAHigh stands up most app subscriptions with a replicaCount of 2
+	// Not supported for Dev preview
 	HAHigh AvailabilityType = "High"
 )
 
@@ -52,13 +53,10 @@ type SearchSpec struct {
 	AvailabilityConfig AvailabilityType `json:"availabilityConfig,omitempty"`
 
 	// +optional
-	// Control list of Kubernetes resources indexed by search-collector
-	AllowDenyResources FilterSpec `json:"allowDenyResources,omitempty"`
-
-	// +optional
+	// Not part of dev preview
 	// Kubernetes secret name containing user provided db secret
 	// Secret should contain connection parameters [db_host, db_port, db_user, db_password, db_name, ca_cert]
-	ExternalDBInstance string `json:"externalDBInstance,omitempty"`
+	// ExternalDBInstance string `json:"externalDBInstance,omitempty"`
 }
 
 type SearchDeployments struct {
@@ -76,7 +74,7 @@ type SearchDeployments struct {
 
 	// +optional
 	// Configuration for api Deployment
-	API DeploymentConfig `json:"api,omitempty"`
+	Query_API DeploymentConfig `json:"query_api,omitempty"`
 
 	// +optional
 	// Configuration for addon installed collector Deployment
@@ -147,8 +145,8 @@ type ResourceListSpec struct {
 type SearchStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
-	// Human readable health state
-	Health string `json:"health"`
+	// Human readable health status
+	Status string `json:"status"`
 
 	// Database used by search
 	DB string `json:"db"`
