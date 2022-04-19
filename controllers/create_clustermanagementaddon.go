@@ -9,6 +9,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
@@ -21,7 +22,7 @@ func (r *SearchReconciler) createClusterManagementAddOn(ctx context.Context,
 		Namespace: instance.Namespace,
 	}, found)
 	if err != nil && errors.IsNotFound(err) {
-		cma := newClusterManagementAddOn(instance)
+		cma := r.newClusterManagementAddOn(instance)
 		err = r.Create(ctx, cma)
 		if err != nil {
 			log.Error(err, "Could not create ClusterManagementAddOn")
@@ -37,8 +38,8 @@ func (r *SearchReconciler) createClusterManagementAddOn(ctx context.Context,
 	return nil, nil
 }
 
-func newClusterManagementAddOn(instance *searchv1alpha1.Search) *addonv1alpha1.ClusterManagementAddOn {
-	return &addonv1alpha1.ClusterManagementAddOn{
+func (r *SearchReconciler) newClusterManagementAddOn(instance *searchv1alpha1.Search) *addonv1alpha1.ClusterManagementAddOn {
+	cma := &addonv1alpha1.ClusterManagementAddOn{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      getClusterManagementAddonName(),
 			Namespace: instance.GetNamespace(),
@@ -50,4 +51,9 @@ func newClusterManagementAddOn(instance *searchv1alpha1.Search) *addonv1alpha1.C
 			},
 		},
 	}
+	err := controllerutil.SetControllerReference(instance, cma, r.Scheme)
+	if err != nil {
+		log.V(2).Info("Could not set control for search-collector ClusterManagementAddOn", err)
+	}
+	return cma
 }

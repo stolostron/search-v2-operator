@@ -4,6 +4,7 @@ package controllers
 import (
 	"context"
 	"os"
+	"strings"
 
 	searchv1alpha1 "github.com/stolostron/search-v2-operator/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
@@ -21,6 +22,7 @@ const (
 	collectorDeploymentName = "search-collector"
 	indexerDeploymentName   = "search-indexer"
 	postgresDeploymentName  = "search-postgres"
+	AnnotationSearchPause   = "search-pause"
 )
 
 func generateLabels(key, val string) map[string]string {
@@ -52,6 +54,17 @@ func newMetadataEnvVar(name, key string) corev1.EnvVar {
 			},
 		},
 	}
+}
+
+func IsPaused(annotations map[string]string) bool {
+	if annotations == nil {
+		return false
+	}
+	if annotations[AnnotationSearchPause] != "" &&
+		strings.EqualFold(annotations[AnnotationSearchPause], "true") {
+		return true
+	}
+	return false
 }
 
 func getNodeSelector(deploymentName string, instance *searchv1alpha1.Search) map[string]string {

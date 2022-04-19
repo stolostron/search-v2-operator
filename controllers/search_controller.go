@@ -18,7 +18,9 @@ package controllers
 
 import (
 	"context"
+	"sync"
 
+	"github.com/stolostron/search-v2-operator/addon"
 	searchv1alpha1 "github.com/stolostron/search-v2-operator/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -39,6 +41,7 @@ type SearchReconciler struct {
 }
 
 var log = logf.Log.WithName("searchoperator")
+var once sync.Once
 
 //+kubebuilder:rbac:groups=search.open-cluster-management.io,resources=searches,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=search.open-cluster-management.io,resources=searches/status,verbs=get;update;patch
@@ -61,6 +64,12 @@ func (r *SearchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 			return reconcile.Result{}, nil
 		}
 		return reconcile.Result{}, err
+	}
+
+	// Do not reconcile objects if this instance of search is labeled "paused"
+	if IsPaused(instance.GetAnnotations()) {
+		log.Info("Search reconciliation is paused. Nothing more to do.")
+		return ctrl.Result{}, nil
 	}
 	result, err := r.createSearchServiceAccount(ctx, r.SearchServiceAccount(instance))
 	if result != nil {
@@ -138,6 +147,11 @@ func (r *SearchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		log.Error(err, "Search CACert  setup failed")
 		return *result, err
 	}
+
+	once.Do(func() {
+
+		addon.CreateAddonOnce(ctx, instance)
+	})
 
 	return ctrl.Result{}, nil
 }

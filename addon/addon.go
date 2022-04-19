@@ -7,6 +7,8 @@ import (
 	"os"
 	"reflect"
 
+	"github.com/cloudflare/cfssl/log"
+	searchv1alpha1 "github.com/stolostron/search-v2-operator/api/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -20,6 +22,7 @@ import (
 	"open-cluster-management.io/addon-framework/pkg/utils"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
+	ctrl "sigs.k8s.io/controller-runtime"
 )
 
 const (
@@ -165,4 +168,31 @@ func NewAddonManager(kubeConfig *rest.Config) (addonmanager.AddonManager, error)
 	}
 	err = addonMgr.AddAgent(agentAddon)
 	return addonMgr, err
+}
+
+func startAddon(ctx context.Context) {
+	kubeConfig, err := ctrl.GetConfig()
+	if err != nil {
+		klog.Error(err, "unable to get kubeConfig", "controller", "SearchOperator")
+		os.Exit(1)
+	}
+	addonMgr, err := NewAddonManager(kubeConfig)
+
+	if err != nil {
+		klog.Error(err, "unable to create a new  addon manager", "controller", "SearchOperator")
+	} else {
+		klog.Info("starting search addon manager")
+		err = addonMgr.Start(ctx)
+		if err != nil {
+			klog.Error(err, "unable to start a new  addon manager", "controller", "SearchOperator")
+		}
+	}
+}
+
+func CreateAddonOnce(ctx context.Context, instance *searchv1alpha1.Search) {
+	log.Info("Starting Search Addon")
+	if instance.Spec.Deployments.Collector.ImageOverride != "" {
+		SearchCollectorImage = instance.Spec.Deployments.Collector.ImageOverride
+	}
+	go startAddon(ctx)
 }
