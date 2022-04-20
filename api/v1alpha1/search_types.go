@@ -102,6 +102,10 @@ type DeploymentConfig struct {
 	// +optional
 	// Image_override
 	ImageOverride string `json:"imageOverride,omitempty"`
+
+	// +optional
+	// Container Arguments
+	Arguments []string `json:"arguments,omitempty"`
 }
 
 type StorageSpec struct {
