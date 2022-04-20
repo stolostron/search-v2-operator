@@ -37,7 +37,7 @@ type SearchSpec struct {
 	// Important: Run "make" to regenerate code after modifying this file
 
 	// +optional
-	// Storgeclass Name to be used by default db
+	// Storage configuration for the DB
 	DBStorage StorageSpec `json:"dbStorage,omitempty"`
 
 	// +optional
