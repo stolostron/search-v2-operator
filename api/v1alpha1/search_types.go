@@ -42,7 +42,7 @@ type SearchSpec struct {
 
 	// +optional
 	//Configmap name contains parameters to override default db parameters
-	DbConfig string `json:"dbConfig,omitempty"`
+	DBConfig string `json:"dbConfig,omitempty"`
 
 	// +optional
 	// Customization for search deployments
@@ -56,7 +56,19 @@ type SearchSpec struct {
 	// Not part of dev preview
 	// Kubernetes secret name containing user provided db secret
 	// Secret should contain connection parameters [db_host, db_port, db_user, db_password, db_name, ca_cert]
-	// ExternalDBInstance string `json:"externalDBInstance,omitempty"`
+	ExternalDBInstance string `json:"externalDBInstance,omitempty"`
+
+	// +optional
+	//ImagePullSecret
+	ImagePullSecret string `json:"imagePullSecret,omitempty"`
+
+	// +optional
+	//ImagePullPolicy
+	ImagePullPolicy corev1.PullPolicy `json:"imagePullPolicy,omitempty"`
+
+	// +optional
+	// NodeSelector to schedule on nodes with matching labels
+	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
 }
 
 type SearchDeployments struct {
@@ -74,7 +86,7 @@ type SearchDeployments struct {
 
 	// +optional
 	// Configuration for api Deployment
-	Query_API DeploymentConfig `json:"query_api,omitempty"`
+	QueryAPI DeploymentConfig `json:"queryapi,omitempty"`
 }
 
 type DeploymentConfig struct {
@@ -88,69 +100,30 @@ type DeploymentConfig struct {
 	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
 
 	// +optional
-	//Image_override
+	// Image_override
 	ImageOverride string `json:"imageOverride,omitempty"`
-
-	// +optional
-	//ImagePullSecret
-	ImagePullSecret string `json:"imagePullSecret,omitempty"`
-
-	//ImagePullPolicy
-	// +optional
-	ImagePullPolicy corev1.PullPolicy `json:"imagePullPolicy,omitempty"`
-
-	// NodeSelector to schedule on nodes with matching labels
-	// +optional
-	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
-
-	//Proxy config , if remote collectors need to override
-	// +optional
-	ProxyConfig map[string]string `json:"proxyConfig,omitempty"`
 }
 
 type StorageSpec struct {
-	// +optional
 	// name of the storage class
 	StorageClassName string `json:"storageClassName,omitempty"`
 	// +optional
+	// +kubebuilder:validation:default:=10Gi
 	// storage capacity
 	Size *resource.Quantity `json:"size,omitempty"`
 }
 
-type FilterSpec struct {
-	// +optional
-	// Allowed resources from collector
-	AllowedResources []ResourceListSpec `json:"allowedResources,omitempty"`
-
-	// +optional
-	// Denied resources from collector
-	DeniedResources []ResourceListSpec `json:"deniedResources,omitempty"`
-}
-
-type ResourceListSpec struct {
-	//API Group names to be filtered
-	APIGroups []string `json:"apiGroups"`
-	//Resource names to be filtered
-	Resources []string `json:"resources"`
-	// +optional
-	//Cluster Labels this filter to be applied
-	ClusterLabels metav1.LabelSelector `json:"clusterLabels,omitempty"`
-}
-
 // SearchStatus defines the observed state of Search
 type SearchStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
-	// Human readable health status
-	Status string `json:"status"`
 
 	// Database used by search
 	DB string `json:"db"`
 
 	// Storage used by database
-	StorageInUse string `json:"storageInUse"`
+	Storage string `json:"storage"`
 
 	// +optional
+	// Conditions
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }
 
