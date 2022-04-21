@@ -23,6 +23,11 @@ const (
 	postgresDeploymentName  = "search-postgres"
 )
 
+const (
+	indexerConfigmapName  = "search-indexer"
+	postgresConfigmapName = "search-postgres"
+)
+
 func generateLabels(key, val string) map[string]string {
 	allLabels := map[string]string{
 		"component": "search-v2-operator",

@@ -33,6 +33,10 @@ func (r *SearchReconciler) PGDeployment(instance *searchv1alpha1.Search) *appsv1
 				Name:      "postgresdb",
 				MountPath: "/var/lib/pgsql/data",
 			},
+			{
+				Name:      "postgresconf",
+				MountPath: "/var/lib/pgsql/config",
+			},
 		},
 		ReadinessProbe: &corev1.Probe{
 			InitialDelaySeconds: 5,
@@ -59,6 +63,16 @@ func (r *SearchReconciler) PGDeployment(instance *searchv1alpha1.Search) *appsv1
 			Name: "postgresdb",
 			VolumeSource: corev1.VolumeSource{
 				EmptyDir: &corev1.EmptyDirVolumeSource{},
+			},
+		},
+		{
+			Name: "postgresconf",
+			VolumeSource: corev1.VolumeSource{
+				ConfigMap: &corev1.ConfigMapVolumeSource{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: postgresConfigmapName,
+					},
+				},
 			},
 		},
 	}

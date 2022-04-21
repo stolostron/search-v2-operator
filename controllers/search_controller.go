@@ -133,6 +133,11 @@ func (r *SearchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		log.Error(err, "Indexer configmap  setup failed")
 		return *result, err
 	}
+	result, err = r.createConfigMap(ctx, r.PostgresConfigmap(instance))
+	if result != nil {
+		log.Error(err, "Postgres configmap  setup failed")
+		return *result, err
+	}
 	result, err = r.createConfigMap(ctx, r.SearchCACert(instance))
 	if result != nil {
 		log.Error(err, "Search CACert  setup failed")

@@ -8,30 +8,27 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
-func (r *SearchReconciler) IndexerConfigmap(instance *searchv1alpha1.Search) *corev1.ConfigMap {
+// PostgresConfigmap returns a configmap object for the search postgres controller for the operator.
+func (r *SearchReconciler) PostgresConfigmap(instance *searchv1alpha1.Search) *corev1.ConfigMap {
 
 	ns := instance.GetNamespace()
 	deploymentLabels := generateLabels("config", "acm-proxyserver")
 	cm := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      indexerConfigmapName,
+			Name:      postgresConfigmapName,
 			Namespace: ns,
 			Labels:    deploymentLabels,
 		},
 	}
 	data := map[string]string{}
-	data["service"] = ns + "/search-indexer"
-	data["port"] = "3010"
-	data["path"] = "/aggregator/clusters/"
-	data["sub-resource"] = "/sync"
-	data["use-id"] = "true"
-	data["secret"] = ns + "/search-indexer-certs"
-	data["caConfigMap"] = "search-ca-crt"
+	data["ssl"] = "on"
+	data["ssl_cert_file"] = ""
+	data["ssl_key_file"] = ""
 	cm.Data = data
 
 	err := controllerutil.SetControllerReference(instance, cm, r.Scheme)
 	if err != nil {
-		log.V(2).Info("Could not set control for search-indexer configmap")
+		log.V(2).Info("Could not set control for search-postgres configmap")
 	}
 	return cm
 }
