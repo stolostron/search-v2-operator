@@ -15,7 +15,7 @@ func (r *SearchReconciler) SearchCACert(instance *searchv1alpha1.Search) *corev1
 	annotations["service.beta.openshift.io/inject-cabundle"] = "true"
 	cm := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        "search-ca-crt",
+			Name:        caCertConfigmapName,
 			Namespace:   ns,
 			Annotations: annotations,
 		},

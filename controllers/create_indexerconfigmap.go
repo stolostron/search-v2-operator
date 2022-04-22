@@ -26,7 +26,7 @@ func (r *SearchReconciler) IndexerConfigmap(instance *searchv1alpha1.Search) *co
 	data["sub-resource"] = "/sync"
 	data["use-id"] = "true"
 	data["secret"] = ns + "/search-indexer-certs"
-	data["caConfigMap"] = "search-ca-crt"
+	data["caConfigMap"] = caCertConfigmapName
 	cm.Data = data
 
 	err := controllerutil.SetControllerReference(instance, cm, r.Scheme)

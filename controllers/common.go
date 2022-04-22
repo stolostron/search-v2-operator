@@ -21,11 +21,16 @@ const (
 	collectorDeploymentName = "search-collector"
 	indexerDeploymentName   = "search-indexer"
 	postgresDeploymentName  = "search-postgres"
-)
 
-const (
 	indexerConfigmapName  = "search-indexer"
 	postgresConfigmapName = "search-postgres"
+	caCertConfigmapName   = "search-ca-crt"
+
+	postgresCACertSecretName = "search-postgres-certs"
+)
+
+var (
+	certDefaultMode = int32(384)
 )
 
 func generateLabels(key, val string) map[string]string {
