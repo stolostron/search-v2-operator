@@ -16,6 +16,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
+/* #nosec G101 */
 const (
 	apiDeploymentName       = "search-api"
 	collectorDeploymentName = "search-collector"
