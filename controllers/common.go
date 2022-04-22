@@ -26,7 +26,9 @@ const (
 	postgresConfigmapName = "search-postgres"
 	caCertConfigmapName   = "search-ca-crt"
 
-	postgresCACertSecretName = "search-postgres-certs"
+	apiSecretName      = "search-api-certs"
+	indexerSecretName  = "search-indexer-certs"
+	postgresSecretName = "search-postgres-certs"
 )
 
 var (

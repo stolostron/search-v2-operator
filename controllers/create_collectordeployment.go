@@ -54,7 +54,7 @@ func (r *SearchReconciler) CollectorDeployment(instance *searchv1alpha1.Search) 
 			Name: "search-indexer-certs",
 			VolumeSource: corev1.VolumeSource{
 				Secret: &corev1.SecretVolumeSource{
-					SecretName: "search-indexer-certs",
+					SecretName: indexerSecretName,
 				},
 			},
 		},

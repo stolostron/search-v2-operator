@@ -83,8 +83,8 @@ func (r *SearchReconciler) PGDeployment(instance *searchv1alpha1.Search) *appsv1
 			Name: "search-postgres-certs",
 			VolumeSource: corev1.VolumeSource{
 				Secret: &corev1.SecretVolumeSource{
-					SecretName:  postgresCACertSecretName,
 					DefaultMode: &certDefaultMode,
+					SecretName:  postgresSecretName,
 				},
 			},
 		},

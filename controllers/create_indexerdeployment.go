@@ -61,7 +61,7 @@ func (r *SearchReconciler) IndexerDeployment(instance *searchv1alpha1.Search) *a
 			Name: "search-indexer-certs",
 			VolumeSource: corev1.VolumeSource{
 				Secret: &corev1.SecretVolumeSource{
-					SecretName: "search-indexer-certs",
+					SecretName: indexerSecretName,
 				},
 			},
 		},
