@@ -146,13 +146,11 @@ func NewAddonManager(kubeConfig *rest.Config) (addonmanager.AddonManager, error)
 	if SearchCollectorImage == "" {
 		return nil, fmt.Errorf("the search-collector pod image is empty")
 	}
-
 	addonMgr, err := addonmanager.New(kubeConfig)
 	if err != nil {
 		klog.Errorf("unable to setup addon manager: %v", err)
 		return nil, err
 	}
-
 	kubeClient, err := kubernetes.NewForConfig(kubeConfig)
 	if err != nil {
 		klog.Errorf("unable to create kube client: %v", err)
@@ -173,11 +171,10 @@ func NewAddonManager(kubeConfig *rest.Config) (addonmanager.AddonManager, error)
 func startAddon(ctx context.Context) {
 	kubeConfig, err := ctrl.GetConfig()
 	if err != nil {
-		klog.Error(err, "unable to get kubeConfig", "controller", "SearchOperator")
-		os.Exit(1)
+		klog.Error(err, "unable to get kubeConfig , addon cannot be installed", "controller", "SearchOperator")
+		return
 	}
 	addonMgr, err := NewAddonManager(kubeConfig)
-
 	if err != nil {
 		klog.Error(err, "unable to create a new  addon manager", "controller", "SearchOperator")
 	} else {
