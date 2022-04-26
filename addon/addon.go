@@ -186,6 +186,10 @@ func startAddon(ctx context.Context) {
 	}
 }
 
+/*
+Addon needs to be started only at the first time when CR is created.
+No need to start every reconcile
+*/
 func CreateAddonOnce(ctx context.Context, instance *searchv1alpha1.Search) {
 	log.Info("Starting Search Addon")
 	if instance.Spec.Deployments.Collector.ImageOverride != "" {

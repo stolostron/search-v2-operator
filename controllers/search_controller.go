@@ -68,7 +68,7 @@ func (r *SearchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 
 	// Do not reconcile objects if this instance of search is labeled "paused"
 	if IsPaused(instance.GetAnnotations()) {
-		log.Info("Search reconciliation is paused. Nothing more to do.")
+		log.Info("Reconciliation is paused because the annotation 'search-pause: true' was found.")
 		return ctrl.Result{}, nil
 	}
 	result, err := r.createSearchServiceAccount(ctx, r.SearchServiceAccount(instance))

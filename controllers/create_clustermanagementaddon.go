@@ -38,7 +38,8 @@ func (r *SearchReconciler) createClusterManagementAddOn(ctx context.Context,
 	return nil, nil
 }
 
-func (r *SearchReconciler) newClusterManagementAddOn(instance *searchv1alpha1.Search) *addonv1alpha1.ClusterManagementAddOn {
+func (r *SearchReconciler) newClusterManagementAddOn(instance *searchv1alpha1.Search)
+ *addonv1alpha1.ClusterManagementAddOn {
 	cma := &addonv1alpha1.ClusterManagementAddOn{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      getClusterManagementAddonName(),
@@ -53,7 +54,7 @@ func (r *SearchReconciler) newClusterManagementAddOn(instance *searchv1alpha1.Se
 	}
 	err := controllerutil.SetControllerReference(instance, cma, r.Scheme)
 	if err != nil {
-		log.V(2).Info("Could not set control for search-collector ClusterManagementAddOn", err)
+		log.Error(err, "Could not set control for search-collector ClusterManagementAddOn")
 	}
 	return cma
 }
