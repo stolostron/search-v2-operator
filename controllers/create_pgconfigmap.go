@@ -12,12 +12,10 @@ import (
 func (r *SearchReconciler) PostgresConfigmap(instance *searchv1alpha1.Search) *corev1.ConfigMap {
 
 	ns := instance.GetNamespace()
-	deploymentLabels := generateLabels("config", "acm-proxyserver")
 	cm := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      postgresConfigmapName,
 			Namespace: ns,
-			Labels:    deploymentLabels,
 		},
 	}
 	data := map[string]string{}
