@@ -275,7 +275,7 @@ func (r *SearchReconciler) createConfigMap(ctx context.Context, cm *corev1.Confi
 			return &reconcile.Result{}, err
 		}
 	}
-	log.V(2).Info("Created %s configmap", cm.Name)
+	log.V(2).Info("Created %s configmap ", cm.Name)
 	return nil, nil
 }
 
@@ -307,7 +307,7 @@ func (r *SearchReconciler) createOrUpdateDeployment(ctx context.Context, deploy 
 				log.Error(err, "Could not create deployment")
 				return &reconcile.Result{}, err
 			}
-			log.Info("Created  deployment" + deploy.Name)
+			log.Info("Created  deployment " + deploy.Name)
 			log.V(9).Info("Created deployment %+v", deploy)
 			return nil, nil
 		}
@@ -337,7 +337,7 @@ func (r *SearchReconciler) createService(ctx context.Context, svc *corev1.Servic
 				log.Error(err, "Could not create service")
 				return &reconcile.Result{}, err
 			}
-			log.Info("Created service" + svc.Name)
+			log.Info("Created service " + svc.Name)
 			log.V(9).Info("Created service %+v", svc)
 			return nil, nil
 		}
@@ -360,7 +360,7 @@ func (r *SearchReconciler) createSecret(ctx context.Context, secret *corev1.Secr
 				log.Error(err, "Could not create secret")
 				return &reconcile.Result{}, err
 			}
-			log.Info("Created secret" + secret.Name)
+			log.Info("Created secret " + secret.Name)
 			return nil, nil
 		}
 		log.Error(err, "Could not get secret")

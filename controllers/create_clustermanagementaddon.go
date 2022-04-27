@@ -28,7 +28,7 @@ func (r *SearchReconciler) createClusterManagementAddOn(ctx context.Context,
 			log.Error(err, "Could not create ClusterManagementAddOn")
 			return &reconcile.Result{}, err
 		}
-		log.Info("Created %s ClusterManagementAddOn", cma.Name)
+		log.Info("Created ClusterManagementAddOn " + cma.Name)
 		return nil, nil
 	}
 	if err != nil {
@@ -38,8 +38,7 @@ func (r *SearchReconciler) createClusterManagementAddOn(ctx context.Context,
 	return nil, nil
 }
 
-func (r *SearchReconciler) newClusterManagementAddOn(instance *searchv1alpha1.Search)
- *addonv1alpha1.ClusterManagementAddOn {
+func (r *SearchReconciler) newClusterManagementAddOn(instance *searchv1alpha1.Search) *addonv1alpha1.ClusterManagementAddOn {
 	cma := &addonv1alpha1.ClusterManagementAddOn{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      getClusterManagementAddonName(),
