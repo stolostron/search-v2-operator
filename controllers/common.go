@@ -4,6 +4,7 @@ package controllers
 import (
 	"context"
 	"os"
+	"strings"
 
 	searchv1alpha1 "github.com/stolostron/search-v2-operator/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
@@ -21,6 +22,7 @@ const (
 	collectorDeploymentName = "search-collector"
 	indexerDeploymentName   = "search-indexer"
 	postgresDeploymentName  = "search-postgres"
+	AnnotationSearchPause   = "search-pause"
 )
 
 func generateLabels(key, val string) map[string]string {
@@ -52,6 +54,17 @@ func newMetadataEnvVar(name, key string) corev1.EnvVar {
 			},
 		},
 	}
+}
+
+func IsPaused(annotations map[string]string) bool {
+	if annotations == nil {
+		return false
+	}
+	if annotations[AnnotationSearchPause] != "" &&
+		strings.EqualFold(annotations[AnnotationSearchPause], "true") {
+		return true
+	}
+	return false
 }
 
 func getNodeSelector(deploymentName string, instance *searchv1alpha1.Search) map[string]string {
@@ -262,7 +275,7 @@ func (r *SearchReconciler) createConfigMap(ctx context.Context, cm *corev1.Confi
 			return &reconcile.Result{}, err
 		}
 	}
-	log.V(2).Info("Created %s configmap", cm.Name)
+	log.V(2).Info("Created %s configmap ", cm.Name)
 	return nil, nil
 }
 
@@ -294,7 +307,7 @@ func (r *SearchReconciler) createOrUpdateDeployment(ctx context.Context, deploy 
 				log.Error(err, "Could not create deployment")
 				return &reconcile.Result{}, err
 			}
-			log.Info("Created  deployment" + deploy.Name)
+			log.Info("Created  deployment " + deploy.Name)
 			log.V(9).Info("Created deployment %+v", deploy)
 			return nil, nil
 		}
@@ -324,7 +337,7 @@ func (r *SearchReconciler) createService(ctx context.Context, svc *corev1.Servic
 				log.Error(err, "Could not create service")
 				return &reconcile.Result{}, err
 			}
-			log.Info("Created service" + svc.Name)
+			log.Info("Created service " + svc.Name)
 			log.V(9).Info("Created service %+v", svc)
 			return nil, nil
 		}
@@ -347,7 +360,7 @@ func (r *SearchReconciler) createSecret(ctx context.Context, secret *corev1.Secr
 				log.Error(err, "Could not create secret")
 				return &reconcile.Result{}, err
 			}
-			log.Info("Created secret" + secret.Name)
+			log.Info("Created secret " + secret.Name)
 			return nil, nil
 		}
 		log.Error(err, "Could not get secret")

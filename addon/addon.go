@@ -7,6 +7,8 @@ import (
 	"os"
 	"reflect"
 
+	"github.com/cloudflare/cfssl/log"
+	searchv1alpha1 "github.com/stolostron/search-v2-operator/api/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -20,6 +22,7 @@ import (
 	"open-cluster-management.io/addon-framework/pkg/utils"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
+	ctrl "sigs.k8s.io/controller-runtime"
 )
 
 const (
@@ -143,13 +146,11 @@ func NewAddonManager(kubeConfig *rest.Config) (addonmanager.AddonManager, error)
 	if SearchCollectorImage == "" {
 		return nil, fmt.Errorf("the search-collector pod image is empty")
 	}
-
 	addonMgr, err := addonmanager.New(kubeConfig)
 	if err != nil {
 		klog.Errorf("unable to setup addon manager: %v", err)
 		return nil, err
 	}
-
 	kubeClient, err := kubernetes.NewForConfig(kubeConfig)
 	if err != nil {
 		klog.Errorf("unable to create kube client: %v", err)
@@ -165,4 +166,34 @@ func NewAddonManager(kubeConfig *rest.Config) (addonmanager.AddonManager, error)
 	}
 	err = addonMgr.AddAgent(agentAddon)
 	return addonMgr, err
+}
+
+func startAddon(ctx context.Context) {
+	kubeConfig, err := ctrl.GetConfig()
+	if err != nil {
+		klog.Error(err, "unable to get kubeConfig , addon cannot be installed", "controller", "SearchOperator")
+		return
+	}
+	addonMgr, err := NewAddonManager(kubeConfig)
+	if err != nil {
+		klog.Error(err, "unable to create a new  addon manager", "controller", "SearchOperator")
+	} else {
+		klog.Info("starting search addon manager")
+		err = addonMgr.Start(ctx)
+		if err != nil {
+			klog.Error(err, "unable to start a new  addon manager", "controller", "SearchOperator")
+		}
+	}
+}
+
+/*
+Addon needs to be started only at the first time when CR is created.
+No need to start every reconcile
+*/
+func CreateAddonOnce(ctx context.Context, instance *searchv1alpha1.Search) {
+	log.Info("Starting Search Addon")
+	if instance.Spec.Deployments.Collector.ImageOverride != "" {
+		SearchCollectorImage = instance.Spec.Deployments.Collector.ImageOverride
+	}
+	go startAddon(ctx)
 }
