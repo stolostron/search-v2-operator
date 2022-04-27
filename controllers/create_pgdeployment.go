@@ -39,7 +39,7 @@ func (r *SearchReconciler) PGDeployment(instance *searchv1alpha1.Search) *appsv1
 			},
 			{
 				Name:      "search-postgres-certs",
-				MountPath: "/opt/app-root/src",
+				MountPath: "/sslcert",
 			},
 		},
 		ReadinessProbe: &corev1.Probe{

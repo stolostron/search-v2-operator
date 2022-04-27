@@ -19,7 +19,7 @@ func (r *SearchReconciler) PostgresConfigmap(instance *searchv1alpha1.Search) *c
 		},
 	}
 	data := map[string]string{}
-	data["postgresql.conf"] = "ssl = 'on'\nssl_cert_file = '/sslcerts/tls.crt'\nssl_key_file = '/sslcerts/tls.key'"
+	data["postgresql.conf"] = "ssl = 'on'\nssl_cert_file = '/sslcert/tls.crt'\nssl_key_file = '/sslcert/tls.key'"
 	cm.Data = data
 
 	err := controllerutil.SetControllerReference(instance, cm, r.Scheme)
