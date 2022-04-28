@@ -95,7 +95,7 @@ Find the managed clusters that the user is authorized to view and [cache](#cache
 >       - CLI: `oc projects --as=<user>`
 >       - API: [ProjectList](https://docs.okd.io/3.9/rest_api/apis-project.openshift.io/v1.Project.html#Get-apis-project.openshift.io-v1-projects)
 > 3. Build a list of all the managed clusters visible to the user.
->       - UNION of results from steps 1 and 2.
+>       - INTERSECTION of results from steps 1 and 2.
 > 4. For each managed cluster, check if the user has permission to view resources.
 >       - CLI: `oc auth can-i create ManagedClusterView -n <managedClusterName> --as=<user>`
 >       - API: [SelfSubjectRulesReview](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.23/#selfsubjectrulesreview-v1-authorization-k8s-io) (We already have this data.)
