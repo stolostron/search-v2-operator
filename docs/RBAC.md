@@ -27,8 +27,8 @@ The default ACM admin and viewer roles should include access to the Search API b
 
 ## Authenticate the user 
 
-The Search API authenticates the user (or service account) and impersonates the user to obtain their access rules.
-We cache the token validation for a short period (60 seconds) to reduce requests to the kube api. Tokens have a short expiration, so we must revalidate often. **Note that** this time-to-live period is independent of the cached rules, which is longer at 10 minutes of inactivity.
+The Search API uses the Service Account bind to the pod (search-serviceaccount) to authenticate the user (or service account) that makes the request, then impersonates the user to obtain their access rules.
+We cache the token validation for a short period (default: 60 seconds) to reduce requests to the kube api. Tokens have a short expiration, so we must revalidate often. **Note that** this time-to-live period is independent of the cached rules, which is longer at 10 minutes of inactivity.
 
 > Use the [TokenReview API](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.23/#tokenreview-v1-authentication-k8s-io) to validate the user token and obtain the UserInfo (username and groups).
 
