@@ -59,7 +59,7 @@ func (r *SearchReconciler) APIDeployment(instance *searchv1alpha1.Search) *appsv
 			Name: "search-api-certs",
 			VolumeSource: corev1.VolumeSource{
 				Secret: &corev1.SecretVolumeSource{
-					SecretName: "search-api-certs",
+					SecretName: apiSecretName,
 				},
 			},
 		},

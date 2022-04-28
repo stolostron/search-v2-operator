@@ -14,7 +14,7 @@ func (r *SearchReconciler) IndexerConfigmap(instance *searchv1alpha1.Search) *co
 	deploymentLabels := generateLabels("config", "acm-proxyserver")
 	cm := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "search-indexer",
+			Name:      indexerConfigmapName,
 			Namespace: ns,
 			Labels:    deploymentLabels,
 		},
@@ -26,7 +26,7 @@ func (r *SearchReconciler) IndexerConfigmap(instance *searchv1alpha1.Search) *co
 	data["sub-resource"] = "/sync"
 	data["use-id"] = "true"
 	data["secret"] = ns + "/search-indexer-certs"
-	data["caConfigMap"] = "search-ca-crt"
+	data["caConfigMap"] = caCertConfigmapName
 	cm.Data = data
 
 	err := controllerutil.SetControllerReference(instance, cm, r.Scheme)

@@ -33,6 +33,14 @@ func (r *SearchReconciler) PGDeployment(instance *searchv1alpha1.Search) *appsv1
 				Name:      "postgresdb",
 				MountPath: "/var/lib/pgsql/data",
 			},
+			{
+				Name:      "postgresconf",
+				MountPath: "/opt/app-root/src/postgresql-cfg",
+			},
+			{
+				Name:      "search-postgres-certs",
+				MountPath: "/sslcert",
+			},
 		},
 		ReadinessProbe: &corev1.Probe{
 			InitialDelaySeconds: 5,
@@ -59,6 +67,25 @@ func (r *SearchReconciler) PGDeployment(instance *searchv1alpha1.Search) *appsv1
 			Name: "postgresdb",
 			VolumeSource: corev1.VolumeSource{
 				EmptyDir: &corev1.EmptyDirVolumeSource{},
+			},
+		},
+		{
+			Name: "postgresconf",
+			VolumeSource: corev1.VolumeSource{
+				ConfigMap: &corev1.ConfigMapVolumeSource{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: postgresConfigmapName,
+					},
+				},
+			},
+		},
+		{
+			Name: "search-postgres-certs",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					DefaultMode: &certDefaultMode,
+					SecretName:  postgresSecretName,
+				},
 			},
 		},
 	}

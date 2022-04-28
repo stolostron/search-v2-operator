@@ -8,22 +8,23 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
-func (r *SearchReconciler) SearchCACert(instance *searchv1alpha1.Search) *corev1.ConfigMap {
+// PostgresConfigmap returns a configmap object for the search postgres controller for the operator.
+func (r *SearchReconciler) PostgresConfigmap(instance *searchv1alpha1.Search) *corev1.ConfigMap {
 
 	ns := instance.GetNamespace()
-	annotations := map[string]string{}
-	annotations["service.beta.openshift.io/inject-cabundle"] = "true"
 	cm := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        caCertConfigmapName,
-			Namespace:   ns,
-			Annotations: annotations,
+			Name:      postgresConfigmapName,
+			Namespace: ns,
 		},
 	}
+	data := map[string]string{}
+	data["postgresql.conf"] = "ssl = 'on'\nssl_cert_file = '/sslcert/tls.crt'\nssl_key_file = '/sslcert/tls.key'"
+	cm.Data = data
 
 	err := controllerutil.SetControllerReference(instance, cm, r.Scheme)
 	if err != nil {
-		log.V(2).Info("Could not set control for search-ca-cert configmap")
+		log.V(2).Info("Could not set control for search-postgres configmap")
 	}
 	return cm
 }

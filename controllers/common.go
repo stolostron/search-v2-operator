@@ -17,12 +17,27 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
+/* #nosec G101
+gosec will flag the "secrets" as security violations. This flag will allow us to ignore it as a false positive.
+*/
 const (
 	apiDeploymentName       = "search-api"
 	collectorDeploymentName = "search-collector"
 	indexerDeploymentName   = "search-indexer"
 	postgresDeploymentName  = "search-postgres"
-	AnnotationSearchPause   = "search-pause"
+
+	indexerConfigmapName  = "search-indexer"
+	postgresConfigmapName = "search-postgres"
+	caCertConfigmapName   = "search-ca-crt"
+
+	apiSecretName      = "search-api-certs"
+	indexerSecretName  = "search-indexer-certs"
+	postgresSecretName = "search-postgres-certs"
+)
+
+var (
+	certDefaultMode       = int32(384)
+	AnnotationSearchPause = "search-pause"
 )
 
 func generateLabels(key, val string) map[string]string {

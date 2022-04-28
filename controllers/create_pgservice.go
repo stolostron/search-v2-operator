@@ -13,8 +13,9 @@ func (r *SearchReconciler) PGService(instance *searchv1alpha1.Search) *corev1.Se
 
 	svc := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "search-postgres",
-			Namespace: instance.GetNamespace(),
+			Name:        "search-postgres",
+			Namespace:   instance.GetNamespace(),
+			Annotations: map[string]string{"service.beta.openshift.io/serving-cert-secret-name": postgresSecretName},
 		},
 	}
 	svc.Spec.Ports = append(svc.Spec.Ports, corev1.ServicePort{})
