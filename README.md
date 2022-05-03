@@ -2,33 +2,47 @@
 
 ## Installing search-v2-operator in openshift cluster
 
-Install search-v2-operator in open-cluster-management namespace, after disabling search-operator (v1) by updating MulticlusterHub CR.
+Install search-v2-operator in open-cluster-management namespace, after disabling search-operator (v1) by updating MulticlusterHub CR. In the MulticlusterHub CR set `enabled: false` where `spec.overrides.components.name = search`
+```
+spec:
+  overrides:
+    components:
+      - enabled: false
+        name: search
+```        
 
 **Prerequisite** :  You will need operator sdk to install search operator bundle image. Download and install operator-sdk client version  >= v1.15
 
 <https://sdk.operatorframework.io/docs/installation/>
 
-#### 1. Create Image pull secret to pull images from quay (Hub cluster)
+#### 1. Log into the cluster using CLI
+If not done already, use `oc login` to log in to the cluster by replacing `yoururl` and `yourpassword` below
+```
+oc login https://yoururl.com:6443 -u kubeadmin -p yourpassword
+```
+#### 2. Create Image pull secret to pull images from quay (Hub cluster)
 
-    go to https://quay.io/user/<your_id>?tab=settings replacing <your_id>  with your username
-    click on Generate Encrypted Password
-    enter your quay.io password
-    select Kubernetes Secret from left-hand menu
-    Download yaml file and rename secret as  `search-pull-secret`
-    oc apply -f <your_secret.yaml>
-    Verify secrets presence by running ` oc get secret | grep search-pull-secret`
+1. go to https://quay.io/user/<your_id>?tab=settings replacing <your_id>  with your username
+1. click on Generate Encrypted Password
+1. enter your quay.io password
+1. select Kubernetes Secret from left-hand menu
+1. Download yaml file and rename secret as  `search-pull-secret`
+1. oc apply -f <your_secret.yaml>
+1. Verify secrets presence by running ` oc get secret | grep search-pull-secret`
 
-#### 2. Run bundle
-
-    operator-sdk run bundle quay.io/stolostron/search-operator-bundle:latest --pull-secret-name search-pull-secret
+_Note: A secret does need to be created with name as `search-pull-secret`_
+#### 3. Run bundle
+```
+operator-sdk run bundle quay.io/stolostron/search-operator-bundle:latest --pull-secret-name search-pull-secret
+```
 
 Wait for `OLM has successfully installed "search-v2-operator.v0.0.1"` message.
 You can replace the latest tag with specific image tag from quay to test other images.
 
-#### 3. Apply the empty CR to create the search components
+#### 4. Apply the empty CR to create the search components
 
     oc apply -f config/samples/search_v1alpha1_search.yaml
-
+_Note: The custom resource must be named  `search-v2-operator`_
 Check if all the search pods are running, use ACM console to search.
 
 ## Building search-v2-operator in local machine
