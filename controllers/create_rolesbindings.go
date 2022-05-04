@@ -132,6 +132,11 @@ func getRules() []rbacv1.PolicyRule {
 			Resources: []string{"deployments"},
 			Verbs:     []string{"*"},
 		},
+		{
+			APIGroups: []string{"authentication.k8s.io"},
+			Resources: []string{"tokenreviews"},
+			Verbs:     []string{"create"},
+		},
 	}
 }
 
