@@ -14,7 +14,7 @@ func TestGetDeploymentConfigForNil(t *testing.T) {
 	instance := &searchv1alpha1.Search{
 		Spec: searchv1alpha1.SearchSpec{
 			Deployments: searchv1alpha1.SearchDeployments{
-				API: searchv1alpha1.DeploymentConfig{
+				QueryAPI: searchv1alpha1.DeploymentConfig{
 					ReplicaCount: 1,
 				},
 			},
@@ -33,7 +33,7 @@ func TestResourcesCustomized(t *testing.T) {
 	instance := &searchv1alpha1.Search{
 		Spec: searchv1alpha1.SearchSpec{
 			Deployments: searchv1alpha1.SearchDeployments{
-				API: searchv1alpha1.DeploymentConfig{
+				QueryAPI: searchv1alpha1.DeploymentConfig{
 					ReplicaCount: 1,
 					Resources: &corev1.ResourceRequirements{
 						Limits: corev1.ResourceList{
@@ -50,14 +50,14 @@ func TestResourcesCustomized(t *testing.T) {
 	}
 	want := true
 	if isResourcesCustomized("search-api", instance) != want {
-		t.Errorf("API is not customized")
+		t.Errorf("QueryAPI is not customized")
 	}
 }
 func TestResourcesNotCustomized(t *testing.T) {
 	instance := &searchv1alpha1.Search{
 		Spec: searchv1alpha1.SearchSpec{
 			Deployments: searchv1alpha1.SearchDeployments{
-				API: searchv1alpha1.DeploymentConfig{
+				QueryAPI: searchv1alpha1.DeploymentConfig{
 					ReplicaCount: 1,
 					Resources: &corev1.ResourceRequirements{
 						Limits: corev1.ResourceList{
@@ -99,13 +99,13 @@ func TestAPICustomization(t *testing.T) {
 	testFor := "search-api"
 	instance := &searchv1alpha1.Search{
 		Spec: searchv1alpha1.SearchSpec{
+			ImagePullPolicy: "IfNotPresent",
+			ImagePullSecret: "personal-pull-secret",
+			NodeSelector:    map[string]string{"key1": "val1"},
 			Deployments: searchv1alpha1.SearchDeployments{
-				API: searchv1alpha1.DeploymentConfig{
-					ReplicaCount:    5,
-					ImagePullPolicy: "IfNotPresent",
-					ImagePullSecret: "personal-pull-secret",
-					ImageOverride:   "quay.io/test-image:007",
-					NodeSelector:    map[string]string{"key1": "val1"},
+				QueryAPI: searchv1alpha1.DeploymentConfig{
+					ReplicaCount:  5,
+					ImageOverride: "quay.io/test-image:007",
 					Resources: &corev1.ResourceRequirements{
 						Limits: corev1.ResourceList{
 							"memory": resource.MustParse("25Mi"),
@@ -165,13 +165,14 @@ func TestIndexerCustomization(t *testing.T) {
 	testFor := "search-indexer"
 	instance := &searchv1alpha1.Search{
 		Spec: searchv1alpha1.SearchSpec{
+			ImagePullPolicy: "IfNotPresent",
+			ImagePullSecret: "personal-pull-secret",
+			NodeSelector:    map[string]string{"key1": "val1"},
 			Deployments: searchv1alpha1.SearchDeployments{
 				Indexer: searchv1alpha1.DeploymentConfig{
-					ReplicaCount:    5,
-					ImagePullPolicy: "IfNotPresent",
-					ImagePullSecret: "personal-pull-secret",
-					ImageOverride:   "quay.io/test-image:007",
-					NodeSelector:    map[string]string{"key1": "val1"},
+					Arguments:     []string{"arg1", "arg2"},
+					ReplicaCount:  5,
+					ImageOverride: "quay.io/test-image:007",
 					Resources: &corev1.ResourceRequirements{
 						Limits: corev1.ResourceList{
 							"memory": resource.MustParse("25Mi"),
@@ -223,6 +224,10 @@ func TestIndexerCustomization(t *testing.T) {
 	actual_image_sha := getImageSha(testFor, instance)
 	if actual_image_sha != "quay.io/test-image:007" {
 		t.Errorf("ImageOverride with incorrect image")
+	}
+	actual_args := getContainerArgs(testFor, instance)
+	if actual_args == nil || len(actual_args) != 2 || actual_args[0] != "arg1" || actual_args[1] != "arg2" {
+		t.Errorf("Incorrect Args parsed")
 	}
 
 }
@@ -230,13 +235,13 @@ func TestCollectorCustomization(t *testing.T) {
 	testFor := "search-collector"
 	instance := &searchv1alpha1.Search{
 		Spec: searchv1alpha1.SearchSpec{
+			ImagePullPolicy: "IfNotPresent",
+			ImagePullSecret: "personal-pull-secret",
+			NodeSelector:    map[string]string{"key1": "val1"},
 			Deployments: searchv1alpha1.SearchDeployments{
 				Collector: searchv1alpha1.DeploymentConfig{
-					ReplicaCount:    5,
-					ImagePullPolicy: "IfNotPresent",
-					ImagePullSecret: "personal-pull-secret",
-					ImageOverride:   "quay.io/test-image:007",
-					NodeSelector:    map[string]string{"key1": "val1"},
+					ReplicaCount:  5,
+					ImageOverride: "quay.io/test-image:007",
 					Resources: &corev1.ResourceRequirements{
 						Limits: corev1.ResourceList{
 							"memory": resource.MustParse("25Mi"),
@@ -288,6 +293,10 @@ func TestCollectorCustomization(t *testing.T) {
 	actual_image_sha := getImageSha(testFor, instance)
 	if actual_image_sha != "quay.io/test-image:007" {
 		t.Errorf("ImageOverride with incorrect image")
+	}
+	actual_args := getContainerArgs(testFor, instance)
+	if actual_args != nil {
+		t.Errorf("Incorrect Args parsed")
 	}
 
 }
@@ -296,13 +305,14 @@ func TestPostgresCustomization(t *testing.T) {
 	testFor := "search-postgres"
 	instance := &searchv1alpha1.Search{
 		Spec: searchv1alpha1.SearchSpec{
+			ImagePullPolicy: "IfNotPresent",
+			ImagePullSecret: "personal-pull-secret",
+			NodeSelector:    map[string]string{"key1": "val1"},
 			Deployments: searchv1alpha1.SearchDeployments{
 				Database: searchv1alpha1.DeploymentConfig{
-					ReplicaCount:    5,
-					ImagePullPolicy: "IfNotPresent",
-					ImagePullSecret: "personal-pull-secret",
-					ImageOverride:   "quay.io/test-image:007",
-					NodeSelector:    map[string]string{"key1": "val1"},
+					Arguments:     []string{"arg1"},
+					ReplicaCount:  5,
+					ImageOverride: "quay.io/test-image:007",
 					Resources: &corev1.ResourceRequirements{
 						Limits: corev1.ResourceList{
 							"memory": resource.MustParse("25Mi"),
@@ -354,6 +364,10 @@ func TestPostgresCustomization(t *testing.T) {
 	actual_image_sha := getImageSha(testFor, instance)
 	if actual_image_sha != "quay.io/test-image:007" {
 		t.Errorf("ImageOverride with incorrect image")
+	}
+	actual_args := getContainerArgs(testFor, instance)
+	if actual_args == nil || len(actual_args) != 1 || actual_args[0] != "arg1" {
+		t.Errorf("Incorrect Args parsed")
 	}
 
 }

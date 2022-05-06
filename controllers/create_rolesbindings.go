@@ -9,6 +9,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
@@ -55,7 +56,7 @@ func (r *SearchReconciler) createRoleBinding(ctx context.Context,
 }
 
 func (r *SearchReconciler) ClusterRole(instance *searchv1alpha1.Search) *rbacv1.ClusterRole {
-	return &rbacv1.ClusterRole{
+	cr := &rbacv1.ClusterRole{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "ClusterRole",
 			APIVersion: rbacv1.SchemeGroupVersion.String(),
@@ -66,10 +67,15 @@ func (r *SearchReconciler) ClusterRole(instance *searchv1alpha1.Search) *rbacv1.
 		},
 		Rules: getRules(),
 	}
+	err := controllerutil.SetControllerReference(instance, cr, r.Scheme)
+	if err != nil {
+		log.Info("Could not set control for ClusterRole " + getRoleName())
+	}
+	return cr
 }
 
 func (r *SearchReconciler) ClusterRoleBinding(instance *searchv1alpha1.Search) *rbacv1.ClusterRoleBinding {
-	return &rbacv1.ClusterRoleBinding{
+	crb := &rbacv1.ClusterRoleBinding{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "ClusterRoleBinding",
 			APIVersion: rbacv1.SchemeGroupVersion.String(),
@@ -85,6 +91,11 @@ func (r *SearchReconciler) ClusterRoleBinding(instance *searchv1alpha1.Search) *
 		},
 		Subjects: getSubjects(instance.GetNamespace()),
 	}
+	err := controllerutil.SetControllerReference(instance, crb, r.Scheme)
+	if err != nil {
+		log.Info("Could not set control for ClusterRoleBinding" + getRoleBindingName())
+	}
+	return crb
 }
 
 func (r *SearchReconciler) AddonClusterRole(instance *searchv1alpha1.Search) *rbacv1.ClusterRole {
