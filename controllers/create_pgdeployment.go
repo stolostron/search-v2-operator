@@ -34,8 +34,12 @@ func (r *SearchReconciler) PGDeployment(instance *searchv1alpha1.Search) *appsv1
 				MountPath: "/var/lib/pgsql/data",
 			},
 			{
-				Name:      "postgresconf",
+				Name:      "postgresql-cfg",
 				MountPath: "/opt/app-root/src/postgresql-cfg",
+			},
+			{
+				Name:      "postgresql-start",
+				MountPath: "/opt/app-root/src/postgresql-start",
 			},
 			{
 				Name:      "search-postgres-certs",
@@ -70,7 +74,17 @@ func (r *SearchReconciler) PGDeployment(instance *searchv1alpha1.Search) *appsv1
 			},
 		},
 		{
-			Name: "postgresconf",
+			Name: "postgresql-cfg",
+			VolumeSource: corev1.VolumeSource{
+				ConfigMap: &corev1.ConfigMapVolumeSource{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: postgresConfigmapName,
+					},
+				},
+			},
+		},
+		{
+			Name: "postgresql-start",
 			VolumeSource: corev1.VolumeSource{
 				ConfigMap: &corev1.ConfigMapVolumeSource{
 					LocalObjectReference: corev1.LocalObjectReference{
