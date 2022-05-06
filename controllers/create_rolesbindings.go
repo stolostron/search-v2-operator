@@ -139,12 +139,7 @@ func getRules() []rbacv1.PolicyRule {
 		},
 		{
 			APIGroups: []string{"authorization.k8s.io"},
-			Resources: []string{"selfsubjectaccessreviews"},
-			Verbs:     []string{"create"},
-		},
-		{
-			APIGroups: []string{"authorization.k8s.io"},
-			Resources: []string{"selfsubjectrulesreviews"},
+			Resources: []string{"selfsubjectaccessreviews", "selfsubjectrulesreviews"},
 			Verbs:     []string{"create"},
 		},
 	}
