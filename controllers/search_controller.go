@@ -19,6 +19,7 @@ package controllers
 import (
 	"context"
 	"sync"
+	"time"
 
 	"github.com/stolostron/search-v2-operator/addon"
 	searchv1alpha1 "github.com/stolostron/search-v2-operator/api/v1alpha1"
@@ -70,6 +71,16 @@ func (r *SearchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	if IsPaused(instance.GetAnnotations()) {
 		log.Info("Reconciliation is paused because the annotation 'search-pause: true' was found.")
 		return ctrl.Result{}, nil
+	}
+	if instance.Spec.DBStorage.StorageClassName != "" && !r.isPVCPresent(ctx, instance) {
+		pvcConfigured := r.configurePVC(ctx, instance)
+		if !pvcConfigured {
+			log.Info("Persistent Volume Claim is not ready yet , retyring in 10 seconds")
+			return ctrl.Result{
+				RequeueAfter: 10 * time.Second,
+				Requeue:      true,
+			}, nil
+		}
 	}
 	result, err := r.createSearchServiceAccount(ctx, r.SearchServiceAccount(instance))
 	if result != nil {

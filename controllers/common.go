@@ -98,6 +98,27 @@ func getImagePullPolicy(deploymentName string, instance *searchv1alpha1.Search) 
 	return corev1.PullAlways
 }
 
+func getPostgresVolume(instance *searchv1alpha1.Search) corev1.Volume {
+	storageClass := instance.Spec.DBStorage.StorageClassName
+	if storageClass != "" {
+		pvcName := getPVCName(storageClass)
+		return corev1.Volume{
+			Name: "postgresdb",
+			VolumeSource: corev1.VolumeSource{
+				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+					ClaimName: pvcName,
+				},
+			},
+		}
+	}
+	return corev1.Volume{
+		Name: "postgresdb",
+		VolumeSource: corev1.VolumeSource{
+			EmptyDir: &corev1.EmptyDirVolumeSource{},
+		},
+	}
+}
+
 func getContainerArgs(deploymentName string, instance *searchv1alpha1.Search) []string {
 	var result []string
 	switch deploymentName {
@@ -136,6 +157,9 @@ func getRoleName() string {
 }
 func getRoleBindingName() string {
 	return "search"
+}
+func getPVCName(scName string) string {
+	return scName + "-search"
 }
 
 func getAddonRoleName() string {

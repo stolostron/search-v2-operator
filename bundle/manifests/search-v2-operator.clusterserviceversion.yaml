@@ -89,6 +89,7 @@ spec:
           - secrets
           - serviceaccounts
           - services
+          - persistentvolumeclaims
           verbs:
           - '*'
         - apiGroups:
@@ -216,7 +217,7 @@ spec:
                 - --leader-elect
                 command:
                 - /manager
-                image: quay.io/stolostron/search-v2-operator:latest
+                image: quay.io/xrajesh/search-v2-operator:f0509
                 livenessProbe:
                   httpGet:
                     path: /healthz

@@ -72,12 +72,6 @@ func (r *SearchReconciler) PGDeployment(instance *searchv1alpha1.Search) *appsv1
 	postgresContainer.Resources = getResourceRequirements(deploymentName, instance)
 	volumes := []corev1.Volume{
 		{
-			Name: "postgresdb",
-			VolumeSource: corev1.VolumeSource{
-				EmptyDir: &corev1.EmptyDirVolumeSource{},
-			},
-		},
-		{
 			Name: "postgresql-cfg",
 			VolumeSource: corev1.VolumeSource{
 				ConfigMap: &corev1.ConfigMapVolumeSource{
@@ -107,6 +101,8 @@ func (r *SearchReconciler) PGDeployment(instance *searchv1alpha1.Search) *appsv1
 			},
 		},
 	}
+	postgresVolume := getPostgresVolume(instance)
+	volumes = append(volumes, postgresVolume)
 	postgresContainer.ImagePullPolicy = getImagePullPolicy(deploymentName, instance)
 	deployment.Spec.Replicas = getReplicaCount(deploymentName, instance)
 
