@@ -180,13 +180,6 @@ func TestSearch_controller(t *testing.T) {
 
 	r = &SearchReconciler{Client: cl, Scheme: s}
 
-	// Mock request to simulate Reconcile() being called on an event for a watched resource .
-	req = ctrl.Request{
-		NamespacedName: types.NamespacedName{
-			Name: name,
-		},
-	}
-
 	//check for PVC
 	err = cl.Get(context.TODO(), types.NamespacedName{
 		Name: getPVCName(storageClassName),
