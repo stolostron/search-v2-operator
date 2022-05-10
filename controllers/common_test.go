@@ -370,4 +370,42 @@ func TestPostgresCustomization(t *testing.T) {
 		t.Errorf("Incorrect Args parsed")
 	}
 
+	actual_volume := getPostgresVolume(instance)
+	if actual_volume.VolumeSource.EmptyDir == nil {
+		t.Errorf("Incorrect Volume created")
+	}
+}
+
+func TestPostgresCustomizationPVC(t *testing.T) {
+	instance := &searchv1alpha1.Search{
+		Spec: searchv1alpha1.SearchSpec{
+			ImagePullPolicy: "IfNotPresent",
+			ImagePullSecret: "personal-pull-secret",
+			NodeSelector:    map[string]string{"key1": "val1"},
+			DBStorage: searchv1alpha1.StorageSpec{
+				StorageClassName: "test",
+			},
+			Deployments: searchv1alpha1.SearchDeployments{
+				Database: searchv1alpha1.DeploymentConfig{
+					Arguments:     []string{"arg1"},
+					ReplicaCount:  5,
+					ImageOverride: "quay.io/test-image:007",
+					Resources: &corev1.ResourceRequirements{
+						Limits: corev1.ResourceList{
+							"memory": resource.MustParse("25Mi"),
+							"cpu":    resource.MustParse("40m"),
+						},
+						Requests: corev1.ResourceList{
+							"cpu":    resource.MustParse("25m"),
+							"memory": resource.MustParse("10Mi"),
+						},
+					},
+				},
+			},
+		},
+	}
+	actual_volume := getPostgresVolume(instance)
+	if actual_volume.VolumeSource.PersistentVolumeClaim.ClaimName != "test-search" {
+		t.Errorf("Incorrect Volume created")
+	}
 }

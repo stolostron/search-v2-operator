@@ -13,13 +13,13 @@ import (
 )
 
 func (r *SearchReconciler) configurePVC(ctx context.Context, instance *searchv1alpha1.Search) bool {
-	if err := r.CreatePVC(ctx, instance); err != nil {
+	if err := r.createPVC(ctx, instance); err != nil {
 		return false
 	}
 	return true
 }
 
-func (r *SearchReconciler) CreatePVC(ctx context.Context, instance *searchv1alpha1.Search) error {
+func (r *SearchReconciler) createPVC(ctx context.Context, instance *searchv1alpha1.Search) error {
 	pvc := &corev1.PersistentVolumeClaim{}
 	pvcName := getPVCName(instance.Spec.DBStorage.StorageClassName)
 	namespace := instance.GetNamespace()
@@ -30,9 +30,7 @@ func (r *SearchReconciler) CreatePVC(ctx context.Context, instance *searchv1alph
 	}
 	resource := client.ObjectKey{Name: pvcName, Namespace: namespace}
 	err := r.Get(ctx, resource, pvc)
-
 	if err != nil && errors.IsNotFound(err) {
-
 		err = r.Create(ctx, NewPVC(pvcName, namespace, storageClass, storageSize))
 		if err != nil {
 			log.Error(err, "Failed to create persistentvolumeclaim")
@@ -47,7 +45,6 @@ func (r *SearchReconciler) CreatePVC(ctx context.Context, instance *searchv1alph
 }
 
 func (r *SearchReconciler) isPVCPresent(ctx context.Context, instance *searchv1alpha1.Search) bool {
-
 	pvcs := &corev1.PersistentVolumeClaimList{}
 	opts := []client.ListOption{
 		client.InNamespace(instance.GetNamespace()),
@@ -58,7 +55,7 @@ func (r *SearchReconciler) isPVCPresent(ctx context.Context, instance *searchv1a
 	}
 	for _, pvc := range pvcs.Items {
 		if pvc.GetName() == getPVCName(instance.Spec.DBStorage.StorageClassName) {
-			log.(v2).Info("Found PersistentVolumeClaim in namespace")
+			log.V(2).Info("Found PersistentVolumeClaim in namespace")
 			return true
 		}
 	}
