@@ -22,11 +22,11 @@ func TestGetDeploymentConfigForNil(t *testing.T) {
 	}
 	deploymentConfig := getDeploymentConfig("search-api", instance)
 	if deploymentConfig.DeepCopy() == nil {
-		t.Errorf("DeploymentConfig returned unexpectd nil")
+		t.Error("DeploymentConfig returned unexpectd nil")
 	}
 	actualCustomized := isDeploymentCustomized("search-api", instance)
 	if !actualCustomized {
-		t.Errorf("isDeploymentCustomized returned incorrect status")
+		t.Error("isDeploymentCustomized returned incorrect status")
 	}
 }
 func TestResourcesCustomized(t *testing.T) {
@@ -50,7 +50,7 @@ func TestResourcesCustomized(t *testing.T) {
 	}
 	want := true
 	if isResourcesCustomized("search-api", instance) != want {
-		t.Errorf("QueryAPI is not customized")
+		t.Error("QueryAPI is not customized")
 	}
 }
 func TestResourcesNotCustomized(t *testing.T) {
@@ -75,24 +75,24 @@ func TestResourcesNotCustomized(t *testing.T) {
 	os.Setenv("COLLECTOR_IMAGE", "value-from-env")
 	want := false
 	if isResourcesCustomized("search-collector", instance) != want {
-		t.Errorf("Collector is customized")
+		t.Error("Collector is customized")
 	}
 
 	actualNodelSelector := getNodeSelector("search-collector", instance)
 	if actualNodelSelector != nil {
-		t.Errorf("NodeSelector Not expected")
+		t.Error("NodeSelector Not expected")
 	}
 	actualImagePullPolicy := getImagePullPolicy("search-collector", instance)
 	if actualImagePullPolicy != "Always" {
-		t.Errorf("ImagePullPolicy Not expected")
+		t.Error("ImagePullPolicy Not expected")
 	}
 	actualImagePullSecret := getImagePullSecret("search-collector", instance)
 	if actualImagePullSecret[0].Name != "search-pull-secret" {
-		t.Errorf("ImagePullSecret Not expected")
+		t.Error("ImagePullSecret Not expected")
 	}
 	actualImageSha := getImageSha("search-collector", instance)
 	if actualImageSha != "value-from-env" {
-		t.Errorf("ImageOverride with incorrect image")
+		t.Error("ImageOverride with incorrect image")
 	}
 }
 func TestAPICustomization(t *testing.T) {
@@ -123,19 +123,19 @@ func TestAPICustomization(t *testing.T) {
 	want := "val1"
 	actualNodeSelector := getNodeSelector(testFor, instance)
 	if actualNodeSelector["key1"] != want {
-		t.Errorf("Incorrect NodeSelector")
+		t.Error("Incorrect NodeSelector")
 	}
 	actualImagePullPolicy := getImagePullPolicy(testFor, instance)
 	if actualImagePullPolicy != "IfNotPresent" {
-		t.Errorf("ImagePullPolicy Not expected")
+		t.Error("ImagePullPolicy Not expected")
 	}
 	actualReplicaCount := getReplicaCount(testFor, instance)
 	if *actualReplicaCount != int32(5) {
-		t.Errorf("ReplicaCount Not expected")
+		t.Error("ReplicaCount Not expected")
 	}
 	actualImagePullSecret := getImagePullSecret(testFor, instance)
 	if actualImagePullSecret[0].Name != "personal-pull-secret" {
-		t.Errorf("ImagePullSecret Not expected")
+		t.Error("ImagePullSecret Not expected")
 	}
 	request_memory_want := "10Mi"
 	request_cpu_want := "25m"
@@ -143,20 +143,20 @@ func TestAPICustomization(t *testing.T) {
 	limit_memory_want := "25Mi"
 	actualResourceRequirements := getResourceRequirements("search-api", instance)
 	if actualResourceRequirements.Requests.Memory().String() != request_memory_want {
-		t.Errorf("Request Memory Not expected")
+		t.Error("Request Memory Not expected")
 	}
 	if actualResourceRequirements.Requests.Cpu().String() != request_cpu_want {
-		t.Errorf("Request Memory Not expected")
+		t.Error("Request Memory Not expected")
 	}
 	if actualResourceRequirements.Limits.Memory().String() != limit_memory_want {
-		t.Errorf("Limit Memory Not expected")
+		t.Error("Limit Memory Not expected")
 	}
 	if actualResourceRequirements.Limits.Cpu().String() != limit_cpu_want {
-		t.Errorf("Limit CPU Not expected")
+		t.Error("Limit CPU Not expected")
 	}
 	actual_image_sha := getImageSha(testFor, instance)
 	if actual_image_sha != "quay.io/test-image:007" {
-		t.Errorf("ImageOverride with incorrect image")
+		t.Error("ImageOverride with incorrect image")
 	}
 
 }
@@ -190,19 +190,19 @@ func TestIndexerCustomization(t *testing.T) {
 	want := "val1"
 	actualNodeSelector := getNodeSelector(testFor, instance)
 	if actualNodeSelector["key1"] != want {
-		t.Errorf("Incorrect NodeSelector")
+		t.Error("Incorrect NodeSelector")
 	}
 	actualImagePullPolicy := getImagePullPolicy(testFor, instance)
 	if actualImagePullPolicy != "IfNotPresent" {
-		t.Errorf("ImagePullPolicy Not expected")
+		t.Error("ImagePullPolicy Not expected")
 	}
 	actualReplicaCount := getReplicaCount(testFor, instance)
 	if *actualReplicaCount != int32(5) {
-		t.Errorf("ReplicaCount Not expected")
+		t.Error("ReplicaCount Not expected")
 	}
 	actualImagePullSecret := getImagePullSecret(testFor, instance)
 	if actualImagePullSecret[0].Name != "personal-pull-secret" {
-		t.Errorf("ImagePullSecret Not expected")
+		t.Error("ImagePullSecret Not expected")
 	}
 	request_memory_want := "10Mi"
 	request_cpu_want := "25m"
@@ -210,24 +210,24 @@ func TestIndexerCustomization(t *testing.T) {
 	limit_memory_want := "25Mi"
 	actualResourceRequirements := getResourceRequirements(testFor, instance)
 	if actualResourceRequirements.Requests.Memory().String() != request_memory_want {
-		t.Errorf("Request Memory Not expected")
+		t.Error("Request Memory Not expected")
 	}
 	if actualResourceRequirements.Requests.Cpu().String() != request_cpu_want {
-		t.Errorf("Request Memory Not expected")
+		t.Error("Request Memory Not expected")
 	}
 	if actualResourceRequirements.Limits.Memory().String() != limit_memory_want {
-		t.Errorf("Limit Memory Not expected")
+		t.Error("Limit Memory Not expected")
 	}
 	if actualResourceRequirements.Limits.Cpu().String() != limit_cpu_want {
-		t.Errorf("Limit CPU Not expected")
+		t.Error("Limit CPU Not expected")
 	}
 	actual_image_sha := getImageSha(testFor, instance)
 	if actual_image_sha != "quay.io/test-image:007" {
-		t.Errorf("ImageOverride with incorrect image")
+		t.Error("ImageOverride with incorrect image")
 	}
 	actual_args := getContainerArgs(testFor, instance)
 	if actual_args == nil || len(actual_args) != 2 || actual_args[0] != "arg1" || actual_args[1] != "arg2" {
-		t.Errorf("Incorrect Args parsed")
+		t.Error("Incorrect Args parsed")
 	}
 
 }
@@ -259,19 +259,19 @@ func TestCollectorCustomization(t *testing.T) {
 	want := "val1"
 	actualNodeSelector := getNodeSelector(testFor, instance)
 	if actualNodeSelector["key1"] != want {
-		t.Errorf("Incorrect NodeSelector")
+		t.Error("Incorrect NodeSelector")
 	}
 	actualImagePullPolicy := getImagePullPolicy(testFor, instance)
 	if actualImagePullPolicy != "IfNotPresent" {
-		t.Errorf("ImagePullPolicy Not expected")
+		t.Error("ImagePullPolicy Not expected")
 	}
 	actualReplicaCount := getReplicaCount(testFor, instance)
 	if *actualReplicaCount != int32(5) {
-		t.Errorf("ReplicaCount Not expected")
+		t.Error("ReplicaCount Not expected")
 	}
 	actualImagePullSecret := getImagePullSecret(testFor, instance)
 	if actualImagePullSecret[0].Name != "personal-pull-secret" {
-		t.Errorf("ImagePullSecret Not expected")
+		t.Error("ImagePullSecret Not expected")
 	}
 	request_memory_want := "10Mi"
 	request_cpu_want := "25m"
@@ -279,24 +279,24 @@ func TestCollectorCustomization(t *testing.T) {
 	limit_memory_want := "25Mi"
 	actualResourceRequirements := getResourceRequirements(testFor, instance)
 	if actualResourceRequirements.Requests.Memory().String() != request_memory_want {
-		t.Errorf("Request Memory Not expected")
+		t.Error("Request Memory Not expected")
 	}
 	if actualResourceRequirements.Requests.Cpu().String() != request_cpu_want {
-		t.Errorf("Request Memory Not expected")
+		t.Error("Request Memory Not expected")
 	}
 	if actualResourceRequirements.Limits.Memory().String() != limit_memory_want {
-		t.Errorf("Limit Memory Not expected")
+		t.Error("Limit Memory Not expected")
 	}
 	if actualResourceRequirements.Limits.Cpu().String() != limit_cpu_want {
-		t.Errorf("Limit CPU Not expected")
+		t.Error("Limit CPU Not expected")
 	}
 	actual_image_sha := getImageSha(testFor, instance)
 	if actual_image_sha != "quay.io/test-image:007" {
-		t.Errorf("ImageOverride with incorrect image")
+		t.Error("ImageOverride with incorrect image")
 	}
 	actual_args := getContainerArgs(testFor, instance)
 	if actual_args != nil {
-		t.Errorf("Incorrect Args parsed")
+		t.Error("Incorrect Args parsed")
 	}
 
 }
@@ -330,19 +330,19 @@ func TestPostgresCustomization(t *testing.T) {
 	want := "val1"
 	actualNodeSelector := getNodeSelector(testFor, instance)
 	if actualNodeSelector["key1"] != want {
-		t.Errorf("Incorrect NodeSelector")
+		t.Error("Incorrect NodeSelector")
 	}
 	actualImagePullPolicy := getImagePullPolicy(testFor, instance)
 	if actualImagePullPolicy != "IfNotPresent" {
-		t.Errorf("ImagePullPolicy Not expected")
+		t.Error("ImagePullPolicy Not expected")
 	}
 	actualReplicaCount := getReplicaCount(testFor, instance)
 	if *actualReplicaCount != int32(5) {
-		t.Errorf("ReplicaCount Not expected")
+		t.Error("ReplicaCount Not expected")
 	}
 	actualImagePullSecret := getImagePullSecret(testFor, instance)
 	if actualImagePullSecret[0].Name != "personal-pull-secret" {
-		t.Errorf("ImagePullSecret Not expected")
+		t.Error("ImagePullSecret Not expected")
 	}
 	request_memory_want := "10Mi"
 	request_cpu_want := "25m"
@@ -350,29 +350,29 @@ func TestPostgresCustomization(t *testing.T) {
 	limit_memory_want := "25Mi"
 	actualResourceRequirements := getResourceRequirements(testFor, instance)
 	if actualResourceRequirements.Requests.Memory().String() != request_memory_want {
-		t.Errorf("Request Memory Not expected")
+		t.Error("Request Memory Not expected")
 	}
 	if actualResourceRequirements.Requests.Cpu().String() != request_cpu_want {
-		t.Errorf("Request Memory Not expected")
+		t.Error("Request Memory Not expected")
 	}
 	if actualResourceRequirements.Limits.Memory().String() != limit_memory_want {
-		t.Errorf("Limit Memory Not expected")
+		t.Error("Limit Memory Not expected")
 	}
 	if actualResourceRequirements.Limits.Cpu().String() != limit_cpu_want {
-		t.Errorf("Limit CPU Not expected")
+		t.Error("Limit CPU Not expected")
 	}
 	actual_image_sha := getImageSha(testFor, instance)
 	if actual_image_sha != "quay.io/test-image:007" {
-		t.Errorf("ImageOverride with incorrect image")
+		t.Error("ImageOverride with incorrect image")
 	}
 	actual_args := getContainerArgs(testFor, instance)
 	if actual_args == nil || len(actual_args) != 1 || actual_args[0] != "arg1" {
-		t.Errorf("Incorrect Args parsed")
+		t.Error("Incorrect Args parsed")
 	}
 
 	actual_volume := getPostgresVolume(instance)
 	if actual_volume.VolumeSource.EmptyDir == nil {
-		t.Errorf("Incorrect Volume created")
+		t.Error("Incorrect Volume created")
 	}
 }
 
@@ -406,6 +406,6 @@ func TestPostgresCustomizationPVC(t *testing.T) {
 	}
 	actual_volume := getPostgresVolume(instance)
 	if actual_volume.VolumeSource.PersistentVolumeClaim.ClaimName != "test-search" {
-		t.Errorf("Incorrect Volume created")
+		t.Error("Incorrect Volume created")
 	}
 }
