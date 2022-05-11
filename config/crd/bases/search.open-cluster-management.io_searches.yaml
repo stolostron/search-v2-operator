@@ -45,7 +45,7 @@ spec:
                   db parameters
                 type: string
               dbStorage:
-                description: Storage configuration for the DB
+                description: Storage configuration for the database.
                 properties:
                   size:
                     anyOf:
@@ -239,9 +239,9 @@ spec:
                     type: object
                 type: object
               externalDBInstance:
-                description: Not part of dev preview Kubernetes secret name containing
-                  user provided db secret Secret should contain connection parameters
-                  [db_host, db_port, db_user, db_password, db_name, ca_cert]
+                description: Kubernetes secret name containing user provided db secret
+                  Secret should contain connection parameters [db_host, db_port, db_user,
+                  db_password, db_name, ca_cert] Not supported for development preview.
                 type: string
               imagePullPolicy:
                 description: ImagePullPolicy

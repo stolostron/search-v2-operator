@@ -121,25 +121,10 @@ func getPostgresVolume(instance *searchv1alpha1.Search) corev1.Volume {
 
 func getContainerArgs(deploymentName string, instance *searchv1alpha1.Search) []string {
 	var result []string
-	switch deploymentName {
-	case apiDeploymentName:
-		if instance.Spec.Deployments.QueryAPI.Arguments != nil {
-			return instance.Spec.Deployments.QueryAPI.Arguments
-		}
-	case collectorDeploymentName:
-		if instance.Spec.Deployments.Collector.Arguments != nil {
-			return instance.Spec.Deployments.Collector.Arguments
-		}
-	case indexerDeploymentName:
-		if instance.Spec.Deployments.Indexer.Arguments != nil {
-			return instance.Spec.Deployments.Indexer.Arguments
-		}
-	case postgresDeploymentName:
-		if instance.Spec.Deployments.Database.Arguments != nil {
-			return instance.Spec.Deployments.Database.Arguments
-		}
+	deploymentConfig := getDeploymentConfig(deploymentName, instance)
+	if deploymentConfig.Arguments != nil {
+		return deploymentConfig.Arguments
 	}
-	log.V(2).Info("Unknown deployment %s ", deploymentName)
 	return result
 }
 

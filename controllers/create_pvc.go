@@ -45,21 +45,16 @@ func (r *SearchReconciler) createPVC(ctx context.Context, instance *searchv1alph
 }
 
 func (r *SearchReconciler) isPVCPresent(ctx context.Context, instance *searchv1alpha1.Search) bool {
-	pvcs := &corev1.PersistentVolumeClaimList{}
-	opts := []client.ListOption{
-		client.InNamespace(instance.GetNamespace()),
-	}
-	if err := r.List(ctx, pvcs, opts...); err != nil {
-		log.Info("Failed to list PersistentVolumeClaim in namespace" + instance.GetNamespace())
+	pvc := &corev1.PersistentVolumeClaim{}
+	namespace := instance.GetNamespace()
+	pvcName := getPVCName(instance.Spec.DBStorage.StorageClassName)
+	resource := client.ObjectKey{Name: pvcName, Namespace: namespace}
+	err := r.Get(ctx, resource, pvc)
+	if err != nil && errors.IsNotFound(err) {
 		return false
 	}
-	for _, pvc := range pvcs.Items {
-		if pvc.GetName() == getPVCName(instance.Spec.DBStorage.StorageClassName) {
-			log.V(2).Info("Found PersistentVolumeClaim in namespace")
-			return true
-		}
-	}
-	return false
+	return true
+
 }
 
 func NewPVC(pvcName, namespace, storageClass string, storageSize resource.Quantity) *corev1.PersistentVolumeClaim {

@@ -15,7 +15,7 @@ const (
 	// HABasic stands up most app subscriptions with a replicaCount of 1
 	HABasic AvailabilityType = "Basic"
 	// HAHigh stands up most app subscriptions with a replicaCount of 2
-	// Not supported for Dev preview
+	// Not supported for development preview.
 	HAHigh AvailabilityType = "High"
 )
 
@@ -37,7 +37,7 @@ type SearchSpec struct {
 	// Important: Run "make" to regenerate code after modifying this file
 
 	// +optional
-	// Storage configuration for the DB
+	// Storage configuration for the database.
 	DBStorage StorageSpec `json:"dbStorage,omitempty"`
 
 	// +optional
@@ -53,17 +53,17 @@ type SearchSpec struct {
 	AvailabilityConfig AvailabilityType `json:"availabilityConfig,omitempty"`
 
 	// +optional
-	// Not part of dev preview
 	// Kubernetes secret name containing user provided db secret
 	// Secret should contain connection parameters [db_host, db_port, db_user, db_password, db_name, ca_cert]
+	// Not supported for development preview.
 	ExternalDBInstance string `json:"externalDBInstance,omitempty"`
 
 	// +optional
-	//ImagePullSecret
+	// ImagePullSecret
 	ImagePullSecret string `json:"imagePullSecret,omitempty"`
 
 	// +optional
-	//ImagePullPolicy
+	// ImagePullPolicy
 	ImagePullPolicy corev1.PullPolicy `json:"imagePullPolicy,omitempty"`
 
 	// +optional
@@ -130,7 +130,7 @@ type SearchStatus struct {
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }
 
-//+kubebuilder:object:root=true
+// +kubebuilder:object:root=true
 
 // SearchList contains a list of Search
 type SearchList struct {
