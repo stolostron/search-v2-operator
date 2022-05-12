@@ -89,6 +89,7 @@ spec:
           - secrets
           - serviceaccounts
           - services
+          - persistentvolumeclaims
           verbs:
           - '*'
         - apiGroups:
