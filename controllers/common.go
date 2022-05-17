@@ -83,28 +83,55 @@ func IsPaused(annotations map[string]string) bool {
 }
 
 func getNodeSelector(deploymentName string, instance *searchv1alpha1.Search) map[string]string {
-	deploymentConfig := getDeploymentConfig(deploymentName, instance)
-	if deploymentConfig.NodeSelector != nil {
-		return deploymentConfig.NodeSelector
+	if instance.Spec.NodeSelector != nil {
+		return instance.Spec.NodeSelector
 	}
 	var result map[string]string
 	return result
 }
 
 func getImagePullPolicy(deploymentName string, instance *searchv1alpha1.Search) corev1.PullPolicy {
-	deploymentConfig := getDeploymentConfig(deploymentName, instance)
-	if deploymentConfig.ImagePullPolicy != "" {
-		return deploymentConfig.ImagePullPolicy
+	if instance.Spec.ImagePullPolicy != "" {
+		return instance.Spec.ImagePullPolicy
 	}
 	// Dev preview option
 	return corev1.PullAlways
 }
 
+func getPostgresVolume(instance *searchv1alpha1.Search) corev1.Volume {
+	storageClass := instance.Spec.DBStorage.StorageClassName
+	if storageClass != "" {
+		pvcName := getPVCName(storageClass)
+		return corev1.Volume{
+			Name: "postgresdb",
+			VolumeSource: corev1.VolumeSource{
+				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+					ClaimName: pvcName,
+				},
+			},
+		}
+	}
+	return corev1.Volume{
+		Name: "postgresdb",
+		VolumeSource: corev1.VolumeSource{
+			EmptyDir: &corev1.EmptyDirVolumeSource{},
+		},
+	}
+}
+
+func getContainerArgs(deploymentName string, instance *searchv1alpha1.Search) []string {
+	var result []string
+	deploymentConfig := getDeploymentConfig(deploymentName, instance)
+	if deploymentConfig.Arguments != nil {
+		return deploymentConfig.Arguments
+	}
+	return result
+}
+
 func getImagePullSecret(deploymentName string, instance *searchv1alpha1.Search) []corev1.LocalObjectReference {
 	result := []corev1.LocalObjectReference{}
-	deploymentConfig := getDeploymentConfig(deploymentName, instance)
-	if deploymentConfig.ImagePullSecret != "" {
-		return append(result, corev1.LocalObjectReference{Name: deploymentConfig.ImagePullSecret})
+	if instance.Spec.ImagePullSecret != "" {
+		return append(result, corev1.LocalObjectReference{Name: instance.Spec.ImagePullSecret})
 	}
 	default_pull_secret := getImagePullSecretName()
 	return append(result, corev1.LocalObjectReference{Name: default_pull_secret})
@@ -115,6 +142,9 @@ func getRoleName() string {
 }
 func getRoleBindingName() string {
 	return "search"
+}
+func getPVCName(scName string) string {
+	return scName + "-search"
 }
 
 func getAddonRoleName() string {
@@ -233,8 +263,8 @@ func getReplicaCount(deploymentName string, instance *searchv1alpha1.Search) *in
 func getImageSha(deploymentName string, instance *searchv1alpha1.Search) string {
 	switch deploymentName {
 	case apiDeploymentName:
-		if instance.Spec.Deployments.API.ImageOverride != "" {
-			return instance.Spec.Deployments.API.ImageOverride
+		if instance.Spec.Deployments.QueryAPI.ImageOverride != "" {
+			return instance.Spec.Deployments.QueryAPI.ImageOverride
 		}
 		return os.Getenv("API_IMAGE")
 	case collectorDeploymentName:
@@ -298,7 +328,7 @@ func getDeploymentConfig(name string, instance *searchv1alpha1.Search) searchv1a
 	var result searchv1alpha1.DeploymentConfig
 	switch name {
 	case apiDeploymentName:
-		return instance.Spec.Deployments.API
+		return instance.Spec.Deployments.QueryAPI
 	case collectorDeploymentName:
 		return instance.Spec.Deployments.Collector
 	case indexerDeploymentName:

@@ -12,6 +12,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -28,7 +29,11 @@ func TestSearch_controller(t *testing.T) {
 	search := &searchv1alpha1.Search{
 		TypeMeta:   metav1.TypeMeta{Kind: "Search"},
 		ObjectMeta: metav1.ObjectMeta{Name: name},
-		Spec:       searchv1alpha1.SearchSpec{},
+		Spec: searchv1alpha1.SearchSpec{
+			DBStorage: searchv1alpha1.StorageSpec{
+				StorageClassName: "test",
+			},
+		},
 	}
 	s := scheme.Scheme
 	err := searchv1alpha1.SchemeBuilder.AddToScheme(s)
@@ -149,6 +154,39 @@ func TestSearch_controller(t *testing.T) {
 
 	if err != nil {
 		t.Errorf("Failed to get ClusterManagementAddOn %s: %v", getClusterManagementAddonName(), err)
+	}
+
+	//check for PVC
+	pvc := &corev1.PersistentVolumeClaim{}
+	storageClassName := search.Spec.DBStorage.StorageClassName
+	err = cl.Get(context.TODO(), types.NamespacedName{
+		Name: getPVCName(storageClassName),
+	}, pvc)
+
+	if err != nil {
+		t.Errorf("Failed to get PersistentVolumeClaim %s: %v", getPVCName(storageClassName), err)
+	}
+
+	//Test EmptyDir
+	search = &searchv1alpha1.Search{
+		TypeMeta:   metav1.TypeMeta{Kind: "Search"},
+		ObjectMeta: metav1.ObjectMeta{Name: name},
+		Spec:       searchv1alpha1.SearchSpec{},
+	}
+
+	objsEmpty := []runtime.Object{search}
+	// Create a fake client to mock API calls.
+	cl = fake.NewClientBuilder().WithRuntimeObjects(objsEmpty...).Build()
+
+	r = &SearchReconciler{Client: cl, Scheme: s}
+
+	//check for PVC
+	err = cl.Get(context.TODO(), types.NamespacedName{
+		Name: getPVCName(storageClassName),
+	}, pvc)
+
+	if !errors.IsNotFound(err) {
+		t.Errorf("Emptydir expected but PVC found %v", err)
 	}
 
 }
