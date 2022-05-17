@@ -229,11 +229,11 @@ spec:
                 - name: POSTGRES_IMAGE
                   value: 'registry.redhat.io/rhscl/postgresql-13-rhel7:1-31.1638430360'
                 - name: INDEXER_IMAGE
-                  value: 'quay.io/stolostron/search-indexer:2.5.0-SNAPSHOT-2022-04-27-11-35-16'
+                  value: 'quay.io/stolostron/search-indexer:2.5.0-SNAPSHOT-2022-05-16-21-43-45'
                 - name: COLLECTOR_IMAGE
-                  value: 'quay.io/stolostron/search-collector:2.5.0-SNAPSHOT-2022-04-27-11-35-16'
+                  value: 'quay.io/stolostron/search-collector:2.5.0-SNAPSHOT-2022-05-16-21-43-45'
                 - name: API_IMAGE
-                  value: 'quay.io/stolostron/search-v2-api:2.5.0-SNAPSHOT-2022-04-27-11-35-16'
+                  value: 'quay.io/stolostron/search-v2-api:2.5.0-SNAPSHOT-2022-05-16-21-43-45'
                 readinessProbe:
                   httpGet:
                     path: /readyz
@@ -301,11 +301,12 @@ spec:
   - supported: true
     type: AllNamespaces
   keywords:
-  - search
-  - acm
-  - ocm
   - Advanced Cluster Management
+  - acm
   - Open Cluster Management
+  - ocm
+  - odyssey
+  - search
   - stolostron
   links:
   - name: Search V2 Operator
