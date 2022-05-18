@@ -108,7 +108,7 @@ func (r *SearchReconciler) PGDeployment(instance *searchv1alpha1.Search) *appsv1
 
 	deployment.Spec.Template.Spec.Containers = []corev1.Container{postgresContainer}
 	deployment.Spec.Template.Spec.Volumes = volumes
-	deployment.Spec.Template.Spec.ImagePullSecrets = getImagePullSecret(deploymentName, instance)
+	// deployment.Spec.Template.Spec.ImagePullSecrets = getImagePullSecret(deploymentName, instance)
 	if getNodeSelector(deploymentName, instance) != nil {
 		deployment.Spec.Template.Spec.NodeSelector = getNodeSelector(deploymentName, instance)
 	}
