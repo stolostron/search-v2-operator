@@ -76,7 +76,7 @@ func (r *SearchReconciler) IndexerDeployment(instance *searchv1alpha1.Search) *a
 	deployment.Spec.Template.Spec.Containers = []corev1.Container{indexerContainer}
 	deployment.Spec.Template.Spec.Volumes = volumes
 	deployment.Spec.Template.Spec.ServiceAccountName = getServiceAccountName()
-	deployment.Spec.Template.Spec.ImagePullSecrets = getImagePullSecret(deploymentName, instance)
+	// deployment.Spec.Template.Spec.ImagePullSecrets = getImagePullSecret(deploymentName, instance)
 	if getNodeSelector(deploymentName, instance) != nil {
 		deployment.Spec.Template.Spec.NodeSelector = getNodeSelector(deploymentName, instance)
 	}

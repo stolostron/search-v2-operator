@@ -86,10 +86,10 @@ func TestResourcesNotCustomized(t *testing.T) {
 	if actualImagePullPolicy != "Always" {
 		t.Error("ImagePullPolicy Not expected")
 	}
-	actualImagePullSecret := getImagePullSecret("search-collector", instance)
-	if actualImagePullSecret[0].Name != "search-pull-secret" {
-		t.Error("ImagePullSecret Not expected")
-	}
+	// actualImagePullSecret := getImagePullSecret("search-collector", instance)
+	// if actualImagePullSecret[0].Name != "search-pull-secret" {
+	// 	t.Error("ImagePullSecret Not expected")
+	// }
 	actualImageSha := getImageSha("search-collector", instance)
 	if actualImageSha != "value-from-env" {
 		t.Error("ImageOverride with incorrect image")

@@ -250,8 +250,6 @@ spec:
                 securityContext:
                   allowPrivilegeEscalation: false
               imagePullPolicy: Always 
-              imagePullSecrets:
-              - name: search-pull-secret
               securityContext:
                 runAsNonRoot: true
               serviceAccountName: search-v2-operator
