@@ -249,7 +249,9 @@ spec:
                     memory: 50Mi
                 securityContext:
                   allowPrivilegeEscalation: false
-              imagePullPolicy: Always 
+              imagePullPolicy: Always
+              imagePullSecrets:
+              - name: search-pull-secret
               securityContext:
                 runAsNonRoot: true
               serviceAccountName: search-v2-operator
@@ -307,8 +309,8 @@ spec:
   - search
   - stolostron
   links:
-  - name: Search V2 Operator
-    url: https://search-v2-operator.domain
+  - name: Search Operator
+    url: https://github.com/stolostron/search-v2-operator
   maturity: alpha
   provider:
     name: Red Hat
