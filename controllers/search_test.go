@@ -5,6 +5,7 @@ package controllers
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -21,6 +22,15 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
+
+func containVolumes(volumes []corev1.Volume, expectedVal string) error {
+	for _, v := range volumes {
+		if v.Name == expectedVal {
+			return nil
+		}
+	}
+	return fmt.Errorf("%s does not exist within the listed volumes env", expectedVal)
+}
 
 func TestSearch_controller(t *testing.T) {
 	var (
@@ -78,6 +88,18 @@ func TestSearch_controller(t *testing.T) {
 		t.Fatalf("Failed to get deployment %s: %v", "search-postgres", err)
 	}
 
+	volumes := deploy.Spec.Template.Spec.Volumes
+
+	err = containVolumes(volumes, "search-postgres-certs")
+	if err != nil {
+		t.Errorf("Failed to find to find volume: %s", "search-postgres-certs")
+	}
+
+	err = containVolumes(volumes, "search-postgres-cfg")
+	if err != nil {
+		t.Errorf("Failed to find to find volume: %s", "search-postgres-cfg")
+	}
+
 	//check for service
 	service := &corev1.Secret{}
 	err = cl.Get(context.TODO(), types.NamespacedName{
@@ -116,6 +138,16 @@ func TestSearch_controller(t *testing.T) {
 
 	if err != nil {
 		t.Fatalf("Failed to get configmap %s: %v", "search-indexer", err)
+	}
+
+	//check for configmap
+	configmap3 := &corev1.ConfigMap{}
+	err = cl.Get(context.TODO(), types.NamespacedName{
+		Name: "search-postgres",
+	}, configmap3)
+
+	if err != nil {
+		t.Fatalf("Failed to get configmap %s: %v", "search-postgres", err)
 	}
 
 	//check for Service Account
@@ -188,5 +220,4 @@ func TestSearch_controller(t *testing.T) {
 	if !errors.IsNotFound(err) {
 		t.Errorf("Emptydir expected but PVC found %v", err)
 	}
-
 }
