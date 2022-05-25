@@ -95,9 +95,9 @@ func TestSearch_controller(t *testing.T) {
 		t.Errorf("Failed to find to find volume: %s", "search-postgres-certs")
 	}
 
-	err = containVolumes(volumes, "search-postgres-cfg")
+	err = containVolumes(volumes, "postgresql-cfg")
 	if err != nil {
-		t.Errorf("Failed to find to find volume: %s", "search-postgres-cfg")
+		t.Errorf("Failed to find to find volume: %s", "postgresql-cfg")
 	}
 
 	//check for service
