@@ -249,7 +249,7 @@ spec:
                     memory: 50Mi
                 securityContext:
                   allowPrivilegeEscalation: false
-              imagePullPolicy: Always
+              imagePullPolicy: Always 
               imagePullSecrets:
               - name: search-pull-secret
               securityContext:

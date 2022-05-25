@@ -86,10 +86,6 @@ func TestResourcesNotCustomized(t *testing.T) {
 	if actualImagePullPolicy != "Always" {
 		t.Error("ImagePullPolicy Not expected")
 	}
-	// actualImagePullSecret := getImagePullSecret("search-collector", instance)
-	// if actualImagePullSecret[0].Name != "search-pull-secret" {
-	// 	t.Error("ImagePullSecret Not expected")
-	// }
 	actualImageSha := getImageSha("search-collector", instance)
 	if actualImageSha != "value-from-env" {
 		t.Error("ImageOverride with incorrect image")
@@ -133,10 +129,6 @@ func TestAPICustomization(t *testing.T) {
 	if *actualReplicaCount != int32(5) {
 		t.Error("ReplicaCount Not expected")
 	}
-	// actualImagePullSecret := getImagePullSecret(testFor, instance)
-	// if actualImagePullSecret[0].Name != "personal-pull-secret" {
-	// 	t.Error("ImagePullSecret Not expected")
-	// }
 	request_memory_want := "10Mi"
 	request_cpu_want := "25m"
 	limit_cpu_want := "40m"
@@ -200,10 +192,6 @@ func TestIndexerCustomization(t *testing.T) {
 	if *actualReplicaCount != int32(5) {
 		t.Error("ReplicaCount Not expected")
 	}
-	// actualImagePullSecret := getImagePullSecret(testFor, instance)
-	// if actualImagePullSecret[0].Name != "personal-pull-secret" {
-	// 	t.Error("ImagePullSecret Not expected")
-	// }
 	request_memory_want := "10Mi"
 	request_cpu_want := "25m"
 	limit_cpu_want := "40m"
@@ -269,10 +257,6 @@ func TestCollectorCustomization(t *testing.T) {
 	if *actualReplicaCount != int32(5) {
 		t.Error("ReplicaCount Not expected")
 	}
-	// actualImagePullSecret := getImagePullSecret(testFor, instance)
-	// if actualImagePullSecret[0].Name != "personal-pull-secret" {
-	// 	t.Error("ImagePullSecret Not expected")
-	// }
 	request_memory_want := "10Mi"
 	request_cpu_want := "25m"
 	limit_cpu_want := "40m"
@@ -340,10 +324,6 @@ func TestPostgresCustomization(t *testing.T) {
 	if *actualReplicaCount != int32(5) {
 		t.Error("ReplicaCount Not expected")
 	}
-	// actualImagePullSecret := getImagePullSecret(testFor, instance)
-	// if actualImagePullSecret[0].Name != "personal-pull-secret" {
-	// 	t.Error("ImagePullSecret Not expected")
-	// }
 	request_memory_want := "10Mi"
 	request_cpu_want := "25m"
 	limit_cpu_want := "40m"
