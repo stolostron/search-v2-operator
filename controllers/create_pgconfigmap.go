@@ -30,7 +30,9 @@ func (r *SearchReconciler) PostgresConfigmap(instance *searchv1alpha1.Search) *c
 	psql -d search -U searchuser -c "CREATE TABLE IF NOT EXISTS search.edges (sourceId TEXT, sourceKind TEXT,destId TEXT,destKind TEXT,edgeType TEXT,cluster TEXT, PRIMARY KEY(sourceId, destId, edgeType))"
 	psql -d search -U searchuser -c "CREATE INDEX IF NOT EXISTS data_kind_idx ON search.resources USING GIN ((data -> 'kind'))"
 	psql -d search -U searchuser -c "CREATE INDEX IF NOT EXISTS data_namespace_idx ON search.resources USING GIN ((data -> 'namespace'))"
-	psql -d search -U searchuser -c "CREATE INDEX IF NOT EXISTS data_name_idx ON search.resources USING GIN ((data ->  'name'))"`
+	psql -d search -U searchuser -c "CREATE INDEX IF NOT EXISTS data_name_idx ON search.resources USING GIN ((data ->  'name'))"
+	psql -d search -U searchuser -c "CREATE or REPLACE VIEW search.all_edges AS SELECT * from search.edges UNION SELECT a.uid as sourceid , a.data->>'kind' as sourcekind, b.uid as destid, b.data->>'kind' as destkind, 'deployedBy' as edgetype, a.cluster as cluster FROM search.resources a INNER JOIN search.resources b ON split_part(a.data->>'_hostingSubscription', '/', 1) = b.data->>'namespace' AND split_part(a.data->>'_hostingSubscription', '/', 2) = b.data->>'name' WHERE a.data->>'kind' = 'Subscription' AND b.data->>'kind' = 'Subscription' AND a.uid <> b.uid"`
+
 	cm.Data = data
 
 	err := controllerutil.SetControllerReference(instance, cm, r.Scheme)
