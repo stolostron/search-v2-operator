@@ -5,7 +5,7 @@ package controllers
 
 import (
 	"context"
-	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -23,13 +23,25 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
-func containVolumes(volumes []corev1.Volume, expectedVal string) error {
+// Verifies that the expected volume is contained within the list of given volumes from a deployment.
+func verifyContainsVolumes(t *testing.T, volumes []corev1.Volume, expectedVolume string) {
 	for _, v := range volumes {
-		if v.Name == expectedVal {
-			return nil
+		if v.Name == expectedVolume {
+			return
 		}
 	}
-	return fmt.Errorf("%s does not exist within the listed volumes env", expectedVal)
+	t.Errorf("Failed to find the expected volume: %s", expectedVolume)
+}
+
+// Verifies that the expected data content is contained within the configmap.
+func verifyConfigmapDataContent(t *testing.T, cm *corev1.ConfigMap, expectedKey string, expectedValue string) {
+	if val, ok := cm.Data[expectedKey]; ok {
+		if strings.Contains(val, expectedValue) {
+			return
+		}
+		t.Errorf("Failed to find the expected value: %s within the data key: %s in configmap: %s", expectedValue, expectedKey, cm.Name)
+	}
+	t.Errorf("Failed to find the expected data key: %s within the configmap: %s", expectedKey, cm.Name)
 }
 
 func TestSearch_controller(t *testing.T) {
@@ -88,17 +100,10 @@ func TestSearch_controller(t *testing.T) {
 		t.Fatalf("Failed to get deployment %s: %v", "search-postgres", err)
 	}
 
+	//check for postgres deployment volumes
 	volumes := deploy.Spec.Template.Spec.Volumes
-
-	err = containVolumes(volumes, "search-postgres-certs")
-	if err != nil {
-		t.Errorf("Failed to find to find volume: %s", "search-postgres-certs")
-	}
-
-	err = containVolumes(volumes, "postgresql-cfg")
-	if err != nil {
-		t.Errorf("Failed to find to find volume: %s", "postgresql-cfg")
-	}
+	verifyContainsVolumes(t, volumes, "search-postgres-certs")
+	verifyContainsVolumes(t, volumes, "postgresql-cfg")
 
 	//check for service
 	service := &corev1.Secret{}
@@ -149,6 +154,9 @@ func TestSearch_controller(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to get configmap %s: %v", "search-postgres", err)
 	}
+
+	verifyConfigmapDataContent(t, configmap3, "postgresql.conf", "ssl = 'on'")
+	verifyConfigmapDataContent(t, configmap3, "postgresql-start.sh", "CREATE SCHEMA IF NOT EXISTS search")
 
 	//check for Service Account
 	serviceaccount := &corev1.ServiceAccount{}
