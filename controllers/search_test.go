@@ -5,6 +5,7 @@ package controllers
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -21,6 +22,27 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
+
+// Verifies that the expected volume is contained within the list of given volumes from a deployment.
+func verifyContainsVolumes(t *testing.T, volumes []corev1.Volume, expectedVolume string) {
+	for _, v := range volumes {
+		if v.Name == expectedVolume {
+			return
+		}
+	}
+	t.Errorf("Failed to find the expected volume: %s", expectedVolume)
+}
+
+// Verifies that the expected data content is contained within the configmap.
+func verifyConfigmapDataContent(t *testing.T, cm *corev1.ConfigMap, expectedKey string, expectedValue string) {
+	if val, ok := cm.Data[expectedKey]; ok {
+		if strings.Contains(val, expectedValue) {
+			return
+		}
+		t.Errorf("Failed to find the expected value: %s within the data key: %s in configmap: %s", expectedValue, expectedKey, cm.Name)
+	}
+	t.Errorf("Failed to find the expected data key: %s within the configmap: %s", expectedKey, cm.Name)
+}
 
 func TestSearch_controller(t *testing.T) {
 	var (
@@ -78,6 +100,11 @@ func TestSearch_controller(t *testing.T) {
 		t.Fatalf("Failed to get deployment %s: %v", "search-postgres", err)
 	}
 
+	//check for postgres deployment volumes
+	volumes := deploy.Spec.Template.Spec.Volumes
+	verifyContainsVolumes(t, volumes, "search-postgres-certs")
+	verifyContainsVolumes(t, volumes, "postgresql-cfg")
+
 	//check for service
 	service := &corev1.Secret{}
 	err = cl.Get(context.TODO(), types.NamespacedName{
@@ -117,6 +144,19 @@ func TestSearch_controller(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to get configmap %s: %v", "search-indexer", err)
 	}
+
+	//check for configmap
+	configmap3 := &corev1.ConfigMap{}
+	err = cl.Get(context.TODO(), types.NamespacedName{
+		Name: "search-postgres",
+	}, configmap3)
+
+	if err != nil {
+		t.Fatalf("Failed to get configmap %s: %v", "search-postgres", err)
+	}
+
+	verifyConfigmapDataContent(t, configmap3, "postgresql.conf", "ssl = 'on'")
+	verifyConfigmapDataContent(t, configmap3, "postgresql-start.sh", "CREATE SCHEMA IF NOT EXISTS search")
 
 	//check for Service Account
 	serviceaccount := &corev1.ServiceAccount{}
@@ -188,5 +228,4 @@ func TestSearch_controller(t *testing.T) {
 	if !errors.IsNotFound(err) {
 		t.Errorf("Emptydir expected but PVC found %v", err)
 	}
-
 }
