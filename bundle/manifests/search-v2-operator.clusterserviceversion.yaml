@@ -229,11 +229,11 @@ spec:
                 - name: POSTGRES_IMAGE
                   value: registry.redhat.io/rhscl/postgresql-13-rhel7:1-56
                 - name: INDEXER_IMAGE
-                  value: quay.io/stolostron/search-indexer:2.6.0-SNAPSHOT-2022-06-07-14-08-53
+                  value: quay.io/stolostron/search-indexer:2.6.0-SNAPSHOT-2022-06-08-18-35-33
                 - name: COLLECTOR_IMAGE
-                  value: quay.io/stolostron/search-collector:2.6.0-SNAPSHOT-2022-06-07-14-08-53
+                  value: quay.io/stolostron/search-collector:2.6.0-SNAPSHOT-2022-06-08-18-35-33
                 - name: API_IMAGE
-                  value: quay.io/stolostron/search-v2-api:2.6.0-SNAPSHOT-2022-06-07-14-08-53
+                  value: quay.io/stolostron/search-v2-api:2.6.0-SNAPSHOT-2022-06-08-18-35-33
                 readinessProbe:
                   httpGet:
                     path: /readyz
