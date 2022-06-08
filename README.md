@@ -1,20 +1,23 @@
-# search-v2-operator
+# Search Operator
 Deploys the Odyssey (OCM Search v2) components. 
 
-## Installing search-v2-operator in openshift cluster
+## Installing the Search Operator in a Red Hat OpenShift cluster
 
-Install search-v2-operator in open-cluster-management namespace, after disabling search-operator (v1) by updating MulticlusterHub CR. In the MulticlusterHub CR set `enabled: false` where `spec.overrides.components.name = search`
-```
-spec:
-  overrides:
-    components:
-      - enabled: false
-        name: search
-```        
+#### Prerequisites
+- You will need [Operator SDK](https://sdk.operatorframework.io/) to install search operator bundle image. [Download and install](<https://sdk.operatorframework.io/docs/installation/>) client version >= v1.15
+- You'll need **Red Hat Advanced Cluster Management** v2.5 or later.
+- Update the MulticlusterHub CR to disable search v1.
+    In the MulticlusterHub CR set `enabled: false` where `spec.overrides.components.name = search`
+    ```
+    spec:
+    overrides:
+        components:
+        - enabled: false
+            name: search
+    ```        
 
-**Prerequisite** :  You will need operator sdk to install search operator bundle image. Download and install operator-sdk client version  >= v1.15
 
-<https://sdk.operatorframework.io/docs/installation/>
+After disabling search (v1), install the search operator (v2) in the open-cluster-management namespace.
 
 #### 1. Log into the cluster using CLI
 If not done already, use `oc login` to log in to the cluster by replacing `yoururl` and `yourpassword` below
