@@ -128,15 +128,6 @@ func getContainerArgs(deploymentName string, instance *searchv1alpha1.Search) []
 	return result
 }
 
-func getImagePullSecret(deploymentName string, instance *searchv1alpha1.Search) []corev1.LocalObjectReference {
-	result := []corev1.LocalObjectReference{}
-	if instance.Spec.ImagePullSecret != "" {
-		return append(result, corev1.LocalObjectReference{Name: instance.Spec.ImagePullSecret})
-	}
-	default_pull_secret := getImagePullSecretName()
-	return append(result, corev1.LocalObjectReference{Name: default_pull_secret})
-}
-
 func getRoleName() string {
 	return "search"
 }
