@@ -34,138 +34,6 @@ spec:
           spec:
             description: SearchSpec defines the desired state of Search
             properties:
-              allowDenyResources:
-                description: Control list of Kubernetes resources indexed by search-collector
-                properties:
-                  allowedResources:
-                    description: Allowed resources from collector
-                    items:
-                      properties:
-                        apiGroups:
-                          description: API Group names to be filtered
-                          items:
-                            type: string
-                          type: array
-                        clusterLabels:
-                          description: Cluster Labels this filter to be applied
-                          properties:
-                            matchExpressions:
-                              description: matchExpressions is a list of label selector
-                                requirements. The requirements are ANDed.
-                              items:
-                                description: A label selector requirement is a selector
-                                  that contains values, a key, and an operator that
-                                  relates the key and values.
-                                properties:
-                                  key:
-                                    description: key is the label key that the selector
-                                      applies to.
-                                    type: string
-                                  operator:
-                                    description: operator represents a key's relationship
-                                      to a set of values. Valid operators are In,
-                                      NotIn, Exists and DoesNotExist.
-                                    type: string
-                                  values:
-                                    description: values is an array of string values.
-                                      If the operator is In or NotIn, the values array
-                                      must be non-empty. If the operator is Exists
-                                      or DoesNotExist, the values array must be empty.
-                                      This array is replaced during a strategic merge
-                                      patch.
-                                    items:
-                                      type: string
-                                    type: array
-                                required:
-                                - key
-                                - operator
-                                type: object
-                              type: array
-                            matchLabels:
-                              additionalProperties:
-                                type: string
-                              description: matchLabels is a map of {key,value} pairs.
-                                A single {key,value} in the matchLabels map is equivalent
-                                to an element of matchExpressions, whose key field
-                                is "key", the operator is "In", and the values array
-                                contains only "value". The requirements are ANDed.
-                              type: object
-                          type: object
-                        resources:
-                          description: Resource names to be filtered
-                          items:
-                            type: string
-                          type: array
-                      required:
-                      - apiGroups
-                      - resources
-                      type: object
-                    type: array
-                  deniedResources:
-                    description: Denied resources from collector
-                    items:
-                      properties:
-                        apiGroups:
-                          description: API Group names to be filtered
-                          items:
-                            type: string
-                          type: array
-                        clusterLabels:
-                          description: Cluster Labels this filter to be applied
-                          properties:
-                            matchExpressions:
-                              description: matchExpressions is a list of label selector
-                                requirements. The requirements are ANDed.
-                              items:
-                                description: A label selector requirement is a selector
-                                  that contains values, a key, and an operator that
-                                  relates the key and values.
-                                properties:
-                                  key:
-                                    description: key is the label key that the selector
-                                      applies to.
-                                    type: string
-                                  operator:
-                                    description: operator represents a key's relationship
-                                      to a set of values. Valid operators are In,
-                                      NotIn, Exists and DoesNotExist.
-                                    type: string
-                                  values:
-                                    description: values is an array of string values.
-                                      If the operator is In or NotIn, the values array
-                                      must be non-empty. If the operator is Exists
-                                      or DoesNotExist, the values array must be empty.
-                                      This array is replaced during a strategic merge
-                                      patch.
-                                    items:
-                                      type: string
-                                    type: array
-                                required:
-                                - key
-                                - operator
-                                type: object
-                              type: array
-                            matchLabels:
-                              additionalProperties:
-                                type: string
-                              description: matchLabels is a map of {key,value} pairs.
-                                A single {key,value} in the matchLabels map is equivalent
-                                to an element of matchExpressions, whose key field
-                                is "key", the operator is "In", and the values array
-                                contains only "value". The requirements are ANDed.
-                              type: object
-                          type: object
-                        resources:
-                          description: Resource names to be filtered
-                          items:
-                            type: string
-                          type: array
-                      required:
-                      - apiGroups
-                      - resources
-                      type: object
-                    type: array
-                type: object
               availabilityConfig:
                 description: 'Specifies deployment replication for improved availability.
                   Options are: Basic and High (default)'
@@ -175,13 +43,13 @@ spec:
                   db parameters
                 type: string
               dbStorage:
-                description: Storgeclass Name to be used by default db
+                description: Storage configuration for the database.
                 properties:
                   size:
                     anyOf:
                     - type: integer
                     - type: string
-                    description: storage capacity
+                    default: 10Gi
                     pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                     x-kubernetes-int-or-string: true
                   storageClassName:
@@ -191,85 +59,17 @@ spec:
               deployments:
                 description: Customization for search deployments
                 properties:
-                  api:
-                    description: Configuration for api Deployment
-                    properties:
-                      imageOverride:
-                        description: Image_override
-                        type: string
-                      imagePullPolicy:
-                        description: ImagePullPolicy
-                        type: string
-                      imagePullSecret:
-                        description: ImagePullSecret
-                        type: string
-                      nodeSelector:
-                        additionalProperties:
-                          type: string
-                        description: NodeSelector to schedule on nodes with matching
-                          labels
-                        type: object
-                      proxyConfig:
-                        additionalProperties:
-                          type: string
-                        description: Proxy config , if remote collectors need to override
-                        type: object
-                      replicaCount:
-                        description: Number of pod instances for deployment
-                        format: int32
-                        minimum: 1
-                        type: integer
-                      resources:
-                        description: Compute Resources required by deployment
-                        properties:
-                          limits:
-                            additionalProperties:
-                              anyOf:
-                              - type: integer
-                              - type: string
-                              pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
-                              x-kubernetes-int-or-string: true
-                            description: 'Limits describes the maximum amount of compute
-                              resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
-                            type: object
-                          requests:
-                            additionalProperties:
-                              anyOf:
-                              - type: integer
-                              - type: string
-                              pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
-                              x-kubernetes-int-or-string: true
-                            description: 'Requests describes the minimum amount of
-                              compute resources required. If Requests is omitted for
-                              a container, it defaults to Limits if that is explicitly
-                              specified, otherwise to an implementation-defined value.
-                              More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
-                            type: object
-                        type: object
-                    type: object
                   collector:
                     description: Configuration for collector Deployment
                     properties:
+                      arguments:
+                        description: Container Arguments
+                        items:
+                          type: string
+                        type: array
                       imageOverride:
                         description: Image_override
                         type: string
-                      imagePullPolicy:
-                        description: ImagePullPolicy
-                        type: string
-                      imagePullSecret:
-                        description: ImagePullSecret
-                        type: string
-                      nodeSelector:
-                        additionalProperties:
-                          type: string
-                        description: NodeSelector to schedule on nodes with matching
-                          labels
-                        type: object
-                      proxyConfig:
-                        additionalProperties:
-                          type: string
-                        description: Proxy config , if remote collectors need to override
-                        type: object
                       replicaCount:
                         description: Number of pod instances for deployment
                         format: int32
@@ -306,26 +106,14 @@ spec:
                   database:
                     description: Configuration for DB Deployment
                     properties:
+                      arguments:
+                        description: Container Arguments
+                        items:
+                          type: string
+                        type: array
                       imageOverride:
                         description: Image_override
                         type: string
-                      imagePullPolicy:
-                        description: ImagePullPolicy
-                        type: string
-                      imagePullSecret:
-                        description: ImagePullSecret
-                        type: string
-                      nodeSelector:
-                        additionalProperties:
-                          type: string
-                        description: NodeSelector to schedule on nodes with matching
-                          labels
-                        type: object
-                      proxyConfig:
-                        additionalProperties:
-                          type: string
-                        description: Proxy config , if remote collectors need to override
-                        type: object
                       replicaCount:
                         description: Number of pod instances for deployment
                         format: int32
@@ -362,26 +150,14 @@ spec:
                   indexer:
                     description: Configuration for indexer Deployment
                     properties:
+                      arguments:
+                        description: Container Arguments
+                        items:
+                          type: string
+                        type: array
                       imageOverride:
                         description: Image_override
                         type: string
-                      imagePullPolicy:
-                        description: ImagePullPolicy
-                        type: string
-                      imagePullSecret:
-                        description: ImagePullSecret
-                        type: string
-                      nodeSelector:
-                        additionalProperties:
-                          type: string
-                        description: NodeSelector to schedule on nodes with matching
-                          labels
-                        type: object
-                      proxyConfig:
-                        additionalProperties:
-                          type: string
-                        description: Proxy config , if remote collectors need to override
-                        type: object
                       replicaCount:
                         description: Number of pod instances for deployment
                         format: int32
@@ -415,29 +191,17 @@ spec:
                             type: object
                         type: object
                     type: object
-                  remoteCollector:
-                    description: Configuration for addon installed collector Deployment
+                  queryapi:
+                    description: Configuration for api Deployment
                     properties:
+                      arguments:
+                        description: Container Arguments
+                        items:
+                          type: string
+                        type: array
                       imageOverride:
                         description: Image_override
                         type: string
-                      imagePullPolicy:
-                        description: ImagePullPolicy
-                        type: string
-                      imagePullSecret:
-                        description: ImagePullSecret
-                        type: string
-                      nodeSelector:
-                        additionalProperties:
-                          type: string
-                        description: NodeSelector to schedule on nodes with matching
-                          labels
-                        type: object
-                      proxyConfig:
-                        additionalProperties:
-                          type: string
-                        description: Proxy config , if remote collectors need to override
-                        type: object
                       replicaCount:
                         description: Number of pod instances for deployment
                         format: int32
@@ -475,13 +239,25 @@ spec:
               externalDBInstance:
                 description: Kubernetes secret name containing user provided db secret
                   Secret should contain connection parameters [db_host, db_port, db_user,
-                  db_password, db_name, ca_cert]
+                  db_password, db_name, ca_cert] Not supported for development preview.
                 type: string
+              imagePullPolicy:
+                description: ImagePullPolicy
+                type: string
+              imagePullSecret:
+                description: ImagePullSecret
+                type: string
+              nodeSelector:
+                additionalProperties:
+                  type: string
+                description: NodeSelector to schedule on nodes with matching labels
+                type: object
             type: object
           status:
             description: SearchStatus defines the observed state of Search
             properties:
               conditions:
+                description: Conditions
                 items:
                   description: "Condition contains details for one aspect of the current
                     state of this API Resource. --- This struct is intended for direct
@@ -553,18 +329,12 @@ spec:
               db:
                 description: Database used by search
                 type: string
-              health:
-                description: 'INSERT ADDITIONAL STATUS FIELD - define observed state
-                  of cluster Important: Run "make" to regenerate code after modifying
-                  this file Human readable health state'
-                type: string
-              storageInUse:
+              storage:
                 description: Storage used by database
                 type: string
             required:
             - db
-            - health
-            - storageInUse
+            - storage
             type: object
         type: object
     served: true
