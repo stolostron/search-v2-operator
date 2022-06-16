@@ -309,8 +309,8 @@ spec:
   - search
   - stolostron
   links:
-  - name: Search V2 Operator
-    url: https://search-v2-operator.domain
+  - name: Search Operator
+    url: https://github.com/stolostron/search-v2-operator
   maturity: alpha
   provider:
     name: Red Hat
