@@ -105,3 +105,5 @@ If you want to replace any PR images for any of the search components, you can u
     search-collector
     search-indexer
     search-postgres
+
+Version: 0.0.1 06/17/2022
