@@ -217,7 +217,7 @@ spec:
                 - --leader-elect
                 command:
                 - /manager
-                image: quay.io/xrajesh/search-v2-operator:z0622 
+                image: quay.io/stolostron/search-v2-operator:2.6 
                 livenessProbe:
                   httpGet:
                     path: /healthz
