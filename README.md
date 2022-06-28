@@ -37,7 +37,7 @@ oc login https://yoururl.com:6443 -u kubeadmin -p yourpassword
 _Note: A secret MUST be created with name as `search-pull-secret`_
 #### 3. Run bundle
 ```
-operator-sdk run bundle quay.io/stolostron/search-operator-bundle:latest --pull-secret-name search-pull-secret
+operator-sdk run bundle quay.io/stolostron/search-v2-operator:2.6.0-SNAPSHOT-2022-06-28-18-30-26 --pull-secret-name search-pull-secret
 ```
 
 Wait for `OLM has successfully installed "search-v2-operator.v0.0.1"` message.
@@ -49,6 +49,13 @@ oc apply -f config/samples/search_v1alpha1_search.yaml
 ```
 _Note: The custom resource must be named  `search-v2-operator`_
 Check if all the search pods are running, use ACM console to search.
+
+Unintalling search-v2-operator 
+You can uninstall the operator using the following command.
+```
+operator-sdk cleanup search-v2-operator
+```
+
 
 ## Building search-v2-operator in local machine
 
