@@ -50,7 +50,7 @@ oc apply -f config/samples/search_v1alpha1_search.yaml
 _Note: The custom resource must be named  `search-v2-operator`_
 Check if all the search pods are running, use ACM console to search.
 
-Unintalling search-v2-operator: 
+Uninstalling search-v2-operator: 
 You can uninstall the operator using the following command.
 ```
 operator-sdk cleanup search-v2-operator
