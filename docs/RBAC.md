@@ -49,15 +49,18 @@ This change doesn't change the semantic of the API.
 The search results must include **exactly** the same resources users are authorized to list using kubectl, oc, or the kubernetes API on the OpenShift cluster hosting the ACM Hub.
 
 We request all the authorization rules for the user and [cache](#cache) the results.
-> 1. Get all resources in the cluster that support `list` and `watch`. This is shared across all users.
+> 1. Get all resources in the cluster that support `list` and `watch`. This is shared across all users. 
 >       - CLI: `oc api-resources -o wide | grep watch | grep list`
 >       - API: See with `oc api-resources -o wide -v=6`
+>       - SQL: `SELECT DISTINCT data->>apigroup, data->>kind FROM search.resources WHERE data->>_hubClusterResource = true AND data->>namespace = NULL`
+>       - **Optimal implementation is to get this data from database.**
 > 2. For each cluster-scoped resource (namespaced == false), check if user has permission to list.
 >       - CLI: `oc auth can-i list <resource> --as=<user>`
 >       - API: [SelfSubjectAccessReview](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.23/#selfsubjectaccessreview-v1-authorization-k8s-io) 
-> 3. Get all projects (namespaces) for the user. **Note:** Project list gets filtered by user's access but namespace list won't, so we use projects.
->       - CLI: `oc projects --as=<user>`
+> 3. Get all projects (namespaces). This is shared across all users. 
+>       - CLI: `oc get namespaces`
 >       - API: [ProjectList](https://docs.okd.io/3.9/rest_api/apis-project.openshift.io/v1.Project.html#Get-apis-project.openshift.io-v1-projects)
+>       - **NOTE: Users don't always have visibility to all the projects where they can list rresources. Unfortunately we'll need to query all namespaces to get accurate results in the next step.**
 > 4. For each namespace, obtain the user's authorization rules.
 >       - CLI: `oc auth can-i --list -n <ns> --as=<user> | grep '\[\*\] \| list'`
 >       - API: [SelfSubjectRulesReview](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.23/#selfsubjectrulesreview-v1-authorization-k8s-io)
