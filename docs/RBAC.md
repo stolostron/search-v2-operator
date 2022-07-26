@@ -60,7 +60,7 @@ We request all the authorization rules for the user and [cache](#cache) the resu
 > 3. Get all projects (namespaces). This is shared across all users. 
 >       - CLI: `oc get namespaces`
 >       - API: [ProjectList](https://docs.okd.io/3.9/rest_api/apis-project.openshift.io/v1.Project.html#Get-apis-project.openshift.io-v1-projects)
->       - **NOTE: Users don't always have visibility to all the projects where they can list rresources. Unfortunately we'll need to query all namespaces to get accurate results in the next step.**
+>       - **NOTE: Users don't always have visibility to all the projects where they can list resources. Unfortunately we'll need to query all namespaces to get accurate results in the next step.**
 > 4. For each namespace, obtain the user's authorization rules.
 >       - CLI: `oc auth can-i --list -n <ns> --as=<user> | grep '\[\*\] \| list'`
 >       - API: [SelfSubjectRulesReview](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.23/#selfsubjectrulesreview-v1-authorization-k8s-io)
@@ -95,8 +95,9 @@ Find the managed clusters that the user is authorized to view and [cache](#cache
 > 1. Get all the namespaces associated with a managed cluster. We do this once for all users.
 >       - CLI: `oc get ManagedClusters`
 > 2. Get all projects (namespaces) for the user. (We already have this data.)
->       - CLI: `oc projects --as=<user>`
+>       - CLI: `oc get namespaces`
 >       - API: [ProjectList](https://docs.okd.io/3.9/rest_api/apis-project.openshift.io/v1.Project.html#Get-apis-project.openshift.io-v1-projects)
+>       - **NOTE: Users don't always have visibility to all the projects where they can list resources. Unfortunately we'll need to query all namespaces to get accurate results in the next step.**
 > 3. Build a list of all the managed clusters visible to the user.
 >       - INTERSECTION of results from steps 1 and 2.
 > 4. For each managed cluster, check if the user has permission to view resources.
