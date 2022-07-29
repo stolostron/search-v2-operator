@@ -2,6 +2,9 @@
 package controllers
 
 import (
+	"os"
+	"strings"
+
 	searchv1alpha1 "github.com/stolostron/search-v2-operator/api/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -18,6 +21,14 @@ func (r *SearchReconciler) PostgresConfigmap(instance *searchv1alpha1.Search) *c
 			Namespace: ns,
 		},
 	}
+	trigger, fileErr := os.ReadFile("postgresql.sql")
+	if fileErr != nil {
+		log.Error(fileErr, "Error reading trigger sql file")
+	}
+	var triggers []string
+	for _, str := range strings.Split(string(trigger), "|") {
+		triggers = append(triggers, strings.TrimSpace(strings.ReplaceAll(str, "\n", " ")))
+	}
 	data := map[string]string{}
 	data["postgresql.conf"] = `
 ssl = 'on'
@@ -33,7 +44,10 @@ psql -d search -U searchuser -c "CREATE INDEX IF NOT EXISTS data_namespace_idx O
 psql -d search -U searchuser -c "CREATE INDEX IF NOT EXISTS data_name_idx ON search.resources USING GIN ((data ->  'name'))"
 psql -d search -U searchuser -c "CREATE or REPLACE VIEW search.all_edges AS SELECT * from search.edges UNION SELECT a.uid as sourceid , a.data->>'kind' as sourcekind, b.uid as destid, b.data->>'kind' as destkind, 'deployedBy' as edgetype, a.cluster as cluster FROM search.resources a INNER JOIN search.resources b ON split_part(a.data->>'_hostingSubscription', '/', 1) = b.data->>'namespace' AND split_part(a.data->>'_hostingSubscription', '/', 2) = b.data->>'name' WHERE a.data->>'kind' = 'Subscription' AND b.data->>'kind' = 'Subscription' AND a.uid <> b.uid"`
 
+	data["postgresql.sql"] = strings.Join(triggers, "\n")
+
 	cm.Data = data
+	log.Info("configmap data populated")
 
 	err := controllerutil.SetControllerReference(instance, cm, r.Scheme)
 	if err != nil {
