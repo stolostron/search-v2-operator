@@ -84,7 +84,6 @@ END;
 $BODY$
 language plpgsql;"
 |
-
 psql -d search -U searchuser -c "CREATE  TRIGGER resources_upsert
     AFTER INSERT OR UPDATE ON "search.resources"
     FOR EACH ROW 
