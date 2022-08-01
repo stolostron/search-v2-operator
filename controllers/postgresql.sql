@@ -84,13 +84,17 @@ END;
 $BODY$
 language plpgsql;"
 |
-psql -d search -U searchuser -c "CREATE  TRIGGER resources_upsert
+psql -d search -U searchuser -c "DROP TRIGGER IF EXISTS resources_upsert on search.resources;"
+|
+psql -d search -U searchuser -c "CREATE TRIGGER resources_upsert
     AFTER INSERT OR UPDATE ON "search.resources"
     FOR EACH ROW 
 	WHEN (NEW.data->>'kind' = 'Subscription')
     EXECUTE PROCEDURE search.intercluster_edges();"
 |  
-psql -d search -U searchuser -c "CREATE  TRIGGER resources_delete
+psql -d search -U searchuser -c "DROP TRIGGER IF EXISTS resources_delete on search.resources;"
+|
+psql -d search -U searchuser -c "CREATE TRIGGER resources_delete
     AFTER DELETE ON "search.resources"
     FOR EACH ROW 
 	WHEN (OLD.data->>'kind' = 'Subscription')
