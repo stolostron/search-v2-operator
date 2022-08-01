@@ -94,14 +94,13 @@ implementation has drifted as we learned the limitations, this change realigns s
 Find the managed clusters that the user is authorized to view and [cache](#cache) the results.
 > 1. Get all the namespaces associated with a managed cluster. We do this once for all users.
 >       - CLI: `oc get ManagedClusters`
-> 2. Get all projects (namespaces) for the user. (We already have this data.)
->       - CLI: `oc projects --as=<user>`
+> 2. Get all namespaces. We already have this data (Step 3 in Hub Cluster)
+>       - CLI: `oc get namespaces`
 >       - API: [ProjectList](https://docs.okd.io/3.9/rest_api/apis-project.openshift.io/v1.Project.html#Get-apis-project.openshift.io-v1-projects)
-> 3. Build a list of all the managed clusters visible to the user.
->       - INTERSECTION of results from steps 1 and 2.
-> 4. For each managed cluster, check if the user has permission to view resources.
->       - CLI: `oc auth can-i create ManagedClusterView -n <managedClusterName> --as=<user>`
+> 3. For each namespace, check if the user has permission to view resources.
+>       - CLI: `oc auth can-i create ManagedClusterView -n <namespace> --as=<user>`
 >       - API: [SelfSubjectRulesReview](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.23/#selfsubjectrulesreview-v1-authorization-k8s-io) (We already have this data.)
+> 4. INTERSECTION of namespaces from Step 1 and Step 3 are the mangedclusters, the user has access to view.     
 
 Use the list of managed clusters to [query the database](#query-the-database).
 
