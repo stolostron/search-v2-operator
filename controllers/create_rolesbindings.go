@@ -153,6 +153,11 @@ func getRules() []rbacv1.PolicyRule {
 			Resources: []string{"selfsubjectaccessreviews", "selfsubjectrulesreviews"},
 			Verbs:     []string{"create", "impersonate"},
 		},
+		{
+			APIGroups: []string{""},
+			Resources: []string{"users"},
+			Verbs:     []string{"impersonate"},
+		},
 	}
 }
 
