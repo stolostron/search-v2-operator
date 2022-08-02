@@ -33,9 +33,11 @@ psql -d search -U searchuser -c "CREATE INDEX IF NOT EXISTS data_kind_idx ON sea
 psql -d search -U searchuser -c "CREATE INDEX IF NOT EXISTS data_namespace_idx ON search.resources USING GIN ((data -> 'namespace'))"
 psql -d search -U searchuser -c "CREATE INDEX IF NOT EXISTS data_name_idx ON search.resources USING GIN ((data ->  'name'))"
 psql -d search -U searchuser -c "CREATE INDEX edges_sourceid_idx ON search.edges USING btree (sourceid)"
-psql -d search -U searchuser -c "CREATE INDEX edges_destid_idx ON search.edges USING btree (destid)"`
+psql -d search -U searchuser -c "CREATE INDEX edges_destid_idx ON search.edges USING btree (destid)"
+psql -d search -U searchuser -f postgresql.sql`
 
-	data["postgresql.sql"] = `psql -d search -U searchuser -c "CREATE OR REPLACE FUNCTION search.intercluster_edges() RETURNS TRIGGER AS
+	data["postgresql.sql"] = `
+	"CREATE OR REPLACE FUNCTION search.intercluster_edges() RETURNS TRIGGER AS
 	$BODY$
 	BEGIN
 	raise notice 'running intercluster_edges: %', NEW;
@@ -120,14 +122,14 @@ psql -d search -U searchuser -c "CREATE INDEX edges_destid_idx ON search.edges U
 	END;
 	$BODY$
 	language plpgsql;"
-	psql -d search -U searchuser -c "DROP TRIGGER IF EXISTS resources_upsert on search.resources;"
-	psql -d search -U searchuser -c "CREATE TRIGGER resources_upsert
+	"DROP TRIGGER IF EXISTS resources_upsert on search.resources;"
+	"CREATE TRIGGER resources_upsert
 		AFTER INSERT OR UPDATE ON "search.resources"
 		FOR EACH ROW 
 		WHEN (NEW.data->>'kind' = 'Subscription')
 		EXECUTE PROCEDURE search.intercluster_edges();"
-	psql -d search -U searchuser -c "DROP TRIGGER IF EXISTS resources_delete on search.resources;"
-	psql -d search -U searchuser -c "CREATE TRIGGER resources_delete
+	"DROP TRIGGER IF EXISTS resources_delete on search.resources;"
+	"CREATE TRIGGER resources_delete
 		AFTER DELETE ON "search.resources"
 		FOR EACH ROW 
 		WHEN (OLD.data->>'kind' = 'Subscription')
