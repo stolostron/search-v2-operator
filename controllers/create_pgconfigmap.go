@@ -32,8 +32,8 @@ psql -d search -U searchuser -c "CREATE TABLE IF NOT EXISTS search.edges (source
 psql -d search -U searchuser -c "CREATE INDEX IF NOT EXISTS data_kind_idx ON search.resources USING GIN ((data -> 'kind'))"
 psql -d search -U searchuser -c "CREATE INDEX IF NOT EXISTS data_namespace_idx ON search.resources USING GIN ((data -> 'namespace'))"
 psql -d search -U searchuser -c "CREATE INDEX IF NOT EXISTS data_name_idx ON search.resources USING GIN ((data ->  'name'))"
-psql -d search -U searchuser -c "CREATE INDEX edges_sourceid_idx ON search.edges USING btree (sourceid)"
-psql -d search -U searchuser -c "CREATE INDEX edges_destid_idx ON search.edges USING btree (destid)"
+psql -d search -U searchuser -c "CREATE INDEX IF NOT EXISTS edges_sourceid_idx ON search.edges USING btree (sourceid)"
+psql -d search -U searchuser -c "CREATE INDEX IF NOT EXISTS edges_destid_idx ON search.edges USING btree (destid)"
 psql -d search -U searchuser -f postgresql.sql`
 
 	data["postgresql.sql"] = `
