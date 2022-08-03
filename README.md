@@ -16,7 +16,6 @@ Deploys the Odyssey (OCM Search v2) components.
             name: search
     ```        
 
-
 After disabling search (v1), install the search operator (v2) in the open-cluster-management namespace.
 
 #### 1. Log into the cluster using CLI
@@ -34,20 +33,22 @@ oc login https://yoururl.com:6443 -u kubeadmin -p yourpassword
 1. oc apply -f <your_secret.yaml>
 1. Verify secrets presence by running ` oc get secret | grep search-pull-secret`
 
-_Note: A secret MUST be created with name as `search-pull-secret`_
+> **IMPORTANT**: The secret MUST be created with name as `search-pull-secret`
+
 #### 3. Run bundle
 ```
-operator-sdk run bundle quay.io/stolostron/search-operator-bundle:2.6.0-SNAPSHOT-2022-06-28-18-30-26 --pull-secret-name search-pull-secret
+operator-sdk run bundle quay.io/stolostron/search-operator-bundle:2.6.0-SNAPSHOT-2022-08-02-17-01-58 --pull-secret-name search-pull-secret
 ```
-
 Wait for `OLM has successfully installed "search-v2-operator.v0.0.1"` message.
-You can replace the latest tag with specific image tag from quay to test other images.
+
+> **NOTE**: If you receive an error try adding this flag. `--index-image=quay.io/operator-framework/opm:v1.23.0`  
+> **TIP**: You can replace the image tag with other images in our [Quay repo](https://quay.io/repository/stolostron/search-operator-bundle?tab=tags)
 
 #### 4. Apply the empty CR to create the search components
 ```
 oc apply -f config/samples/search_v1alpha1_search.yaml
 ```
-_Note: The custom resource must be named  `search-v2-operator`_
+> **IMPORTANT**: The custom resource must be named  `search-v2-operator`.
 Check if all the search pods are running, use ACM console to search.
 
 Uninstalling search-v2-operator: 
