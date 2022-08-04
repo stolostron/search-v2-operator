@@ -25,12 +25,13 @@ import (
 	searchv1alpha1 "github.com/stolostron/search-v2-operator/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
@@ -40,6 +41,8 @@ type SearchReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
 }
+
+const searchFinalizer = "search.open-cluster-management.io/finalizer"
 
 var log = logf.Log.WithName("searchoperator")
 var once sync.Once
@@ -67,12 +70,20 @@ func (r *SearchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return reconcile.Result{}, err
 	}
 
+	// Setup finalizers
+	err = r.setFinalizer(ctx, instance)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+
 	// Do not reconcile objects if this instance of search is labeled "paused"
 	if IsPaused(instance.GetAnnotations()) {
 		log.Info("Reconciliation is paused because the annotation 'search-pause: true' was found.")
 		return ctrl.Result{}, nil
 	}
+
 	if instance.Spec.DBStorage.StorageClassName != "" && !r.isPVCPresent(ctx, instance) {
+
 		pvcConfigured := r.configurePVC(ctx, instance)
 		if !pvcConfigured {
 			log.Info("Persistent Volume Claim is not ready yet , retyring in 10 seconds")
@@ -180,6 +191,48 @@ func (r *SearchReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&corev1.ConfigMap{}).
 		Owns(&corev1.Secret{}).
 		Owns(&corev1.Service{}).
-		Owns(&addonv1alpha1.ClusterManagementAddOn{}).
+		Owns(&rbacv1.ClusterRoleBinding{}).
+		Owns(&rbacv1.ClusterRole{}).
 		Complete(r)
+}
+
+func (r *SearchReconciler) finalizeSearch(instance *searchv1alpha1.Search) error {
+	err := r.deleteClusterManagementAddon(instance)
+	if err != nil {
+		return err
+	}
+	log.Info("Successfully finalized search")
+	return nil
+}
+
+func (r *SearchReconciler) setFinalizer(ctx context.Context, instance *searchv1alpha1.Search) error {
+	// Check if the Search instance is marked to be deleted, which is
+	// indicated by the deletion timestamp being set.
+	isSearchMarkedToBeDeleted := instance.GetDeletionTimestamp() != nil
+	if isSearchMarkedToBeDeleted {
+		log.V(2).Info("Search marked for deletion")
+		if controllerutil.ContainsFinalizer(instance, searchFinalizer) {
+			// Run finalization logic for searchFinalizer. If the
+			// finalization logic fails, don't remove the finalizer so
+			// that we can retry during the next reconciliation.
+			if err := r.finalizeSearch(instance); err != nil {
+				return err
+			}
+			// Remove searchFinalizer. Once all finalizers have been
+			// removed, the object will be deleted.
+			controllerutil.RemoveFinalizer(instance, searchFinalizer)
+			r.Update(ctx, instance)
+			log.Info("Finalizer removed from search CR")
+		}
+	}
+	// Add finalizer for this CR
+	if !controllerutil.ContainsFinalizer(instance, searchFinalizer) {
+		log.Info("Adding Finalizer to search CR")
+		controllerutil.AddFinalizer(instance, searchFinalizer)
+		err := r.Update(ctx, instance)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }

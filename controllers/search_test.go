@@ -15,6 +15,7 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -228,4 +229,17 @@ func TestSearch_controller(t *testing.T) {
 	if !errors.IsNotFound(err) {
 		t.Errorf("Emptydir expected but PVC found %v", err)
 	}
+
+	//Test finalizer
+	search.ObjectMeta.DeletionTimestamp = &v1.Time{Time: time.Now()}
+	search.ObjectMeta.Finalizers = []string{"search.open-cluster-management.io/finalizer"}
+	err = cl.Update(context.TODO(), search)
+	if err != nil {
+		t.Fatalf("Failed to update Search CR: (%v)", err)
+	}
+	_, err = r.Reconcile(context.TODO(), req)
+	if err != nil {
+		t.Fatalf("reconcile for finalizer: (%v)", err)
+	}
+
 }
