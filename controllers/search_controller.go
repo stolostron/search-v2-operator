@@ -33,7 +33,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
 // SearchReconciler reconciles a Search object
@@ -65,14 +64,8 @@ func (r *SearchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	err := r.Client.Get(ctx, types.NamespacedName{Name: "search-v2-operator", Namespace: req.Namespace}, instance)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			return reconcile.Result{}, nil
+			return ctrl.Result{}, nil
 		}
-		return reconcile.Result{}, err
-	}
-
-	// Setup finalizers
-	err = r.setFinalizer(ctx, instance)
-	if err != nil {
 		return ctrl.Result{}, err
 	}
 
@@ -80,6 +73,17 @@ func (r *SearchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	if IsPaused(instance.GetAnnotations()) {
 		log.Info("Reconciliation is paused because the annotation 'search-pause: true' was found.")
 		return ctrl.Result{}, nil
+	}
+
+	// Setup finalizers
+	deleted, err := r.setFinalizer(ctx, instance)
+	if err != nil || deleted {
+		if deleted {
+			log.V(2).Info("Search Instance deleted, reque request", err)
+		} else {
+			log.V(2).Info("Error setting Finalizer, reque request ", err)
+		}
+		return ctrl.Result{}, err
 	}
 
 	if instance.Spec.DBStorage.StorageClassName != "" && !r.isPVCPresent(ctx, instance) {
@@ -205,7 +209,7 @@ func (r *SearchReconciler) finalizeSearch(instance *searchv1alpha1.Search) error
 	return nil
 }
 
-func (r *SearchReconciler) setFinalizer(ctx context.Context, instance *searchv1alpha1.Search) error {
+func (r *SearchReconciler) setFinalizer(ctx context.Context, instance *searchv1alpha1.Search) (bool, error) {
 	// Check if the Search instance is marked to be deleted, which is
 	// indicated by the deletion timestamp being set.
 	isSearchMarkedToBeDeleted := instance.GetDeletionTimestamp() != nil
@@ -216,7 +220,7 @@ func (r *SearchReconciler) setFinalizer(ctx context.Context, instance *searchv1a
 			// finalization logic fails, don't remove the finalizer so
 			// that we can retry during the next reconciliation.
 			if err := r.finalizeSearch(instance); err != nil {
-				return err
+				return false, err
 			}
 			// Remove searchFinalizer. Once all finalizers have been
 			// removed, the object will be deleted.
@@ -224,6 +228,7 @@ func (r *SearchReconciler) setFinalizer(ctx context.Context, instance *searchv1a
 			r.Update(ctx, instance)
 			log.Info("Finalizer removed from search CR")
 		}
+		return true, nil
 	}
 	// Add finalizer for this CR
 	if !controllerutil.ContainsFinalizer(instance, searchFinalizer) {
@@ -231,8 +236,9 @@ func (r *SearchReconciler) setFinalizer(ctx context.Context, instance *searchv1a
 		controllerutil.AddFinalizer(instance, searchFinalizer)
 		err := r.Update(ctx, instance)
 		if err != nil {
-			return err
+			log.V(2).Info("Error updating instance with Finalizer", err)
+			return false, err
 		}
 	}
-	return nil
+	return false, nil
 }
