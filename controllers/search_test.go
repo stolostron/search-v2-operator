@@ -264,7 +264,7 @@ func TestSearch_controller(t *testing.T) {
 	}
 	r.Reconcile(context.TODO(), req)
 
-	// We should expect ClusterManagementaddon deleted by Finilizer
+	// We should expect ClusterManagementaddon deleted by Finalizer
 	err = cl.Get(context.TODO(), types.NamespacedName{
 		Name: getClusterManagementAddonName(),
 	}, cma)

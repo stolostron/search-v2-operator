@@ -3,7 +3,6 @@ package controllers
 
 import (
 	"context"
-	"time"
 
 	searchv1alpha1 "github.com/stolostron/search-v2-operator/api/v1alpha1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -28,7 +27,6 @@ func (r *SearchReconciler) deleteClusterManagementAddon(instance *searchv1alpha1
 		log.Error(err, "Failed to delete ClusterManagementAddon", "name", cma)
 		return err
 	}
-	time.Sleep(1 * time.Second)
 	log.V(2).Info("ClusterManagementAddon search-collector deleted", "name", cma)
 	return nil
 }

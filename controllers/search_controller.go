@@ -79,9 +79,9 @@ func (r *SearchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	deleted, err := r.setFinalizer(ctx, instance)
 	if err != nil || deleted {
 		if deleted {
-			log.V(2).Info("Search Instance deleted, reque request", err)
+			log.V(2).Info("Search Instance deleted, requeue request", err)
 		} else {
-			log.V(2).Info("Error setting Finalizer, reque request ", err)
+			log.V(2).Info("Error setting Finalizer, requeue request ", err)
 		}
 		return ctrl.Result{}, err
 	}
@@ -225,7 +225,11 @@ func (r *SearchReconciler) setFinalizer(ctx context.Context, instance *searchv1a
 			// Remove searchFinalizer. Once all finalizers have been
 			// removed, the object will be deleted.
 			controllerutil.RemoveFinalizer(instance, searchFinalizer)
-			r.Update(ctx, instance)
+			err := r.Update(ctx, instance)
+			if err != nil {
+				log.Error(err, "Error updating instance while removing finalizer")
+				return false, err
+			}
 			log.Info("Finalizer removed from search CR")
 		}
 		return true, nil
