@@ -262,9 +262,9 @@ func TestSearch_controller(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to update Search: (%v)", err)
 	}
-	_, err = r.Reconcile(context.TODO(), req)
+	r.Reconcile(context.TODO(), req)
 
-	// We should not expect ClusterManagementaddon deleted by Finilizer
+	// We should expect ClusterManagementaddon deleted by Finilizer
 	err = cl.Get(context.TODO(), types.NamespacedName{
 		Name: getClusterManagementAddonName(),
 	}, cma)
