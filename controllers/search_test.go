@@ -248,6 +248,9 @@ func TestSearch_controller(t *testing.T) {
 	r = &SearchReconciler{Client: cl, Scheme: s}
 	//Reconcile to check if the Finilizer is set
 	_, err = r.Reconcile(context.TODO(), req)
+	if err != nil {
+		t.Logf("Error during reconcile: (%v)", err)
+	}
 	err = cl.Get(context.TODO(), types.NamespacedName{
 		Name: "search-v2-operator",
 	}, search)
