@@ -205,6 +205,25 @@ func (r *SearchReconciler) finalizeSearch(instance *searchv1alpha1.Search) error
 	if err != nil {
 		return err
 	}
+	addonCRName := getAddonRoleName()
+	err = r.deleteClusterRole(instance, addonCRName)
+	if err != nil {
+		return err
+	}
+	err = r.deleteClusterRoleBinding(instance, addonCRName)
+	if err != nil {
+		return err
+	}
+	searchCRName := getRoleName()
+	err = r.deleteClusterRole(instance, searchCRName)
+	if err != nil {
+		return err
+	}
+	searchCRBName := getRoleBindingName()
+	err = r.deleteClusterRoleBinding(instance, searchCRBName)
+	if err != nil {
+		return err
+	}
 	log.Info("Successfully finalized search")
 	return nil
 }
