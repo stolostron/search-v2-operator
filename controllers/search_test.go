@@ -247,10 +247,15 @@ func TestSearch_controller(t *testing.T) {
 
 	r = &SearchReconciler{Client: cl, Scheme: s}
 	//Reconcile to check if the Finilizer is set
-	r.Reconcile(context.TODO(), req)
-	cl.Get(context.TODO(), types.NamespacedName{
+	_, err = r.Reconcile(context.TODO(), req)
+	err = cl.Get(context.TODO(), types.NamespacedName{
 		Name: "search-v2-operator",
 	}, search)
+
+	if err != nil {
+		t.Logf("Failed to get Search: (%v)", err)
+	}
+
 	actual_finalizer := search.GetFinalizers()
 	if len(actual_finalizer) != 1 || actual_finalizer[0] != "search.open-cluster-management.io/finalizer" {
 		t.Errorf("Finalizer not set in search-v2-operator")
@@ -262,7 +267,7 @@ func TestSearch_controller(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to update Search: (%v)", err)
 	}
-	r.Reconcile(context.TODO(), req)
+	_, err = r.Reconcile(context.TODO(), req)
 
 	// We should expect ClusterManagementaddon deleted by Finalizer
 	err = cl.Get(context.TODO(), types.NamespacedName{
