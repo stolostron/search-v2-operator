@@ -247,8 +247,8 @@ func TestSearch_controller(t *testing.T) {
 
 	r = &SearchReconciler{Client: cl, Scheme: s}
 	//Reconcile to check if the Finilizer is set
-	_, err = r.Reconcile(context.TODO(), req)
-	err = cl.Get(context.TODO(), types.NamespacedName{
+	r.Reconcile(context.TODO(), req)
+	cl.Get(context.TODO(), types.NamespacedName{
 		Name: "search-v2-operator",
 	}, search)
 	actual_finalizer := search.GetFinalizers()
