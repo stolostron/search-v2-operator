@@ -269,6 +269,10 @@ func TestSearch_controller(t *testing.T) {
 	}
 	_, err = r.Reconcile(context.TODO(), req)
 
+	if err != nil {
+		t.Logf("Error during reconcile: (%v)", err)
+	}
+
 	// We should expect ClusterManagementaddon deleted by Finalizer
 	err = cl.Get(context.TODO(), types.NamespacedName{
 		Name: getClusterManagementAddonName(),
