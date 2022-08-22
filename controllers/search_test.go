@@ -15,9 +15,11 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
+	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -228,4 +230,59 @@ func TestSearch_controller(t *testing.T) {
 	if !errors.IsNotFound(err) {
 		t.Errorf("Emptydir expected but PVC found %v", err)
 	}
+	//Test Finalizer
+	cmatest := &addonapiv1alpha1.ClusterManagementAddOn{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "ClusterManagementAddon",
+			APIVersion: "addon.open-cluster-management.io",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "search-collector",
+		},
+	}
+
+	objsEmpty = []runtime.Object{search, cmatest}
+	// Create a fake client to mock API calls.
+	cl = fake.NewClientBuilder().WithRuntimeObjects(objsEmpty...).Build()
+
+	r = &SearchReconciler{Client: cl, Scheme: s}
+	//Reconcile to check if the Finilizer is set
+	_, err = r.Reconcile(context.TODO(), req)
+	if err != nil {
+		t.Logf("Error during reconcile: (%v)", err)
+	}
+	err = cl.Get(context.TODO(), types.NamespacedName{
+		Name: "search-v2-operator",
+	}, search)
+
+	if err != nil {
+		t.Logf("Failed to get Search: (%v)", err)
+	}
+
+	actual_finalizer := search.GetFinalizers()
+	if len(actual_finalizer) != 1 || actual_finalizer[0] != "search.open-cluster-management.io/finalizer" {
+		t.Errorf("Finalizer not set in search-v2-operator")
+	}
+
+	//Now delete the search CR by setting the deletion time
+	search.ObjectMeta.DeletionTimestamp = &v1.Time{Time: time.Now()}
+	err = cl.Update(context.TODO(), search)
+	if err != nil {
+		t.Fatalf("Failed to update Search: (%v)", err)
+	}
+	_, err = r.Reconcile(context.TODO(), req)
+
+	if err != nil {
+		t.Logf("Error during reconcile: (%v)", err)
+	}
+
+	// We should expect ClusterManagementaddon deleted by Finalizer
+	err = cl.Get(context.TODO(), types.NamespacedName{
+		Name: getClusterManagementAddonName(),
+	}, cma)
+
+	if !errors.IsNotFound(err) {
+		t.Errorf("Failed to delete ClusterManagementAddOn %s", getClusterManagementAddonName())
+	}
+
 }
