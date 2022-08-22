@@ -285,4 +285,40 @@ func TestSearch_controller(t *testing.T) {
 		t.Errorf("Failed to delete ClusterManagementAddOn %s", getClusterManagementAddonName())
 	}
 
+	// We should expect Addon ClusterRole deleted by Finalizer
+	err = cl.Get(context.TODO(), types.NamespacedName{
+		Name: getAddonRoleName(),
+	}, role)
+
+	if !errors.IsNotFound(err) {
+		t.Errorf("Failed to delete Clusterrole %s", getAddonRoleName())
+	}
+
+	// We should expect Addon ClusterRolebinding deleted by Finalizer
+	err = cl.Get(context.TODO(), types.NamespacedName{
+		Name: getAddonRoleName(),
+	}, rolebinding)
+
+	if !errors.IsNotFound(err) {
+		t.Errorf("Failed to delete ClusterRoleBinding %s", getAddonRoleName())
+	}
+
+	// We should expect Search ClusterRole deleted by Finalizer
+	err = cl.Get(context.TODO(), types.NamespacedName{
+		Name: getRoleName(),
+	}, role)
+
+	if !errors.IsNotFound(err) {
+		t.Errorf("Failed to delete Clusterrole %s", getRoleName())
+	}
+
+	// We should expect Search ClusterRolebinding deleted by Finalizer
+	err = cl.Get(context.TODO(), types.NamespacedName{
+		Name: getRoleBindingName(),
+	}, rolebinding)
+
+	if !errors.IsNotFound(err) {
+		t.Errorf("Failed to delete ClusterRoleBinding %s", getRoleBindingName())
+	}
+
 }
