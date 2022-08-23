@@ -1,7 +1,7 @@
 #!/bin/bash
 
 ###############################################################################
-# Copyright (c) 2022 Red Hat, Inc.
+# Copyright Contributors to the Open Cluster Management project
 ###############################################################################
 
 ####################
@@ -48,8 +48,8 @@ PIPELINE_MANIFEST_FILEPATH=${PIPELINE_MANIFEST_FILEPATH:-"$PIPELINE_REPO/manifes
 OPERATOR_CSV_FILEPATH=${OPERATOR_CSV_FILEPATH:-"bundle/manifests/search-v2-operator.clusterserviceversion.yaml"}
 
 OPERATOR_CONTAINER_PATH=${OPERATOR_CONTAINER_PATH:-".spec.install.spec.deployments[0].spec.template.spec.containers[1]"}
-OPERATOR_ENV_PATH=${OPERATOR_ENV_PATH:-"$OPERATOR_CONTAINER_PATH.env[].values"}
-OPERATOR_IMAGE_PATH=${OPERATOR_IMAGE_PATH:-"$OPERATOR_CONTAINER_PATH.images"}
+OPERATOR_ENV_PATH=${OPERATOR_ENV_PATH:-"$OPERATOR_CONTAINER_PATH.env[].value"}
+OPERATOR_IMAGE_PATH=${OPERATOR_IMAGE_PATH:-"$OPERATOR_CONTAINER_PATH.image"}
 
 ####################
 ## IMAGE VARIABLES
@@ -60,11 +60,9 @@ IMG_REGISTRY=${IMG_REGISTRY:-"quay.io/$ORG"}
 DEFAULT_TAG=${DEFAULT_TAG:-"2.6.0-SNAPSHOT-2022-08-08-20-23-21"}
 DEFAULT_OPERATOR_TAG=${DEFAULT_OPERATOR_TAG:-"2.6"}
 
-# SEARCH V1 IMAGES
-DEFAULT_COLLECTOR_IMAGE=$IMG_REGISTRY/search-collector:$DEFAULT_TAG
-
-# SEARCH-V2 IMAGES
+# SEARCH IMAGES
 DEFAULT_API_IMAGE=$IMG_REGISTRY/search-v2-api:$DEFAULT_TAG
+DEFAULT_COLLECTOR_IMAGE=$IMG_REGISTRY/search-collector:$DEFAULT_TAG
 DEFAULT_INDEXER_IMAGE=$IMG_REGISTRY/search-indexer:$DEFAULT_TAG
 DEFAULT_OPERATOR_IMAGE=$IMG_REGISTRY/search-v2-operator:${DEFAULT_OPERATOR_TAG:-DEFAULT_TAG}
 
@@ -74,11 +72,11 @@ DEFAULT_POSTGRES_IMAGE=registry.redhat.io/rhel8/postgresql-13:1-56
 ####################
 ## IGNORE VARIABLES
 ####################
-IGNORE_COLLECTOR_UPDATE=${IGNORE_COLLECTOR_UPDATE:-"false"}
-IGNORE_INDEXER_UPDATE=${IGNORE_INDEXER_UPDATE:-"false"}
-IGNORE_POSTGRES_UPDATE=${IGNORE_POSTGRES_UPDATE:-"true"}
-IGNORE_V2_API_UPDATE=${IGNORE_V2_API_UPDATE:-"false"}
-IGNORE_V2_OPERATOR_UPDATE=${IGNORE_V2_OPERATOR_UPDATE:-"false"}
+IGNORE_API_IMAGE_UPDATE=${IGNORE_API_IMAGE_UPDATE:-"false"}
+IGNORE_COLLECTOR_IMAGE_UPDATE=${IGNORE_COLLECTOR_IMAGE_UPDATE:-"false"}
+IGNORE_INDEXER_IMAGE_UPDATE=${IGNORE_INDEXER_IMAGE_UPDATE:-"false"}
+IGNORE_OPERATOR_IMAGE_UPDATE=${IGNORE_OPERATOR_IMAGE_UPDATE:-"false"}
+IGNORE_POSTGRES_IMAGE_UPDATE=${IGNORE_POSTGRES_IMAGE_UPDATE:-"true"}
 
 ####################
 ## FUNCTIONS/METHODS
@@ -93,10 +91,10 @@ display_component_images () {
     echo -e "Component Images"
     echo -e "==============================================================================" \
     "\nPOSTGRES:\t\t${POSTGRES_IMAGE:-$DEFAULT_POSTGRES_IMAGE}" \
+    "\nSEARCH_API:\t\t${API_IMAGE:-$DEFAULT_API_IMAGE}" \
     "\nSEARCH_COLLECTOR:\t${COLLECTER_IMAGE:-$DEFAULT_COLLECTOR_IMAGE}" \
     "\nSEARCH_INDEXER:\t\t${INDEXER_IMAGE:-$DEFAULT_INDEXER_IMAGE}" \
-    "\nSEARCH_V2_API:\t\t${API_IMAGE:-$DEFAULT_API_IMAGE}" \
-    "\nSEARCH_V2_OPERATOR:\t${OPERATOR_IMAGE:-$DEFAULT_OPERATOR_IMAGE}" \
+    "\nSEARCH_OPERATOR:\t${OPERATOR_IMAGE:-$DEFAULT_OPERATOR_IMAGE}" \
     "\n==============================================================================\n"
 }
 
