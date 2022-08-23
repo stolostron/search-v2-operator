@@ -44,7 +44,7 @@ RELEASE_BRANCH=${RELEASE_BRANCH:-"2.7-integration"}
 ####################
 ## PATHS (I.E DIR, FILES, ETC)
 ####################
-PIPELINE_MANIFEST_FILEPATH=${PIPELINE_MANIFEST_FILEPATH:-"$PIPELINE_REPO/manifest.json"}
+PIPELINE_MANIFEST_FILEPATH=${PIPELINE_MANIFEST_FILEPATH:-"manifest.json"}
 OPERATOR_CSV_FILEPATH=${OPERATOR_CSV_FILEPATH:-"bundle/manifests/search-v2-operator.clusterserviceversion.yaml"}
 
 OPERATOR_CONTAINER_PATH=${OPERATOR_CONTAINER_PATH:-".spec.install.spec.deployments[0].spec.template.spec.containers[1]"}
@@ -126,24 +126,23 @@ get_default_images_from_csv () {
 }
 
 update_images_csv () {
-  log_color purple "Preparing to update component: $1 => $2\n"
+  COMPONENT=$1
+  NEW_IMAGE=$2
+  log_color purple "Preparing to update component: $COMPONENT => $NEW_IMAGE\n"
 
   # TODO: Replace yq path with $OPERATOR_ENV_PATH. (Note: Adding the env variable seems to cause yq to return no results)
-  if [[ $1 =~ .*"search-indexer".* ]]; then
-    INDEXER_IMAGE=$2
-    yq -i e '.spec.install.spec.deployments[0].spec.template.spec.containers[1].env[1].value = "'$INDEXER_IMAGE'"' $OPERATOR_CSV_FILEPATH
+  if [[ $COMPONENT =~ .*"search-indexer".* ]]; then
+    yq -i e '.spec.install.spec.deployments[0].spec.template.spec.containers[1].env[1].value = "'$NEW_IMAGE'"' $OPERATOR_CSV_FILEPATH
 
-  elif [[ $1 =~ .*"search-collector".* ]]; then
-    COLLECTER_IMAGE=$2
-    yq -i e '.spec.install.spec.deployments[0].spec.template.spec.containers[1].env[2].value = "'$COLLECTER_IMAGE'"' $OPERATOR_CSV_FILEPATH
+  elif [[ $COMPONENT =~ .*"search-collector".* ]]; then
+    yq -i e '.spec.install.spec.deployments[0].spec.template.spec.containers[1].env[2].value = "'$NEW_IMAGE'"' $OPERATOR_CSV_FILEPATH
 
-  elif [[ $1 =~ .*"search-v2-api".* ]]; then
-    API_IMAGE=$2
-    yq -i e '.spec.install.spec.deployments[0].spec.template.spec.containers[1].env[3].value = "'$API_IMAGE'"' $OPERATOR_CSV_FILEPATH
+  elif [[ $COMPONENT =~ .*"search-v2-api".* ]]; then
+    yq -i e '.spec.install.spec.deployments[0].spec.template.spec.containers[1].env[3].value = "'$NEW_IMAGE'"' $OPERATOR_CSV_FILEPATH
     
-  elif [[ $1 =~ .*"search-v2-operator".* ]]; then
-    OPERATOR_IMAGE=$2
-    yq -i e '.spec.install.spec.deployments[0].spec.template.spec.containers[1].image = "'$OPERATOR_IMAGE'"' $OPERATOR_CSV_FILEPATH
+  # TODO: Replace yq path with $OPERATOR_IMAGE_PATH. (Note: Adding the env variable seems to cause yq to return no results)
+  elif [[ $COMPONENT =~ .*"search-v2-operator".* ]]; then
+    yq -i e '.spec.install.spec.deployments[0].spec.template.spec.containers[1].image = "'$NEW_IMAGE'"' $OPERATOR_CSV_FILEPATH
   fi 
 }
 
@@ -155,11 +154,7 @@ SEARCH_COMPONENTS=(postgresql-13 search-collector search-indexer search-v2-api s
 get_default_images_from_csv
 
 # Clone the pipeline repository (We need to fetch the latest manifest file to capture the latest builds)
-if [ ! -d $PIPELINE_REPO ]; then
-    log_color "yellow" "Preparing to clone $ORG/$PIPELINE_REPO repository...\n"
-    git clone -b "$RELEASE_BRANCH" git@github.com:$ORG/$PIPELINE_REPO.git
-    echo -e
-fi
+curl -o $PIPELINE_MANIFEST_FILEPATH https://raw.githubusercontent.com/$ORG/$PIPELINE_REPO/$RELEASE_BRANCH/manifest.json -H "Authorization: token $GITHUB_TOKEN"
 
 log_color "purple" "Fetching image-tags from $PIPELINE_MANIFEST_FILEPATH\n"
 
