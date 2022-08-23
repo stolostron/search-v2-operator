@@ -44,6 +44,7 @@ RELEASE_BRANCH=${RELEASE_BRANCH:-"2.7-integration"}
 ####################
 ## PATHS (I.E DIR, FILES, ETC)
 ####################
+BUNDLE_CHANGELOG_FILEPATH=${BUNDLE_CHANGELOG_FILEPATH:-"scripts/BUNDLE_CHANGELOG.md"}
 OPERATOR_CSV_FILEPATH=${OPERATOR_CSV_FILEPATH:-"bundle/manifests/search-v2-operator.clusterserviceversion.yaml"}
 OPERATOR_CONTAINER_PATH=${OPERATOR_CONTAINER_PATH:-".spec.install.spec.deployments[0].spec.template.spec.containers[1]"}
 OPERATOR_ENV_PATH=${OPERATOR_ENV_PATH:-"$OPERATOR_CONTAINER_PATH.env[].value"}
@@ -81,14 +82,14 @@ IGNORE_POSTGRES_IMAGE_UPDATE=${IGNORE_POSTGRES_IMAGE_UPDATE:-"true"}
 ####################
 
 display_component_images () {
-    echo -e "Component Images"
-    echo -e "==============================================================================" \
-    "\nPOSTGRES:\t\t$POSTGRES_IMAGE" \
-    "\nSEARCH_API:\t\t$API_IMAGE" \
-    "\nSEARCH_COLLECTOR:\t$COLLECTOR_IMAGE" \
-    "\nSEARCH_INDEXER:\t\t$INDEXER_IMAGE" \
-    "\nSEARCH_OPERATOR:\t$OPERATOR_IMAGE" \
-    "\n==============================================================================\n"
+  echo -e "Component Images"
+  echo -e "==============================================================================" \
+  "\nPOSTGRES:\t\t$POSTGRES_IMAGE" \
+  "\nSEARCH_API:\t\t$API_IMAGE" \
+  "\nSEARCH_COLLECTOR:\t$COLLECTOR_IMAGE" \
+  "\nSEARCH_INDEXER:\t\t$INDEXER_IMAGE" \
+  "\nSEARCH_OPERATOR:\t$OPERATOR_IMAGE" \
+  "\n==============================================================================\n"
 }
 
 get_images_from_csv () {
@@ -139,18 +140,38 @@ update_images_csv () {
   fi 
 }
 
+update_doc_entry () {
+  # Check to see if the current date header is within the bundle-image-update.md file.
+  if ! grep -q $(date +%m-%d-%Y) $BUNDLE_CHANGELOG_FILEPATH; then
+        echo -e "\n## Date of Change: $(date +%m-%d-%Y)\n" \
+    "\n---" >> $BUNDLE_CHANGELOG_FILEPATH
+  fi
+
+  echo -e "\n### Updated Build Version: $(date)" >> $BUNDLE_CHANGELOG_FILEPATH
+  echo -e "\n| Image Name                                                             | Image Component  |\n" \
+      "|------------------------------------------------------------------------|------------------|\n" \
+      "| [postgresql-13](https://catalog.redhat.com/software/containers/rhel8/postgresql-13/5ffdbdef73a65398111b8362) | $POSTGRES_IMAGE  |\n" \
+      "| [search-collector](https://github.com/stolostron/search-collector)     | $COLLECTOR_IMAGE |\n" \
+      "| [search-indexer](https://github.com/stolostron/search-indexer)         | $INDEXER_IMAGE   |\n" \
+      "| [search-v2-api](https://github.com/stolostron/search-v2-api)           | $API_IMAGE       |\n" \
+      "| [search-v2-operator](https://github.com/stolostron/search-v2-operator) | $OPERATOR_IMAGE  |" >> $BUNDLE_CHANGELOG_FILEPATH
+
+  sed -i'.bak' 's/^[ \t]*//'  $BUNDLE_CHANGELOG_FILEPATH
+}
+
 log_color "cyan" "Initializing search bundle image pickup..."
 echo -e "Current dir: $(pwd)\n"
 
-# Create an array containing the Search components that we will focus on for image versioning
+# Create an array containing the Search components that we will focus on for image versioning.
 SEARCH_COMPONENTS=(postgresql-13 search-collector search-indexer search-v2-api search-v2-operator)
+
+# Fetch component images and add current entry to bundle history markdown file.
 get_images_from_csv
 
-# Clone the pipeline repository (We need to fetch the latest manifest file to capture the latest builds)
+# Get the latest manifest file to capture the latest builds.
 PIPELINE_MANIFEST=$(curl GET https://raw.githubusercontent.com/$ORG/$PIPELINE_REPO/$RELEASE_BRANCH/manifest.json -H "Authorization: token $GITHUB_TOKEN")
 
-log_color "purple" "Fetching image-tags from pipeline manifest.\n"
-
+log_color "purple" "\nFetching image-tags from pipeline manifest.\n"
 for COMPONENT in ${SEARCH_COMPONENTS[@]}; do
     # Fetch search component within the manifest file.
     MANIFEST_JSON=$(echo $PIPELINE_MANIFEST | jq '.[] | select(."image-name" | match("'$COMPONENT'";"i"))')
@@ -161,7 +182,7 @@ for COMPONENT in ${SEARCH_COMPONENTS[@]}; do
     # Extract the image tag.
     TAG=$(echo $MANIFEST_JSON | jq -r '."image-tag"')
 
-    # Build the latest image tag that will be used within the bundle
+    # Build the latest image tag that will be used within the bundle.
     LATEST_TAG=$IMAGE:$TAG
     
     log_color "yellow" "Component: $COMPONENT"
@@ -172,4 +193,15 @@ for COMPONENT in ${SEARCH_COMPONENTS[@]}; do
 done
 
 get_images_from_csv
+
+# TODO: Create PR for latest image update.
+# if [[ `git status --porcelain | grep $OPERATOR_CSV_FILEPATH` ]]; then
+  # update_doc_entry
+
+#   git add $OPERATOR_CSV_FILEPATH
+#   git add $BUNDLE_CHANGELOG_FILEPATH
+
+#   git commit -sm "[release-2.7] Updated bundle image version"
+# fi
+
 exit 0
