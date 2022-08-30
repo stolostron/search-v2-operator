@@ -217,7 +217,7 @@ spec:
                       - --leader-elect
                     command:
                       - /manager
-                    image: quay.io/stolostron/search-v2-operator:2.7.0-8220bc29e9b609b1f27a4a221962ebeb57dc25cf
+                    image: quay.io/stolostron/search-v2-operator:2.7.0-dc0fc8c59239b6a0a3f440b7752101523d87f597
                     livenessProbe:
                       httpGet:
                         path: /healthz
@@ -231,9 +231,9 @@ spec:
                       - name: INDEXER_IMAGE
                         value: quay.io/stolostron/search-indexer:2.7.0-4c1b1f4f692d5f8be9fca699ea26573227250f39
                       - name: COLLECTOR_IMAGE
-                        value: quay.io/stolostron/search-collector:2.7.0-5f707444e4187a6dc72edd891a2ff97ffc3e6ca8
+                        value: quay.io/stolostron/search-collector:2.7.0-de589fdba4effc06198db8250c1ae3118125d685
                       - name: API_IMAGE
-                        value: quay.io/stolostron/search-v2-api:2.7.0-0da7af171e5cc5c1b319cc9e7710d13db85734d1
+                        value: quay.io/stolostron/search-v2-api:2.7.0-69590634c2de51ceec786af47ca5fb00f42a631a
                     readinessProbe:
                       httpGet:
                         path: /readyz
