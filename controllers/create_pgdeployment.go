@@ -111,6 +111,9 @@ func (r *SearchReconciler) PGDeployment(instance *searchv1alpha1.Search) *appsv1
 	if getNodeSelector(deploymentName, instance) != nil {
 		deployment.Spec.Template.Spec.NodeSelector = getNodeSelector(deploymentName, instance)
 	}
+	if getTolerations(deploymentName, instance) != nil {
+		deployment.Spec.Template.Spec.Tolerations = getTolerations(deploymentName, instance)
+	}
 	err := controllerutil.SetControllerReference(instance, deployment, r.Scheme)
 	if err != nil {
 		log.V(2).Info("Could not set control for search-postgres deployment")
