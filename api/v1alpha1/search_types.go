@@ -71,7 +71,7 @@ type SearchSpec struct {
 	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
 
 	// +optional
-	// Tolerations to schedule pods with matching taints
+	// Tolerations to schedule pods on nodes with matching taints
 	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
 }
 

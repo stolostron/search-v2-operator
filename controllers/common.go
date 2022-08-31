@@ -94,8 +94,7 @@ func getTolerations(deploymentName string, instance *searchv1alpha1.Search) []co
 	if instance.Spec.Tolerations != nil {
 		return instance.Spec.Tolerations
 	}
-	var result []corev1.Toleration
-	return result
+	return []corev1.Toleration{}
 }
 
 func getImagePullPolicy(deploymentName string, instance *searchv1alpha1.Search) corev1.PullPolicy {
