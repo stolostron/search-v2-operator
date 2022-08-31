@@ -93,11 +93,17 @@ func TestResourcesNotCustomized(t *testing.T) {
 }
 func TestAPICustomization(t *testing.T) {
 	testFor := "search-api"
+	tol := corev1.Toleration{
+		Key:      "node-role.kubernetes.io/infra",
+		Effect:   corev1.TaintEffectNoSchedule,
+		Operator: corev1.TolerationOpExists,
+	}
 	instance := &searchv1alpha1.Search{
 		Spec: searchv1alpha1.SearchSpec{
 			ImagePullPolicy: "IfNotPresent",
 			ImagePullSecret: "personal-pull-secret",
 			NodeSelector:    map[string]string{"key1": "val1"},
+			Tolerations:     []corev1.Toleration{tol},
 			Deployments: searchv1alpha1.SearchDeployments{
 				QueryAPI: searchv1alpha1.DeploymentConfig{
 					ReplicaCount:  5,
@@ -120,6 +126,15 @@ func TestAPICustomization(t *testing.T) {
 	actualNodeSelector := getNodeSelector(testFor, instance)
 	if actualNodeSelector["key1"] != want {
 		t.Error("Incorrect NodeSelector")
+	}
+	wantEffect := corev1.TaintEffectNoSchedule
+	wantOperator := corev1.TolerationOpExists
+	actualTolerations := getTolerations(testFor, instance)
+	if actualTolerations[0].Effect != wantEffect {
+		t.Error("Incorrect Toleration Effect")
+	}
+	if actualTolerations[0].Operator != wantOperator {
+		t.Error("Incorrect Toleration Operator")
 	}
 	actualImagePullPolicy := getImagePullPolicy(testFor, instance)
 	if actualImagePullPolicy != "IfNotPresent" {
@@ -155,11 +170,17 @@ func TestAPICustomization(t *testing.T) {
 
 func TestIndexerCustomization(t *testing.T) {
 	testFor := "search-indexer"
+	tol := corev1.Toleration{
+		Key:      "node-role.kubernetes.io/infra",
+		Effect:   corev1.TaintEffectNoSchedule,
+		Operator: corev1.TolerationOpExists,
+	}
 	instance := &searchv1alpha1.Search{
 		Spec: searchv1alpha1.SearchSpec{
 			ImagePullPolicy: "IfNotPresent",
 			ImagePullSecret: "personal-pull-secret",
 			NodeSelector:    map[string]string{"key1": "val1"},
+			Tolerations:     []corev1.Toleration{tol},
 			Deployments: searchv1alpha1.SearchDeployments{
 				Indexer: searchv1alpha1.DeploymentConfig{
 					Arguments:     []string{"arg1", "arg2"},
@@ -183,6 +204,15 @@ func TestIndexerCustomization(t *testing.T) {
 	actualNodeSelector := getNodeSelector(testFor, instance)
 	if actualNodeSelector["key1"] != want {
 		t.Error("Incorrect NodeSelector")
+	}
+	wantEffect := corev1.TaintEffectNoSchedule
+	wantOperator := corev1.TolerationOpExists
+	actualTolerations := getTolerations(testFor, instance)
+	if actualTolerations[0].Effect != wantEffect {
+		t.Error("Incorrect Toleration Effect")
+	}
+	if actualTolerations[0].Operator != wantOperator {
+		t.Error("Incorrect Toleration Operator")
 	}
 	actualImagePullPolicy := getImagePullPolicy(testFor, instance)
 	if actualImagePullPolicy != "IfNotPresent" {
@@ -221,11 +251,17 @@ func TestIndexerCustomization(t *testing.T) {
 }
 func TestCollectorCustomization(t *testing.T) {
 	testFor := "search-collector"
+	tol := corev1.Toleration{
+		Key:      "node-role.kubernetes.io/infra",
+		Effect:   corev1.TaintEffectNoSchedule,
+		Operator: corev1.TolerationOpExists,
+	}
 	instance := &searchv1alpha1.Search{
 		Spec: searchv1alpha1.SearchSpec{
 			ImagePullPolicy: "IfNotPresent",
 			ImagePullSecret: "personal-pull-secret",
 			NodeSelector:    map[string]string{"key1": "val1"},
+			Tolerations:     []corev1.Toleration{tol},
 			Deployments: searchv1alpha1.SearchDeployments{
 				Collector: searchv1alpha1.DeploymentConfig{
 					ReplicaCount:  5,
@@ -248,6 +284,15 @@ func TestCollectorCustomization(t *testing.T) {
 	actualNodeSelector := getNodeSelector(testFor, instance)
 	if actualNodeSelector["key1"] != want {
 		t.Error("Incorrect NodeSelector")
+	}
+	wantEffect := corev1.TaintEffectNoSchedule
+	wantOperator := corev1.TolerationOpExists
+	actualTolerations := getTolerations(testFor, instance)
+	if actualTolerations[0].Effect != wantEffect {
+		t.Error("Incorrect Toleration Effect")
+	}
+	if actualTolerations[0].Operator != wantOperator {
+		t.Error("Incorrect Toleration Operator")
 	}
 	actualImagePullPolicy := getImagePullPolicy(testFor, instance)
 	if actualImagePullPolicy != "IfNotPresent" {
@@ -287,11 +332,17 @@ func TestCollectorCustomization(t *testing.T) {
 
 func TestPostgresCustomization(t *testing.T) {
 	testFor := "search-postgres"
+	tol := corev1.Toleration{
+		Key:      "node-role.kubernetes.io/infra",
+		Effect:   corev1.TaintEffectNoSchedule,
+		Operator: corev1.TolerationOpExists,
+	}
 	instance := &searchv1alpha1.Search{
 		Spec: searchv1alpha1.SearchSpec{
 			ImagePullPolicy: "IfNotPresent",
 			ImagePullSecret: "personal-pull-secret",
 			NodeSelector:    map[string]string{"key1": "val1"},
+			Tolerations:     []corev1.Toleration{tol},
 			Deployments: searchv1alpha1.SearchDeployments{
 				Database: searchv1alpha1.DeploymentConfig{
 					Arguments:     []string{"arg1"},
@@ -315,6 +366,15 @@ func TestPostgresCustomization(t *testing.T) {
 	actualNodeSelector := getNodeSelector(testFor, instance)
 	if actualNodeSelector["key1"] != want {
 		t.Error("Incorrect NodeSelector")
+	}
+	wantEffect := corev1.TaintEffectNoSchedule
+	wantOperator := corev1.TolerationOpExists
+	actualTolerations := getTolerations(testFor, instance)
+	if actualTolerations[0].Effect != wantEffect {
+		t.Error("Incorrect Toleration Effect")
+	}
+	if actualTolerations[0].Operator != wantOperator {
+		t.Error("Incorrect Toleration Operator")
 	}
 	actualImagePullPolicy := getImagePullPolicy(testFor, instance)
 	if actualImagePullPolicy != "IfNotPresent" {
@@ -357,11 +417,17 @@ func TestPostgresCustomization(t *testing.T) {
 }
 
 func TestPostgresCustomizationPVC(t *testing.T) {
+	tol := corev1.Toleration{
+		Key:      "node-role.kubernetes.io/infra",
+		Effect:   corev1.TaintEffectNoSchedule,
+		Operator: corev1.TolerationOpExists,
+	}
 	instance := &searchv1alpha1.Search{
 		Spec: searchv1alpha1.SearchSpec{
 			ImagePullPolicy: "IfNotPresent",
 			ImagePullSecret: "personal-pull-secret",
 			NodeSelector:    map[string]string{"key1": "val1"},
+			Tolerations:     []corev1.Toleration{tol},
 			DBStorage: searchv1alpha1.StorageSpec{
 				StorageClassName: "test",
 			},
