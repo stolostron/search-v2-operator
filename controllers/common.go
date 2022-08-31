@@ -90,6 +90,14 @@ func getNodeSelector(deploymentName string, instance *searchv1alpha1.Search) map
 	return result
 }
 
+func getTolerations(deploymentName string, instance *searchv1alpha1.Search) []corev1.Toleration {
+	if instance.Spec.Tolerations != nil {
+		return instance.Spec.Tolerations
+	}
+	var result []corev1.Toleration
+	return result
+}
+
 func getImagePullPolicy(deploymentName string, instance *searchv1alpha1.Search) corev1.PullPolicy {
 	if instance.Spec.ImagePullPolicy != "" {
 		return instance.Spec.ImagePullPolicy
