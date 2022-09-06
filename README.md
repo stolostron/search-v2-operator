@@ -44,7 +44,7 @@ oc login https://yoururl.com:6443 -u kubeadmin -p yourpassword
 #### 3. Run bundle
 
 ```bash
-operator-sdk run bundle quay.io/stolostron/search-operator-bundle:2.6.0-SNAPSHOT-2022-08-02-17-01-58 --pull-secret-name search-pull-secret
+operator-sdk run bundle quay.io/stolostron/search-operator-bundle:2.7.0-SNAPSHOT-2022-09-06-15-42-23 --pull-secret-name search-pull-secret
 ```
 
 Wait for `OLM has successfully installed "search-v2-operator.v0.0.1"` message.
