@@ -11,7 +11,7 @@ Deploys the Odyssey (OCM Search v2) components.
 - Update the MulticlusterHub CR to disable search v1.
     In the MulticlusterHub CR set `enabled: false` where `spec.overrides.components.name = search`
 
->    `oc edit mch`
+>    `oc edit mch -n open-cluster-management`
 
 ```yaml
     spec:
