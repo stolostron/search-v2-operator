@@ -81,8 +81,8 @@ search-postgres-59b96c5486-xjs8p                                  1/1     Runnin
 search-v2-operator-controller-manager-549ff4b78b-l9qs2            2/2     Running
 ```
 
-> On the managed cluster( if you have managed clusters in ACM hub), list the pods `oc get pods -n open-cluster-management-agent-addon | grep search`
-> You should see the following pod running .
+> On the managed cluster (if you have managed clusters in hub), list the pods `oc get pods -n open-cluster-management-agent-addon | grep search`
+> You should see the following pod running.
 
 ```
 klusterlet-addon-search-7b6645bd4-h7pxj        1/1     Running
