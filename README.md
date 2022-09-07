@@ -61,6 +61,33 @@ oc apply -f config/samples/search_v1alpha1_search.yaml
 > **IMPORTANT**: The custom resource must be named  `search-v2-operator`.
 Check if all the search pods are running, use ACM console to search.
 
+#### Verifying search-v2 installation:
+
+##### Verifying the search application 
+Go to ACM Console , on the left side click search . Try the following sample searches
+`cluster` should show all the managed clusters on the type ahead list.
+`kind`:`Pod` should show all the pods
+
+##### Verifying the installation on the cluster 
+
+> On your hub cluster, list the pods `oc get pods -n open-cluster-management | grep search`
+> You should see the following pods running .
+
+```
+search-api-5884985f56-tx4kl                                       1/1     Running     
+search-collector-85db8d84cc-ndtm5                                 1/1     Running 
+search-indexer-65f975b8b4-bn4lf                                   1/1     Running  
+search-postgres-59b96c5486-xjs8p                                  1/1     Running
+search-v2-operator-controller-manager-549ff4b78b-l9qs2            2/2     Running
+```
+
+> On the managed cluster( if you have managed clusters in ACM hub), list the pods `oc get pods -n open-cluster-management-agent-addon | grep search`
+> You should see the following pod running .
+
+```
+klusterlet-addon-search-7b6645bd4-h7pxj        1/1     Running
+```
+
 Uninstalling search-v2-operator: You can uninstall the operator using the following command.
 
 ```bash
