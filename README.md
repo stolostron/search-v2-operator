@@ -10,6 +10,7 @@ Deploys the Odyssey (OCM Search v2) components.
 - You'll need **Red Hat Advanced Cluster Management** v2.5 or later.
 - Update the MulticlusterHub CR to disable search v1.
     In the MulticlusterHub CR set `enabled: false` where `spec.overrides.components.name = search`
+    `oc edit mch`
 
 ```yaml
     spec:
@@ -59,16 +60,8 @@ oc apply -f config/samples/search_v1alpha1_search.yaml
 ```
 
 > **IMPORTANT**: The custom resource must be named  `search-v2-operator`.
-Check if all the search pods are running, use ACM console to search.
 
 #### Verifying search-v2 installation:
-
-##### Verifying the search application 
-Go to ACM Console, on the left side click search . Try the following sample searches:
-- `cluster` should show all the managed clusters on the type ahead list.
-- `kind:Pod` should show all the pods
-
-##### Verifying the installation on the cluster 
 
 > On your hub cluster, list the pods `oc get pods -n open-cluster-management | grep search`
 > You should see the following pods running.
