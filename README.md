@@ -71,7 +71,7 @@ Go to ACM Console , on the left side click search . Try the following sample sea
 ##### Verifying the installation on the cluster 
 
 > On your hub cluster, list the pods `oc get pods -n open-cluster-management | grep search`
-> You should see the following pods running .
+> You should see the following pods running.
 
 ```
 search-api-5884985f56-tx4kl                                       1/1     Running     
