@@ -64,9 +64,9 @@ Check if all the search pods are running, use ACM console to search.
 #### Verifying search-v2 installation:
 
 ##### Verifying the search application 
-Go to ACM Console , on the left side click search . Try the following sample searches
-`cluster` should show all the managed clusters on the type ahead list.
-`kind`:`Pod` should show all the pods
+Go to ACM Console, on the left side click search . Try the following sample searches:
+- `cluster` should show all the managed clusters on the type ahead list.
+- `kind:Pod` should show all the pods
 
 ##### Verifying the installation on the cluster 
 
