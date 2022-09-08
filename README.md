@@ -11,6 +11,8 @@ Deploys the Odyssey (OCM Search v2) components.
 - Update the MulticlusterHub CR to disable search v1.
     In the MulticlusterHub CR set `enabled: false` where `spec.overrides.components.name = search`
 
+>    `oc edit mch -n open-cluster-management`
+
 ```yaml
     spec:
     overrides:
@@ -59,7 +61,26 @@ oc apply -f config/samples/search_v1alpha1_search.yaml
 ```
 
 > **IMPORTANT**: The custom resource must be named  `search-v2-operator`.
-Check if all the search pods are running, use ACM console to search.
+
+#### Verifying search-v2 installation:
+
+> On your hub cluster, list the pods `oc get pods -n open-cluster-management | grep search`
+> You should see the following pods running.
+
+```
+search-api-5884985f56-tx4kl                                       1/1     Running     
+search-collector-85db8d84cc-ndtm5                                 1/1     Running 
+search-indexer-65f975b8b4-bn4lf                                   1/1     Running  
+search-postgres-59b96c5486-xjs8p                                  1/1     Running
+search-v2-operator-controller-manager-549ff4b78b-l9qs2            2/2     Running
+```
+
+> On the managed cluster (if you have managed clusters in hub), list the pods `oc get pods -n open-cluster-management-agent-addon | grep search`
+> You should see the following pod running.
+
+```
+klusterlet-addon-search-7b6645bd4-h7pxj        1/1     Running
+```
 
 Uninstalling search-v2-operator: You can uninstall the operator using the following command.
 
