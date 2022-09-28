@@ -187,7 +187,6 @@ func (r *SearchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	}
 
 	once.Do(func() {
-
 		addon.CreateAddonOnce(ctx, instance)
 	})
 	return ctrl.Result{}, nil
@@ -205,12 +204,30 @@ func (r *SearchReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	}
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&searchv1alpha1.Search{}).
-		Watches(&source.Kind{Type: &appsv1.Deployment{}}, &handler.EnqueueRequestForObject{}, builder.WithPredicates(pred)).
-		Watches(&source.Kind{Type: &corev1.ConfigMap{}}, &handler.EnqueueRequestForObject{}, builder.WithPredicates(pred)).
-		Watches(&source.Kind{Type: &corev1.Secret{}}, &handler.EnqueueRequestForObject{}, builder.WithPredicates(pred)).
-		Watches(&source.Kind{Type: &corev1.Service{}}, &handler.EnqueueRequestForObject{}, builder.WithPredicates(pred)).
-		Watches(&source.Kind{Type: &rbacv1.ClusterRoleBinding{}}, &handler.EnqueueRequestForObject{}, builder.WithPredicates(pred)).
-		Watches(&source.Kind{Type: &rbacv1.ClusterRole{}}, &handler.EnqueueRequestForObject{}, builder.WithPredicates(pred)).
+		Watches(&source.Kind{Type: &appsv1.Deployment{}}, &handler.EnqueueRequestForOwner{
+			IsController: true,
+			OwnerType:    &searchv1alpha1.Search{},
+		}, builder.WithPredicates(pred)).
+		Watches(&source.Kind{Type: &corev1.ConfigMap{}}, &handler.EnqueueRequestForOwner{
+			IsController: true,
+			OwnerType:    &searchv1alpha1.Search{},
+		}, builder.WithPredicates(pred)).
+		Watches(&source.Kind{Type: &corev1.Secret{}}, &handler.EnqueueRequestForOwner{
+			IsController: true,
+			OwnerType:    &searchv1alpha1.Search{},
+		}, builder.WithPredicates(pred)).
+		Watches(&source.Kind{Type: &corev1.Service{}}, &handler.EnqueueRequestForOwner{
+			IsController: true,
+			OwnerType:    &searchv1alpha1.Search{},
+		}, builder.WithPredicates(pred)).
+		Watches(&source.Kind{Type: &rbacv1.ClusterRoleBinding{}}, &handler.EnqueueRequestForOwner{
+			IsController: true,
+			OwnerType:    &searchv1alpha1.Search{},
+		}, builder.WithPredicates(pred)).
+		Watches(&source.Kind{Type: &rbacv1.ClusterRole{}}, &handler.EnqueueRequestForOwner{
+			IsController: true,
+			OwnerType:    &searchv1alpha1.Search{},
+		}, builder.WithPredicates(pred)).
 		Complete(r)
 }
 

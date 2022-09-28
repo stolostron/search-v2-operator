@@ -33,7 +33,7 @@ func newCluster(name string) *clusterv1.ManagedCluster {
 	return cluster
 }
 
-func newAddon(name, cluster, installNamespace string, annotationValues string) *addonapiv1alpha1.ManagedClusterAddOn {
+func newAddon(name, cluster, installNamespace string, annotationValues map[string]string) *addonapiv1alpha1.ManagedClusterAddOn {
 	addon := &addonapiv1alpha1.ManagedClusterAddOn{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
@@ -43,9 +43,7 @@ func newAddon(name, cluster, installNamespace string, annotationValues string) *
 			InstallNamespace: installNamespace,
 		},
 	}
-	if annotationValues != "" {
-		addon.SetAnnotations(map[string]string{"addon.open-cluster-management.io/values": annotationValues})
-	}
+	addon.SetAnnotations(annotationValues)
 	return addon
 }
 
@@ -66,33 +64,66 @@ func newAgentAddon(t *testing.T) agent.AgentAddon {
 }
 
 func TestManifest(t *testing.T) {
+	annotationsTest := map[string]string{"addon.open-cluster-management.io/values": `{"global":{"nodeSelector":{"node-role.kubernetes.io/infra":""},"imageOverrides":
+	{"search_collector":"quay.io/test/search_collector:test"}}}`,
+		"addon.open-cluster-management.io/search_memory_limit":    "2000Mi",
+		"addon.open-cluster-management.io/search_memory_request":  "1000Mi",
+		"addon.open-cluster-management.io/search_rediscover_rate": "4000",
+		"addon.open-cluster-management.io/search_heartbeat":       "3000",
+		"addon.open-cluster-management.io/search_report_rate":     "2000",
+		"addon.open-cluster-management.io/search_args":            "--v=2"}
+	annotations250 := map[string]string{"addon.open-cluster-management.io/values": "",
+		"addon.open-cluster-management.io/search_memory_limit":    "2000Mi",
+		"addon.open-cluster-management.io/search_memory_request":  "1000Mi",
+		"addon.open-cluster-management.io/search_rediscover_rate": "4000",
+		"addon.open-cluster-management.io/search_args":            "--v=2",
+		"addon.open-cluster-management.io/search_heartbeat":       "3000",
+		"addon.open-cluster-management.io/search_report_rate":     "2000"}
 	tests := []struct {
-		name              string
-		cluster           *clusterv1.ManagedCluster
-		addon             *addonapiv1alpha1.ManagedClusterAddOn
-		expectedNamespace string
-		expectedImage     string
-		expectedCount     int
+		name                   string
+		cluster                *clusterv1.ManagedCluster
+		addon                  *addonapiv1alpha1.ManagedClusterAddOn
+		expectedNamespace      string
+		expectedImage          string
+		expectedCount          int
+		expectedLimit          string
+		expectedRequest        string
+		expectedArgs           string
+		expectedHeartBeat      string
+		expectedRediscoverRate string
+		expectedReportRate     string
 	}{
 		{
-			name:              "case_1",
-			cluster:           newCluster("cluster1"),
-			addon:             newAddon(SearchAddonName, "cluster1", "", `{"global":{"nodeSelector":{"node-role.kubernetes.io/infra":""},"imageOverrides":{"search_collector":"quay.io/test/search_collector:test"}}}`),
-			expectedNamespace: "open-cluster-management-agent-addon",
-			expectedImage:     "quay.io/test/search_collector:test",
-			expectedCount:     4,
+			name:                   "case_1",
+			cluster:                newCluster("cluster1"),
+			addon:                  newAddon(SearchAddonName, "cluster1", "", annotationsTest),
+			expectedNamespace:      "open-cluster-management-agent-addon",
+			expectedImage:          "quay.io/test/search_collector:test",
+			expectedCount:          4,
+			expectedLimit:          "2000Mi",
+			expectedRequest:        "1000Mi",
+			expectedArgs:           "--v=2",
+			expectedHeartBeat:      "3000",
+			expectedRediscoverRate: "4000",
+			expectedReportRate:     "2000",
 		},
 		{
-			name:              "case_2",
-			cluster:           newCluster("cluster1"),
-			addon:             newAddon(SearchAddonName, "cluster1", "test", ""),
-			expectedNamespace: "test",
-			expectedImage:     "quay.io/stolostron/search_collector:2.5.0",
-			expectedCount:     4,
+			name:                   "case_2",
+			cluster:                newCluster("cluster1"),
+			addon:                  newAddon(SearchAddonName, "cluster1", "test", annotations250),
+			expectedNamespace:      "test",
+			expectedImage:          "quay.io/stolostron/search_collector:2.7.0",
+			expectedCount:          4,
+			expectedLimit:          "2000Mi",
+			expectedRequest:        "1000Mi",
+			expectedArgs:           "--v=2",
+			expectedHeartBeat:      "3000",
+			expectedRediscoverRate: "4000",
+			expectedReportRate:     "2000",
 		},
 	}
 
-	SearchCollectorImage = "quay.io/stolostron/search_collector:2.5.0"
+	SearchCollectorImage = "quay.io/stolostron/search_collector:2.7.0"
 	agentAddon := newAgentAddon(t)
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -114,6 +145,34 @@ func TestManifest(t *testing.T) {
 					if object.Spec.Template.Spec.Containers[0].Image != test.expectedImage {
 						t.Errorf("expected image is %s, but got %s", test.expectedImage, object.Spec.Template.Spec.Containers[0].Image)
 					}
+					if object.Spec.Template.Spec.Containers[0].Resources.Limits.Memory().String() != test.expectedLimit {
+						t.Errorf("expected limit is %s, but got %s", test.expectedLimit, object.Spec.Template.Spec.Containers[0].Resources.Limits.Memory().String())
+					}
+					if object.Spec.Template.Spec.Containers[0].Resources.Requests.Memory().String() != test.expectedRequest {
+						t.Errorf("expected request is %s, but got %s", test.expectedRequest, object.Spec.Template.Spec.Containers[0].Resources.Requests.Memory().String())
+					}
+					if object.Spec.Template.Spec.Containers[0].Args[0] != test.expectedArgs {
+						t.Errorf("expected args is %s, but got %s", test.expectedLimit, object.Spec.Template.Spec.Containers[0].Args[0])
+					}
+					if object.Spec.Template.Spec.Containers[0].Env[4].Name != "REDISCOVER_RATE_MS" {
+						t.Errorf("expected env is REDISCOVER_RATE_MS, but got %s", object.Spec.Template.Spec.Containers[0].Env[4].Name)
+					}
+					if object.Spec.Template.Spec.Containers[0].Env[5].Name != "HEARTBEAT_MS" {
+						t.Errorf("expected env is HEARTBEAT_MS, but got %s", object.Spec.Template.Spec.Containers[0].Env[5].Name)
+					}
+					if object.Spec.Template.Spec.Containers[0].Env[6].Name != "REPORT_RATE_MS" {
+						t.Errorf("expected env is REPORT_RATE_MS, but got %s", object.Spec.Template.Spec.Containers[0].Env[6].Name)
+					}
+					if object.Spec.Template.Spec.Containers[0].Env[4].Value != "4000" {
+						t.Errorf("expected value is 4000, but got %s", object.Spec.Template.Spec.Containers[0].Env[4].Value)
+					}
+					if object.Spec.Template.Spec.Containers[0].Env[5].Value != "3000" {
+						t.Errorf("expected value is 3000, but got %s", object.Spec.Template.Spec.Containers[0].Env[5].Value)
+					}
+					if object.Spec.Template.Spec.Containers[0].Env[6].Value != "2000" {
+						t.Errorf("expected value is 2000, but got %s", object.Spec.Template.Spec.Containers[0].Env[6].Value)
+					}
+
 				}
 			}
 
