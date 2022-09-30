@@ -31,7 +31,6 @@ import (
 	searchv1alpha1 "github.com/stolostron/search-v2-operator/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -208,23 +207,7 @@ func (r *SearchReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			IsController: true,
 			OwnerType:    &searchv1alpha1.Search{},
 		}, builder.WithPredicates(pred)).
-		Watches(&source.Kind{Type: &corev1.ConfigMap{}}, &handler.EnqueueRequestForOwner{
-			IsController: true,
-			OwnerType:    &searchv1alpha1.Search{},
-		}, builder.WithPredicates(pred)).
 		Watches(&source.Kind{Type: &corev1.Secret{}}, &handler.EnqueueRequestForOwner{
-			IsController: true,
-			OwnerType:    &searchv1alpha1.Search{},
-		}, builder.WithPredicates(pred)).
-		Watches(&source.Kind{Type: &corev1.Service{}}, &handler.EnqueueRequestForOwner{
-			IsController: true,
-			OwnerType:    &searchv1alpha1.Search{},
-		}, builder.WithPredicates(pred)).
-		Watches(&source.Kind{Type: &rbacv1.ClusterRoleBinding{}}, &handler.EnqueueRequestForOwner{
-			IsController: true,
-			OwnerType:    &searchv1alpha1.Search{},
-		}, builder.WithPredicates(pred)).
-		Watches(&source.Kind{Type: &rbacv1.ClusterRole{}}, &handler.EnqueueRequestForOwner{
 			IsController: true,
 			OwnerType:    &searchv1alpha1.Search{},
 		}, builder.WithPredicates(pred)).
