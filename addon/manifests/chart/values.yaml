@@ -19,11 +19,13 @@ tolerations:
   operator: Exists
   effect: NoSchedule
 
-resources:
-  requests:
-    memory: 128Mi
-  limits:
-    memory: 512Mi
+userargs:
+  containerArgs: null
+  limitMemory: 1024Mi
+  requestMemory: 128Mi
+  rediscoverRate: null
+  heartBeat: null
+  reportRate: null
 
 logLevel: null
 

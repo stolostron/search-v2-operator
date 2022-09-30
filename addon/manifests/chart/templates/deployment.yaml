@@ -24,6 +24,10 @@ spec:
       - name: collector
         image: "{{ .Values.global.imageOverrides.search_collector }}"
         imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+        {{- if .Values.userargs.containerArgs }}
+        args:
+          - '{{ .Values.userargs.containerArgs }}'
+        {{- end }}
         env:
         - name: CLUSTER_NAME
           value: "{{ .Values.clusterName }}"
@@ -35,6 +39,18 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.namespace
+        {{- if .Values.userargs.rediscoverRate }}
+        - name: REDISCOVER_RATE_MS
+          value: "{{ .Values.userargs.rediscoverRate }}"
+        {{- end }}
+        {{- if .Values.userargs.heartBeat }}
+        - name: HEARTBEAT_MS
+          value: "{{ .Values.userargs.heartBeat }}"
+        {{- end }}
+        {{- if .Values.userargs.reportRate }}
+        - name: REPORT_RATE_MS
+          value: "{{ .Values.userargs.reportRate }}"
+        {{- end }}
         {{- if .Values.global.proxyConfig.HTTP_PROXY }}
         - name: HTTP_PROXY
           value: {{ .Values.global.proxyConfig.HTTP_PROXY }}
@@ -48,7 +64,20 @@ spec:
           value: {{ .Values.global.proxyConfig.NO_PROXY }}
         {{- end }}
         resources:
-          {{- toYaml .Values.resources | nindent 10 }}
+          {{- if .Values.userargs.requestMemory }}
+          requests:
+            memory: {{ .Values.userargs.requestMemory }}
+          {{- else }}
+          requests:
+            memory: 128Mi
+          {{- end }}
+          {{- if .Values.userargs.limitMemory }}
+          limits:
+            memory: {{ .Values.userargs.limitMemory }}
+          {{- else }}
+          limits:
+            memory: 1024Mi
+          {{- end }}
         livenessProbe: null
         readinessProbe: null
         volumeMounts:

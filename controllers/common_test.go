@@ -299,7 +299,7 @@ func TestCollectorCustomization(t *testing.T) {
 		t.Error("ImagePullPolicy Not expected")
 	}
 	actualReplicaCount := getReplicaCount(testFor, instance)
-	if *actualReplicaCount != int32(5) {
+	if *actualReplicaCount != int32(1) {
 		t.Error("ReplicaCount Not expected")
 	}
 	request_memory_want := "10Mi"
@@ -381,7 +381,7 @@ func TestPostgresCustomization(t *testing.T) {
 		t.Error("ImagePullPolicy Not expected")
 	}
 	actualReplicaCount := getReplicaCount(testFor, instance)
-	if *actualReplicaCount != int32(5) {
+	if *actualReplicaCount != int32(1) {
 		t.Error("ReplicaCount Not expected")
 	}
 	request_memory_want := "10Mi"

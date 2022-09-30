@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"os"
 	"reflect"
+	"regexp"
+	"strconv"
 
 	"github.com/cloudflare/cfssl/log"
 	searchv1alpha1 "github.com/stolostron/search-v2-operator/api/v1alpha1"
@@ -41,6 +43,9 @@ const (
 var ChartFS embed.FS
 
 const ChartDir = "manifests/chart"
+const resourceRegex = "^(\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))))?$"
+
+var addonLog = ctrl.Log.WithName("addon")
 
 var SearchCollectorImage string = os.Getenv("COLLECTOR_IMAGE")
 
@@ -52,8 +57,18 @@ type GlobalValues struct {
 	ProxyConfig     map[string]string `json:"proxyConfig,"`
 }
 
+type UserArgs struct {
+	ContainerArgs  string `json:"containerArgs,"`
+	LimitMemory    string `json:"limitMemory,"`
+	RequestMemory  string `json:"requestMemory,"`
+	RediscoverRate int    `json:"rediscoverRate,"`
+	HeartBeat      int    `json:"heartBeat,"`
+	ReportRate     int    `json:"reportRate,"`
+}
+
 type Values struct {
 	GlobalValues GlobalValues `json:"global,"`
+	UserArgs     UserArgs     `json:"userargs,"`
 }
 
 func getValue(cluster *clusterv1.ManagedCluster,
@@ -72,6 +87,44 @@ func getValue(cluster *clusterv1.ManagedCluster,
 				"NO_PROXY":    "",
 			},
 		},
+	}
+	if val, ok := addon.GetAnnotations()["addon.open-cluster-management.io/search_memory_limit"]; ok {
+		match, err := regexp.MatchString(resourceRegex, val)
+		if err != nil {
+			addonLog.Info("Error parsing memory limit for cluster %s", cluster.Name)
+		} else if match {
+			addonValues.UserArgs.LimitMemory = val
+		}
+	}
+	if val, ok := addon.GetAnnotations()["addon.open-cluster-management.io/search_memory_request"]; ok {
+		match, err := regexp.MatchString(resourceRegex, val)
+		if err != nil {
+			addonLog.Info("Error parsing memory request for cluster %s", cluster.Name)
+		} else if match {
+			addonValues.UserArgs.RequestMemory = val
+		}
+	}
+	if val, ok := addon.GetAnnotations()["addon.open-cluster-management.io/search_args"]; ok {
+		addonValues.UserArgs.ContainerArgs = val
+	}
+	if val, ok := addon.GetAnnotations()["addon.open-cluster-management.io/search_rediscover_rate"]; ok {
+		intVal, err := strconv.Atoi(val)
+		if err == nil {
+			addonValues.UserArgs.RediscoverRate = intVal
+		}
+
+	}
+	if val, ok := addon.GetAnnotations()["addon.open-cluster-management.io/search_heartbeat"]; ok {
+		intVal, err := strconv.Atoi(val)
+		if err == nil {
+			addonValues.UserArgs.HeartBeat = intVal
+		}
+	}
+	if val, ok := addon.GetAnnotations()["addon.open-cluster-management.io/search_report_rate"]; ok {
+		intVal, err := strconv.Atoi(val)
+		if err == nil {
+			addonValues.UserArgs.ReportRate = intVal
+		}
 	}
 
 	values, err := addonfactory.JsonStructToValues(addonValues)

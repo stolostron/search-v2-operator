@@ -252,7 +252,11 @@ func getReplicaCount(deploymentName string, instance *searchv1alpha1.Search) *in
 		count = c
 	}
 	deploymentConfig := getDeploymentConfig(deploymentName, instance)
-	if deploymentConfig.ReplicaCount != 0 {
+	if deploymentConfig.ReplicaCount > 0 {
+		//Collector and postgres pods cannot scale up
+		if deploymentName == collectorDeploymentName || deploymentName == postgresDeploymentName {
+			return &count
+		}
 		return &deploymentConfig.ReplicaCount
 	}
 	return &count
