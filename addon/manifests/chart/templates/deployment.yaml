@@ -24,7 +24,7 @@ spec:
       - name: collector
         image: "{{ .Values.global.imageOverrides.search_collector }}"
         imagePullPolicy: {{ .Values.global.imagePullPolicy }}
-                {{- if .Values.userargs.containerArgs }}
+        {{- if .Values.userargs.containerArgs }}
         args:
           - '{{ .Values.userargs.containerArgs }}'
         {{- end }}
