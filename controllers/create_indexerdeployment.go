@@ -71,8 +71,11 @@ func (r *SearchReconciler) IndexerDeployment(instance *searchv1alpha1.Search) *a
 		},
 	}
 	indexerContainer.ImagePullPolicy = getImagePullPolicy(deploymentName, instance)
+	indexerContainer.SecurityContext = getContainerSecurityContext()
+
 	deployment.Spec.Replicas = getReplicaCount(deploymentName, instance)
 
+	deployment.Spec.Template.Spec.SecurityContext = getPodSecurityContext()
 	deployment.Spec.Template.Spec.Containers = []corev1.Container{indexerContainer}
 	deployment.Spec.Template.Spec.Volumes = volumes
 	deployment.Spec.Template.Spec.ServiceAccountName = getServiceAccountName()
