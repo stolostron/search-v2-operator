@@ -18,6 +18,7 @@ package controllers
 
 import (
 	"context"
+	_ "net/http/pprof"
 	"sync"
 	"time"
 

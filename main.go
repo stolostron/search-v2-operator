@@ -18,6 +18,7 @@ package main
 
 import (
 	"flag"
+	"net/http"
 	"os"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
@@ -50,6 +51,12 @@ func init() {
 }
 
 func main() {
+	if os.Getenv("GO_PROFILE") == "true" {
+		go func() {
+			log.Info(http.ListenAndServe("localhost:6060", nil))
+		}()
+	}
+
 	var metricsAddr string
 	var enableLeaderElection bool
 	var probeAddr string
