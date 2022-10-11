@@ -104,10 +104,14 @@ func (r *SearchReconciler) PGDeployment(instance *searchv1alpha1.Search) *appsv1
 	postgresVolume := getPostgresVolume(instance)
 	volumes = append(volumes, postgresVolume)
 	postgresContainer.ImagePullPolicy = getImagePullPolicy(deploymentName, instance)
+	postgresContainer.SecurityContext = getContainerSecurityContext()
+
 	deployment.Spec.Replicas = getReplicaCount(deploymentName, instance)
 
+	deployment.Spec.Template.Spec.SecurityContext = getPodSecurityContext()
 	deployment.Spec.Template.Spec.Containers = []corev1.Container{postgresContainer}
 	deployment.Spec.Template.Spec.Volumes = volumes
+	deployment.Spec.Template.Spec.ServiceAccountName = getServiceAccountName()
 	if getNodeSelector(deploymentName, instance) != nil {
 		deployment.Spec.Template.Spec.NodeSelector = getNodeSelector(deploymentName, instance)
 	}

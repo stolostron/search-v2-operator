@@ -83,7 +83,7 @@ func TestResourcesNotCustomized(t *testing.T) {
 		t.Error("NodeSelector Not expected")
 	}
 	actualImagePullPolicy := getImagePullPolicy("search-collector", instance)
-	if actualImagePullPolicy != "Always" {
+	if actualImagePullPolicy != "IfNotPresent" {
 		t.Error("ImagePullPolicy Not expected")
 	}
 	actualImageSha := getImageSha("search-collector", instance)
