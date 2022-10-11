@@ -99,9 +99,9 @@ func getTolerations(deploymentName string, instance *searchv1alpha1.Search) []co
 }
 
 func getPodSecurityContext() *corev1.PodSecurityContext {
-	falseVal := false
+	trueVal := true
 	return &corev1.PodSecurityContext{
-		RunAsNonRoot: &falseVal,
+		RunAsNonRoot: &trueVal,
 	}
 }
 
