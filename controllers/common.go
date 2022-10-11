@@ -43,6 +43,7 @@ var (
 func generateLabels(key, val string) map[string]string {
 	allLabels := map[string]string{
 		"component": "search-v2-operator",
+		"app":       "search",
 	}
 	allLabels[key] = val
 	return allLabels
@@ -97,12 +98,30 @@ func getTolerations(deploymentName string, instance *searchv1alpha1.Search) []co
 	return []corev1.Toleration{}
 }
 
+func getPodSecurityContext() *corev1.PodSecurityContext {
+	trueVal := true
+	return &corev1.PodSecurityContext{
+		RunAsNonRoot: &trueVal,
+	}
+}
+
+func getContainerSecurityContext() *corev1.SecurityContext {
+	falseVal := false
+	trueVal := true
+	return &corev1.SecurityContext{
+		Privileged:               &falseVal,
+		AllowPrivilegeEscalation: &falseVal,
+		ReadOnlyRootFilesystem:   &trueVal,
+		RunAsNonRoot:             &trueVal,
+		Capabilities:             &corev1.Capabilities{Drop: []corev1.Capability{"ALL"}},
+	}
+}
+
 func getImagePullPolicy(deploymentName string, instance *searchv1alpha1.Search) corev1.PullPolicy {
 	if instance.Spec.ImagePullPolicy != "" {
 		return instance.Spec.ImagePullPolicy
 	}
-	// Dev preview option
-	return corev1.PullAlways
+	return corev1.PullIfNotPresent
 }
 
 func getPostgresVolume(instance *searchv1alpha1.Search) corev1.Volume {
