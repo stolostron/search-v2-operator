@@ -43,6 +43,7 @@ var (
 func generateLabels(key, val string) map[string]string {
 	allLabels := map[string]string{
 		"component": "search-v2-operator",
+		"app":       "search",
 	}
 	allLabels[key] = val
 	return allLabels
