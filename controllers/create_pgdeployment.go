@@ -104,8 +104,14 @@ func (r *SearchReconciler) PGDeployment(instance *searchv1alpha1.Search) *appsv1
 	postgresVolume := getPostgresVolume(instance)
 	volumes = append(volumes, postgresVolume)
 	postgresContainer.ImagePullPolicy = getImagePullPolicy(deploymentName, instance)
-	postgresContainer.SecurityContext = getContainerSecurityContext()
-
+	falseVal := false
+	trueVal := true
+	postgresContainer.SecurityContext = &corev1.SecurityContext{
+		Privileged:               &falseVal,
+		AllowPrivilegeEscalation: &falseVal,
+		RunAsNonRoot:             &trueVal,
+		Capabilities:             &corev1.Capabilities{Drop: []corev1.Capability{"ALL"}},
+	}
 	deployment.Spec.Replicas = getReplicaCount(deploymentName, instance)
 
 	deployment.Spec.Template.Spec.SecurityContext = getPodSecurityContext()
