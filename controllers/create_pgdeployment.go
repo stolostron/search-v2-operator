@@ -112,7 +112,6 @@ func (r *SearchReconciler) PGDeployment(instance *searchv1alpha1.Search) *appsv1
 		RunAsNonRoot:             &trueVal,
 		Capabilities:             &corev1.Capabilities{Drop: []corev1.Capability{"ALL"}},
 	}
-
 	deployment.Spec.Replicas = getReplicaCount(deploymentName, instance)
 
 	deployment.Spec.Template.Spec.SecurityContext = getPodSecurityContext()
