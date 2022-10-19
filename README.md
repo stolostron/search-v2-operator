@@ -38,7 +38,7 @@ oc login https://yoururl.com:6443 -u kubeadmin -p yourpassword
 1. enter your quay.io password
 1. select Kubernetes Secret from left-hand menu
 1. Download yaml file and rename secret as  `search-pull-secret`
-1. oc apply -f <your_secret.yaml>
+1. Ensure to be on your `open-cluster-management` namespace and run `oc apply -f` <your_secret.yaml>
 1. Verify secrets presence by running `oc get secret | grep search-pull-secret`
 
 > **IMPORTANT**: The secret MUST be created with name as `search-pull-secret`
@@ -46,7 +46,7 @@ oc login https://yoururl.com:6443 -u kubeadmin -p yourpassword
 #### 3. Run bundle
 
 ```bash
-operator-sdk run bundle quay.io/stolostron/search-operator-bundle:2.7.0-SNAPSHOT-2022-09-06-15-42-23 --pull-secret-name search-pull-secret
+operator-sdk run bundle quay.io/stolostron/search-operator-bundle@sha256:1a20394565bdc61870db1e4443d4d24d0d8eb2d65f3efdffd068cfd389b370ac --pull-secret-name search-pull-secret
 ```
 
 Wait for `OLM has successfully installed "search-v2-operator.v0.0.1"` message.
