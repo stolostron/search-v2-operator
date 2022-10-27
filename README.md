@@ -4,26 +4,12 @@ Deploys the Odyssey (OCM Search v2) components.
 
 ## Installing the Search Operator in a Red Hat OpenShift cluster
 
-### Prerequisites
+### 0. Prerequisites
 
 - You will need [Operator SDK](https://sdk.operatorframework.io/) to install search operator bundle image. [Download and install](<https://sdk.operatorframework.io/docs/installation/>) client version >= v1.15
 - You'll need **Red Hat Advanced Cluster Management** v2.5 or later.
-- Update the MulticlusterHub CR to disable search v1.
-    In the MulticlusterHub CR set `enabled: false` where `spec.overrides.components.name = search`
 
->    `oc edit mch -n open-cluster-management`
-
-```yaml
-    spec:
-    overrides:
-        components:
-        - enabled: false
-            name: search
-```
-
-After disabling search (v1), install the search operator (v2) in the open-cluster-management namespace.
-
-#### 1. Log into the cluster using CLI
+### 1. Log into the cluster using CLI
 
 If not done already, use `oc login` to log in to the cluster by replacing `yoururl` and `yourpassword` below
 
@@ -31,19 +17,39 @@ If not done already, use `oc login` to log in to the cluster by replacing `youru
 oc login https://yoururl.com:6443 -u kubeadmin -p yourpassword
 ```
 
-#### 2. Create Image pull secret to pull images from quay (Hub cluster)
+### 2. Create Image pull secret to pull images from quay (Hub cluster)
 
 1. go to https://quay.io/user/<your_id>?tab=settings replacing <your_id>  with your username
 1. click on Generate Encrypted Password
 1. enter your quay.io password
 1. select Kubernetes Secret from left-hand menu
-1. Download yaml file and rename secret as  `search-pull-secret`
+1. Download yaml file and rename secret as `search-pull-secret`
+
+### 3a. Automatic install
+A script is provided which covers step 4 and 5 is provided in this repo for RHACM 2.6 version. You can launch the script and it will offer you the possibility to choose a version or use the default one. You will need to have the secret created in step 2. in the `deploy` folder.
+
+```bash
+cd ./scripts
+./deploy.sh
+```
+
+### 3b. Manual install
+#### Appply quay.io secret
+
 1. Ensure to be on your `open-cluster-management` namespace and run `oc apply -f` <your_secret.yaml>
 1. Verify secrets presence by running `oc get secret | grep search-pull-secret`
 
 > **IMPORTANT**: The secret MUST be created with name as `search-pull-secret`
 
-#### 3. Run bundle
+#### Disable search v1
+- Update the MulticlusterHub CR to disable search v1.
+    In the MulticlusterHub CR set `enabled: false` where `spec.overrides.components.name = search`
+
+>    `oc patch mch multiclusterhub -n open-cluster-management --type=merge -p '{"spec":{"overrides":{"components":[{"name":"search","enabled": false}]}}}'`
+
+After disabling search (v1), install the search operator (v2) in the open-cluster-management namespace.
+
+#### Run bundle
 
 ```bash
 operator-sdk run bundle quay.io/stolostron/search-operator-bundle@sha256:1a20394565bdc61870db1e4443d4d24d0d8eb2d65f3efdffd068cfd389b370ac --pull-secret-name search-pull-secret
@@ -54,15 +60,15 @@ Wait for `OLM has successfully installed "search-v2-operator.v0.0.1"` message.
 > **NOTE**: If you receive an error try adding this flag. `--index-image=quay.io/operator-framework/opm:v1.23.0`  
 > **TIP**: You can replace the image tag with other images in our [Quay repo](https://quay.io/repository/stolostron/search-operator-bundle?tab=tags)
 
-#### 4. Apply the empty CR to create the search components
+#### Apply the empty CR to create the search components
 
 ```bash
-oc apply -f config/samples/search_v1alpha1_search.yaml
+oc apply -f config/samples/search_v1alpha1_search.yaml -n open-cluster-management
 ```
 
 > **IMPORTANT**: The custom resource must be named  `search-v2-operator`.
 
-#### Verifying search-v2 installation:
+### 4. Verifying search-v2 installation
 
 > On your hub cluster, list the pods `oc get pods -n open-cluster-management | grep search`
 > You should see the following pods running.
@@ -82,10 +88,17 @@ search-v2-operator-controller-manager-549ff4b78b-l9qs2            2/2     Runnin
 klusterlet-addon-search-7b6645bd4-h7pxj        1/1     Running
 ```
 
+### Uninstallation
 Uninstalling search-v2-operator: You can uninstall the operator using the following command.
 
 ```bash
 operator-sdk cleanup search-v2-operator
+```
+
+You can also use the deployer script which will also restore the search v1 and cleanup the secret
+```bash
+cd ./scripts
+./deploy.sh -u
 ```
 
 ### Building search-v2-operator in local machine
