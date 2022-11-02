@@ -37,6 +37,7 @@ psql -d search -U searchuser -c "CREATE INDEX IF NOT EXISTS data_composite_idx O
 psql -d search -U searchuser -c "CREATE INDEX IF NOT EXISTS data_hubCluster_idx ON search.resources USING GIN ((data ->  '_hubClusterResource')) WHERE data ? '_hubClusterResource'"
 psql -d search -U searchuser -c "CREATE INDEX IF NOT EXISTS edges_sourceid_idx ON search.edges USING btree (sourceid)"
 psql -d search -U searchuser -c "CREATE INDEX IF NOT EXISTS edges_destid_idx ON search.edges USING btree (destid)"
+psql -d search -U searchuser -c "ALTER ROLE searchuser set work_mem='16MB'"
 psql -d search -U searchuser -f /opt/app-root/src/postgresql-start/postgresql.sql`
 
 	data["postgresql.sql"] = `
