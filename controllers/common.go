@@ -30,15 +30,18 @@ const (
 	postgresConfigmapName = "search-postgres"
 	caCertConfigmapName   = "search-ca-crt"
 
-	apiSecretName      = "search-api-certs"
-	indexerSecretName  = "search-indexer-certs"
-	postgresSecretName = "search-postgres-certs"
+	apiSecretName             = "search-api-certs"
+	indexerSecretName         = "search-indexer-certs"
+	postgresSecretName        = "search-postgres-certs"
+	POSTGRESQL_SHARED_BUFFERS = "128MB"
+	WORK_MEM                  = "16MB"
 )
 
 var (
 	certDefaultMode       = int32(384)
 	AnnotationSearchPause = "search-pause"
 )
+var dbDefaultMap = map[string]string{"POSTGRESQL_SHARED_BUFFERS": POSTGRESQL_SHARED_BUFFERS, "WORK_MEM": WORK_MEM}
 
 func generateLabels(key, val string) map[string]string {
 	allLabels := map[string]string{
@@ -59,6 +62,14 @@ func getImagePullSecretName() string {
 
 func getClusterManagementAddonName() string {
 	return "search-collector"
+}
+
+func getDefaultDBConfig(varName string) string {
+	value, okay := dbDefaultMap[varName]
+	if okay {
+		return value
+	}
+	return ""
 }
 
 func newMetadataEnvVar(name, key string) corev1.EnvVar {
@@ -343,6 +354,33 @@ func (r *SearchReconciler) createConfigMap(ctx context.Context, cm *corev1.Confi
 	}
 	log.V(2).Info("Created %s configmap ", cm.Name)
 	return nil, nil
+}
+
+func (r *SearchReconciler) getDBConfigData(ctx context.Context, instance *searchv1alpha1.Search) map[string]string {
+	var result map[string]string
+	if instance.Spec.DBConfig == "" {
+		return result
+	}
+	found := &corev1.ConfigMap{}
+	err := r.Get(ctx, types.NamespacedName{
+		Name:      instance.Spec.DBConfig,
+		Namespace: instance.Namespace,
+	}, found)
+	if err != nil && errors.IsNotFound(err) {
+		return result
+	}
+	return found.Data
+}
+
+func (r *SearchReconciler) getDBConfig(ctx context.Context, instance *searchv1alpha1.Search, configName string) string {
+	customMap := r.getDBConfigData(ctx, instance)
+	if customMap != nil {
+		value, present := customMap[configName]
+		if present {
+			return value
+		}
+	}
+	return getDefaultDBConfig(configName)
 }
 
 func getDeploymentConfig(name string, instance *searchv1alpha1.Search) searchv1alpha1.DeploymentConfig {

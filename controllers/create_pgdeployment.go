@@ -2,6 +2,8 @@
 package controllers
 
 import (
+	"context"
+
 	searchv1alpha1 "github.com/stolostron/search-v2-operator/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -13,6 +15,7 @@ func (r *SearchReconciler) PGDeployment(instance *searchv1alpha1.Search) *appsv1
 	image_sha := getImageSha(deploymentName, instance)
 	log.V(2).Info("Using postgres image ", image_sha)
 	deployment := getDeployment(deploymentName, instance)
+	Postgresql_Shared_Buffers := r.getDBConfig(context.TODO(), instance, "POSTGRESQL_SHARED_BUFFERS")
 	postgresContainer := corev1.Container{
 		Name:  deploymentName,
 		Image: image_sha,
@@ -24,6 +27,7 @@ func (r *SearchReconciler) PGDeployment(instance *searchv1alpha1.Search) *appsv1
 			},
 		},
 		Env: []corev1.EnvVar{
+			newEnvVar("POSTGRESQL_SHARED_BUFFERS", Postgresql_Shared_Buffers),
 			newSecretEnvVar("POSTGRESQL_USER", "database-user", "search-postgres"),
 			newSecretEnvVar("POSTGRESQL_PASSWORD", "database-password", "search-postgres"),
 			newSecretEnvVar("POSTGRESQL_DATABASE", "database-name", "search-postgres"),
