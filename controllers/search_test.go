@@ -15,11 +15,9 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
-	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -231,7 +229,7 @@ func TestSearch_controller(t *testing.T) {
 		t.Errorf("Emptydir expected but PVC found %v", err)
 	}
 	//Test Finalizer
-	cmatest := &addonapiv1alpha1.ClusterManagementAddOn{
+	cmatest := &addonv1alpha1.ClusterManagementAddOn{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "ClusterManagementAddon",
 			APIVersion: "addon.open-cluster-management.io",
@@ -265,7 +263,7 @@ func TestSearch_controller(t *testing.T) {
 	}
 
 	//Now delete the search CR by setting the deletion time
-	search.ObjectMeta.DeletionTimestamp = &v1.Time{Time: time.Now()}
+	search.ObjectMeta.DeletionTimestamp = &metav1.Time{Time: time.Now()}
 	err = cl.Update(context.TODO(), search)
 	if err != nil {
 		t.Fatalf("Failed to update Search: (%v)", err)

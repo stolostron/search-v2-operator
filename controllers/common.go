@@ -439,3 +439,49 @@ func (r *SearchReconciler) createSecret(ctx context.Context, secret *corev1.Secr
 func DeploymentEquals(current, new *appsv1.Deployment) bool {
 	return equality.Semantic.DeepEqual(current.Spec, new.Spec)
 }
+
+// update status condition in search instance
+func updateStatusCondition(instance *searchv1alpha1.Search, searchPod *corev1.Pod) *searchv1alpha1.Search {
+	var podCondition metav1.Condition
+	readyType := "Ready--" + strings.Join(strings.Split(searchPod.Name, "-")[:2], "-")
+
+	for _, condition := range searchPod.Status.Conditions {
+		if condition.Type == "Ready" {
+			podCondition = metav1.Condition{
+				Type:   readyType,
+				Status: metav1.ConditionStatus(condition.Status),
+			}
+			// These are optional fields in the pod, but required in Seaarch Instance
+			// Check before assigning to avoid Error:
+			// Invalid value: "": status.conditions.reason in body should be at least 1 chars long
+			if !condition.LastTransitionTime.IsZero() {
+				podCondition.LastTransitionTime = condition.LastTransitionTime
+			}
+			if len(condition.Reason) > 0 {
+				podCondition.Reason = condition.Reason
+			} else {
+				podCondition.Reason = "None"
+			}
+			if len(condition.Message) > 0 {
+				podCondition.Message = condition.Message
+			} else {
+				podCondition.Message = "None"
+			}
+			break
+		}
+	}
+	// instance.Status.Conditions = nil
+	var podPresent bool
+	for _, instanceCondition := range instance.Status.Conditions {
+		if instanceCondition.Type == readyType {
+			podPresent = true
+			instanceCondition = podCondition
+			break
+		}
+	}
+	if !podPresent {
+		instance.Status.Conditions = append(instance.Status.Conditions,
+			podCondition)
+	}
+	return instance
+}
