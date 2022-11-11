@@ -68,7 +68,7 @@ var once sync.Once
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.10.0/pkg/reconcile
 func (r *SearchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	log.Info("Reconciling from search-v2-operator for ", req.Name, req.Namespace)
+	log.V(2).Info("Reconciling from search-v2-operator for ", req.Name, req.Namespace)
 	instance := &searchv1alpha1.Search{}
 	err := r.Client.Get(ctx, types.NamespacedName{Name: "search-v2-operator", Namespace: req.Namespace}, instance)
 	if err != nil {
@@ -273,7 +273,6 @@ func (r *SearchReconciler) updateStatus(ctx context.Context, instance *searchv1a
 						Reason: "No pods running", Message: "Check status of deployment: " + deploymentName}}},
 		})
 		log.Info("No pods found for deployment ", deploymentName, "listing pods failed")
-
 	}
 	instance = updateStatusCondition(instance, podList)
 	instance.Status.Storage = instance.Spec.DBStorage.StorageClassName
@@ -291,11 +290,6 @@ func (r *SearchReconciler) updateStatus(ctx context.Context, instance *searchv1a
 	log.Info("Updated Search CR status successfully")
 
 	return nil
-}
-
-func searchLabels(labels map[string]string) bool {
-	value, ok := labels["component"]
-	return ok && value == "search-v2-operator"
 }
 
 func (r *SearchReconciler) finalizeSearch(instance *searchv1alpha1.Search) error {

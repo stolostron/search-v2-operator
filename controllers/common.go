@@ -493,3 +493,9 @@ func updateStatusCondition(instance *searchv1alpha1.Search, podList *corev1.PodL
 	}
 	return instance
 }
+
+// check if labels has 'component: search-operator'
+func searchLabels(labels map[string]string) bool {
+	value, ok := labels["component"]
+	return ok && value == "search-v2-operator"
+}

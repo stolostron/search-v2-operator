@@ -565,9 +565,11 @@ func TestSearch_controller_Status_Update(t *testing.T) {
 			},
 		},
 		Status: searchv1alpha1.SearchStatus{
-			DB:         "db",
-			Storage:    "storage",
-			Conditions: []metav1.Condition{{Type: "Ready--search-collector", Reason: "None", Message: "None", Status: "True"}},
+			DB:      "db",
+			Storage: "storage",
+			Conditions: []metav1.Condition{
+				{Type: "Ready--search-api", Reason: "None", Message: "None", Status: "True"},
+				{Type: "Ready--search-collector", Reason: "None", Message: "None", Status: "True"}},
 		},
 	}
 	runningCondition := corev1.PodCondition{Type: corev1.PodReady, Status: corev1.ConditionTrue, LastTransitionTime: metav1.Now()}
@@ -618,7 +620,7 @@ func TestSearch_controller_Status_Update(t *testing.T) {
 		t.Logf("Failed to get Search: (%v)", err)
 	}
 	// check if search status is set for api pod
-	resultCondition := search.Status.Conditions[0]
+	resultCondition := search.Status.Conditions[1]
 	if resultCondition.Type != "Ready--search-collector" ||
 		resultCondition.Status != "False" ||
 		resultCondition.Reason != "No pods running" ||
@@ -627,7 +629,7 @@ func TestSearch_controller_Status_Update(t *testing.T) {
 	}
 	if search.Status.DB != "search" ||
 		search.Status.Storage != "test" {
-		t.Errorf("Failed to update db or storage for collector pod: (%v)", err)
+		t.Errorf("Failed to update db or storage for search CR instance: (%v)", err)
 
 	}
 }
