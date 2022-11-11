@@ -270,7 +270,7 @@ func (r *SearchReconciler) updateStatus(ctx context.Context, instance *searchv1a
 				Phase: corev1.PodRunning,
 				Conditions: []corev1.PodCondition{
 					{Type: corev1.PodReady, Status: corev1.ConditionFalse, LastTransitionTime: metav1.Now(),
-						Reason: "No pods running", Message: "Check status of deployment: " + deploymentName}}},
+						Reason: "NoPodsFound", Message: "Check status of deployment: " + deploymentName}}},
 		})
 		log.Info("No pods found for deployment ", deploymentName, "listing pods failed")
 	}

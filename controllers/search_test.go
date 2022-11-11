@@ -546,7 +546,7 @@ func TestSearch_controller_Status_Replicas0(t *testing.T) {
 
 	if resultCondition.Type != "Ready--search-collector" ||
 		resultCondition.Status != "False" ||
-		resultCondition.Reason != "No pods running" ||
+		resultCondition.Reason != "NoPodsFound" ||
 		resultCondition.Message != "Check status of deployment: search-collector" {
 		t.Errorf("Failed to set status for collector pod: (%v)", err)
 	}
@@ -623,7 +623,7 @@ func TestSearch_controller_Status_Update(t *testing.T) {
 	resultCondition := search.Status.Conditions[1]
 	if resultCondition.Type != "Ready--search-collector" ||
 		resultCondition.Status != "False" ||
-		resultCondition.Reason != "No pods running" ||
+		resultCondition.Reason != "NoPodsFound" ||
 		resultCondition.Message != "Check status of deployment: search-collector" {
 		t.Errorf("Failed to update status for collector pod: (%v)", err)
 	}
