@@ -320,3 +320,314 @@ func TestSearch_controller(t *testing.T) {
 	}
 
 }
+
+func buildPod(name string, podCondition corev1.PodCondition) *corev1.Pod {
+	return &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: name, Labels: map[string]string{
+			"app":  "search",
+			"name": strings.Join(strings.Split(name, "-")[:2], "-"),
+		}},
+		Spec: corev1.PodSpec{},
+		Status: corev1.PodStatus{
+			Phase: corev1.PodRunning,
+			Conditions: []corev1.PodCondition{
+				{Type: corev1.ContainersReady, Status: corev1.ConditionTrue, LastTransitionTime: metav1.Now()},
+				podCondition,
+			}},
+	}
+}
+
+func TestSearch_controller_Status(t *testing.T) {
+	var (
+		name = "search-v2-operator"
+	)
+	search := &searchv1alpha1.Search{
+		TypeMeta:   metav1.TypeMeta{Kind: "Search"},
+		ObjectMeta: metav1.ObjectMeta{Name: name},
+		Spec: searchv1alpha1.SearchSpec{
+			DBStorage: searchv1alpha1.StorageSpec{
+				StorageClassName: "test",
+			},
+		},
+	}
+	runningCondition := corev1.PodCondition{Type: corev1.PodReady, Status: corev1.ConditionTrue, LastTransitionTime: metav1.Now()}
+	collectorPod := buildPod("search-collector-abc", runningCondition)
+	apiPod := buildPod("search-api-abc", runningCondition)
+	indexerPod := buildPod("search-indexer-abc", runningCondition)
+	postGresPod := buildPod("search-postgres-abc", runningCondition)
+
+	s := scheme.Scheme
+	err := searchv1alpha1.SchemeBuilder.AddToScheme(s)
+	if err != nil {
+		t.Errorf("error adding search scheme: (%v)", err)
+	}
+
+	err = addonv1alpha1.AddToScheme(s)
+	if err != nil {
+		t.Errorf("error adding addon scheme: (%v)", err)
+	}
+
+	objs := []runtime.Object{search, collectorPod, apiPod, indexerPod, postGresPod}
+	// Create a fake client to mock API calls.
+	cl := fake.NewClientBuilder().WithRuntimeObjects(objs...).Build()
+
+	r := &SearchReconciler{Client: cl, Scheme: s}
+
+	// Mock request to simulate Reconcile() being called on an event for a watched resource.
+	req := ctrl.Request{
+		NamespacedName: types.NamespacedName{
+			Name: "Pod/search-api-abc",
+		},
+	}
+
+	// trigger reconcile
+	_, err = r.Reconcile(context.TODO(), req)
+	if err != nil {
+		t.Errorf("reconcile: (%v)", err)
+	}
+
+	//wait for update status
+	time.Sleep(1 * time.Second)
+
+	// fetch search-operator
+	err = cl.Get(context.TODO(), types.NamespacedName{
+		Name: "search-v2-operator",
+	}, search)
+
+	if err != nil {
+		t.Logf("Failed to get Search: (%v)", err)
+	}
+	// check if search status is set for api pod
+	apiCondition := search.Status.Conditions[0]
+	if apiCondition.Type != "Ready--search-api" ||
+		apiCondition.Status != "True" ||
+		apiCondition.Reason != "None" {
+		t.Errorf("Failed to set status for api pod: (%v)", err)
+	}
+
+}
+
+func TestSearch_controller_Status_Replicas3(t *testing.T) {
+	var (
+		name = "search-v2-operator"
+	)
+	search := &searchv1alpha1.Search{
+		TypeMeta:   metav1.TypeMeta{Kind: "Search"},
+		ObjectMeta: metav1.ObjectMeta{Name: name},
+		Spec: searchv1alpha1.SearchSpec{
+			DBStorage: searchv1alpha1.StorageSpec{
+				StorageClassName: "test",
+			},
+		},
+	}
+	runningCondition := corev1.PodCondition{Type: corev1.PodReady, Status: corev1.ConditionTrue, LastTransitionTime: metav1.Now()}
+	errorCondition := corev1.PodCondition{Type: corev1.PodReady, Status: corev1.ConditionFalse, LastTransitionTime: metav1.Now(),
+		Reason: "OOM", Message: "Error running pod"}
+	collectorPod1 := buildPod("search-collector-abc1", runningCondition)
+	collectorPod2 := buildPod("search-collector-abc2", errorCondition)
+	collectorPod3 := buildPod("search-collector-abc3", runningCondition)
+
+	apiPod := buildPod("search-api-abc", runningCondition)
+	indexerPod := buildPod("search-indexer-abc", runningCondition)
+	postGresPod := buildPod("search-postgres-abc", runningCondition)
+
+	s := scheme.Scheme
+	err := searchv1alpha1.SchemeBuilder.AddToScheme(s)
+	if err != nil {
+		t.Errorf("error adding search scheme: (%v)", err)
+	}
+
+	err = addonv1alpha1.AddToScheme(s)
+	if err != nil {
+		t.Errorf("error adding addon scheme: (%v)", err)
+	}
+
+	objs := []runtime.Object{search, collectorPod1, collectorPod2, collectorPod3, apiPod, indexerPod, postGresPod}
+	// Create a fake client to mock API calls.
+	cl := fake.NewClientBuilder().WithRuntimeObjects(objs...).Build()
+
+	r := &SearchReconciler{Client: cl, Scheme: s}
+
+	// Mock request to simulate Reconcile() being called on an event for a watched resource.
+	req := ctrl.Request{
+		NamespacedName: types.NamespacedName{
+			Name: "Pod/search-collector-abc1",
+		},
+	}
+
+	// trigger reconcile
+	_, err = r.Reconcile(context.TODO(), req)
+	if err != nil {
+		t.Errorf("reconcile: (%v)", err)
+	}
+
+	//wait for update status
+	time.Sleep(1 * time.Second)
+
+	// fetch search-operator
+	err = cl.Get(context.TODO(), types.NamespacedName{
+		Name: "search-v2-operator",
+	}, search)
+	if err != nil {
+		t.Logf("Failed to get Search: (%v)", err)
+	}
+	// check if search status is set for api pod
+	resultCondition := search.Status.Conditions[0]
+	if resultCondition.Type != "Ready--search-collector" ||
+		resultCondition.Status != "False" ||
+		resultCondition.Reason != "OOM" ||
+		resultCondition.Message != "Error running pod" {
+		t.Errorf("Failed to set status for collector pod: (%v)", err)
+	}
+
+}
+
+func TestSearch_controller_Status_Replicas0(t *testing.T) {
+	var (
+		name = "search-v2-operator"
+	)
+	search := &searchv1alpha1.Search{
+		TypeMeta:   metav1.TypeMeta{Kind: "Search"},
+		ObjectMeta: metav1.ObjectMeta{Name: name},
+		Spec: searchv1alpha1.SearchSpec{
+			DBStorage: searchv1alpha1.StorageSpec{
+				StorageClassName: "test",
+			},
+		},
+	}
+	runningCondition := corev1.PodCondition{Type: corev1.PodReady, Status: corev1.ConditionTrue, LastTransitionTime: metav1.Now()}
+
+	apiPod := buildPod("search-api-abc", runningCondition)
+	indexerPod := buildPod("search-indexer-abc", runningCondition)
+	postGresPod := buildPod("search-postgres-abc", runningCondition)
+
+	s := scheme.Scheme
+	err := searchv1alpha1.SchemeBuilder.AddToScheme(s)
+	if err != nil {
+		t.Errorf("error adding search scheme: (%v)", err)
+	}
+
+	err = addonv1alpha1.AddToScheme(s)
+	if err != nil {
+		t.Errorf("error adding addon scheme: (%v)", err)
+	}
+
+	objs := []runtime.Object{search, apiPod, indexerPod, postGresPod}
+	// Create a fake client to mock API calls.
+	cl := fake.NewClientBuilder().WithRuntimeObjects(objs...).Build()
+
+	r := &SearchReconciler{Client: cl, Scheme: s}
+
+	// Mock request to simulate Reconcile() being called on an event for a watched resource.
+	req := ctrl.Request{
+		NamespacedName: types.NamespacedName{
+			Name: "Pod/search-collector-abc",
+		},
+	}
+
+	// trigger reconcile
+	_, err = r.Reconcile(context.TODO(), req)
+	if err != nil {
+		t.Errorf("reconcile: (%v)", err)
+	}
+
+	//wait for update status
+	time.Sleep(1 * time.Second)
+
+	// fetch search-operator
+	err = cl.Get(context.TODO(), types.NamespacedName{
+		Name: "search-v2-operator",
+	}, search)
+	if err != nil {
+		t.Logf("Failed to get Search: (%v)", err)
+	}
+	// check if search status is set for api pod
+	resultCondition := search.Status.Conditions[0]
+
+	if resultCondition.Type != "Ready--search-collector" ||
+		resultCondition.Status != "False" ||
+		resultCondition.Reason != "No pods running" ||
+		resultCondition.Message != "Check status of deployment: search-collector" {
+		t.Errorf("Failed to set status for collector pod: (%v)", err)
+	}
+}
+
+func TestSearch_controller_Status_Update(t *testing.T) {
+	var (
+		name = "search-v2-operator"
+	)
+	search := &searchv1alpha1.Search{
+		TypeMeta:   metav1.TypeMeta{Kind: "Search"},
+		ObjectMeta: metav1.ObjectMeta{Name: name},
+		Spec: searchv1alpha1.SearchSpec{
+			DBStorage: searchv1alpha1.StorageSpec{
+				StorageClassName: "test",
+			},
+		},
+		Status: searchv1alpha1.SearchStatus{
+			DB:         "db",
+			Storage:    "storage",
+			Conditions: []metav1.Condition{{Type: "Ready--search-collector", Reason: "None", Message: "None", Status: "True"}},
+		},
+	}
+	runningCondition := corev1.PodCondition{Type: corev1.PodReady, Status: corev1.ConditionTrue, LastTransitionTime: metav1.Now()}
+
+	apiPod := buildPod("search-api-abc", runningCondition)
+	indexerPod := buildPod("search-indexer-abc", runningCondition)
+	postGresPod := buildPod("search-postgres-abc", runningCondition)
+
+	s := scheme.Scheme
+	err := searchv1alpha1.SchemeBuilder.AddToScheme(s)
+	if err != nil {
+		t.Errorf("error adding search scheme: (%v)", err)
+	}
+
+	err = addonv1alpha1.AddToScheme(s)
+	if err != nil {
+		t.Errorf("error adding addon scheme: (%v)", err)
+	}
+
+	objs := []runtime.Object{search, apiPod, indexerPod, postGresPod}
+	// Create a fake client to mock API calls.
+	cl := fake.NewClientBuilder().WithRuntimeObjects(objs...).Build()
+
+	r := &SearchReconciler{Client: cl, Scheme: s}
+
+	// Mock request to simulate Reconcile() being called on an event for a watched resource.
+	req := ctrl.Request{
+		NamespacedName: types.NamespacedName{
+			Name: "Pod/search-collector-abc",
+		},
+	}
+
+	// trigger reconcile
+	_, err = r.Reconcile(context.TODO(), req)
+	if err != nil {
+		t.Errorf("reconcile: (%v)", err)
+	}
+
+	//wait for update status
+	time.Sleep(1 * time.Second)
+
+	// fetch search-operator
+	err = cl.Get(context.TODO(), types.NamespacedName{
+		Name: "search-v2-operator",
+	}, search)
+
+	if err != nil {
+		t.Logf("Failed to get Search: (%v)", err)
+	}
+	// check if search status is set for api pod
+	resultCondition := search.Status.Conditions[0]
+	if resultCondition.Type != "Ready--search-collector" ||
+		resultCondition.Status != "False" ||
+		resultCondition.Reason != "No pods running" ||
+		resultCondition.Message != "Check status of deployment: search-collector" {
+		t.Errorf("Failed to update status for collector pod: (%v)", err)
+	}
+	if search.Status.DB != "search" ||
+		search.Status.Storage != "test" {
+		t.Errorf("Failed to update db or storage for collector pod: (%v)", err)
+
+	}
+}

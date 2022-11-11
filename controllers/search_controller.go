@@ -18,7 +18,6 @@ package controllers
 
 import (
 	"context"
-	"fmt"
 	"strings"
 	"sync"
 	"time"
@@ -35,6 +34,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -73,22 +73,16 @@ func (r *SearchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	err := r.Client.Get(ctx, types.NamespacedName{Name: "search-v2-operator", Namespace: req.Namespace}, instance)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			fmt.Println("Not found err: search-instance. Returning....")
 			return ctrl.Result{}, nil
 		}
-		fmt.Println("Err: search-instance. Returning....", err)
-
 		return ctrl.Result{}, err
 	}
-	isPod := strings.HasPrefix(req.Name, "Pod/")
-	fmt.Printf("*** \nisPod: %t, req Name: %s\n", isPod, req.Name)
-	if isPod {
-		fmt.Printf("*** Reconcile for pod starting ")
-
-		r.updateStatus(ctx, instance, strings.Split(req.Name, "/")[1])
-	} else {
-		fmt.Printf("*** Reconcile for non-pod starting \n")
-
+	// Update status
+	if strings.HasPrefix(req.Name, "Pod/") {
+		podName := strings.Split(req.Name, "/")[1]
+		log.V(2).Info("Received reconcile for pod", "Updating status for pod ", podName)
+		err := r.updateStatus(ctx, instance, podName)
+		return ctrl.Result{}, err
 	}
 	// Do not reconcile objects if this instance of search is labeled "paused"
 	if IsPaused(instance.GetAnnotations()) {
@@ -239,9 +233,8 @@ func (r *SearchReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		}, builder.WithPredicates(pred)).
 		Watches(&source.Kind{Type: &corev1.Pod{}}, handler.EnqueueRequestsFromMapFunc(
 			func(a client.Object) []reconcile.Request {
-
+				// Trigger reconcile if search pod
 				if searchLabels(a.GetLabels()) {
-					fmt.Println("**** Search pod from EnqueueRequestsFromMapFunc: ", a.GetName())
 					return []reconcile.Request{
 						{
 							NamespacedName: types.NamespacedName{
@@ -250,9 +243,7 @@ func (r *SearchReconciler) SetupWithManager(mgr ctrl.Manager) error {
 							},
 						},
 					}
-
 				} else {
-					fmt.Println("xxxxx Non Search pod from EnqueueRequestsFromMapFunc: ", a.GetName())
 					return nil
 				}
 
@@ -262,20 +253,29 @@ func (r *SearchReconciler) SetupWithManager(mgr ctrl.Manager) error {
 }
 
 func (r *SearchReconciler) updateStatus(ctx context.Context, instance *searchv1alpha1.Search, podName string) error {
-	fmt.Println("In updateStatus for pod:", podName)
-	searchPod := &corev1.Pod{}
-	// Here, we assume that the search pod and search operator instance lives in the same namespace
-	err := r.Client.Get(ctx, types.NamespacedName{Name: podName, Namespace: instance.Namespace}, searchPod)
+	deploymentName := strings.Join(strings.Split(podName, "-")[:2], "-")
+	opts := []client.ListOption{client.MatchingLabels{"app": "search", "name": deploymentName}}
+	// fetch the pods
+	podList := &corev1.PodList{}
+	err := r.Client.List(ctx, podList, opts...)
 	if err != nil {
-		if errors.IsNotFound(err) {
-			fmt.Println("pod ", podName, "not found")
-			return err
-		}
-		fmt.Println("Returning err for pod ", podName, err)
-
+		log.Error(err, "Error listing pods for component", deploymentName)
 		return err
 	}
-	instance = updateStatusCondition(instance, searchPod)
+	// if no pods are found, output an error message on the status
+	if len(podList.Items) == 0 {
+		podList.Items = append(podList.Items, corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{Name: podName},
+			Status: corev1.PodStatus{
+				Phase: corev1.PodRunning,
+				Conditions: []corev1.PodCondition{
+					{Type: corev1.PodReady, Status: corev1.ConditionFalse, LastTransitionTime: metav1.Now(),
+						Reason: "No pods running", Message: "Check status of deployment: " + deploymentName}}},
+		})
+		log.Info("No pods found for deployment ", deploymentName, "listing pods failed")
+
+	}
+	instance = updateStatusCondition(instance, podList)
 	instance.Status.Storage = instance.Spec.DBStorage.StorageClassName
 	instance.Status.DB = DBNAME // This stored in the search-postgres secret, but currently it is a static value
 
@@ -283,15 +283,13 @@ func (r *SearchReconciler) updateStatus(ctx context.Context, instance *searchv1a
 	err = r.Client.Status().Update(ctx, instance)
 	if err != nil {
 		if errors.IsConflict(err) {
-			log.Info("Failed to update status: Object has been modified")
+			log.Error(err, "Failed to update status for Search CR instance: Object has been modified")
 		}
-		log.Info(fmt.Sprintf("Failed to update %s/%s status. Error: %s", instance.Namespace, instance.Name, err.Error()))
+		log.Error(err, "Failed to update status for Search CR instance")
 		return err
-	} else {
-		log.Info(fmt.Sprintf("Updated CR status %+v  ", &instance.Status.Conditions))
 	}
-	log.Info("*** searchPod status: ", podName, searchPod.Status.Phase)
-	fmt.Println("Returning from updateStatus")
+	log.Info("Updated Search CR status successfully")
+
 	return nil
 }
 
