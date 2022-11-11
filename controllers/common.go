@@ -473,6 +473,7 @@ func updateStatusCondition(instance *searchv1alpha1.Search, podList *corev1.PodL
 				} else {
 					podCondition.Message = "None"
 				}
+				log.V(3).Info("podCondition: ", searchPod.Name, podCondition)
 				break
 			}
 		}
