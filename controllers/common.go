@@ -480,7 +480,8 @@ func updateStatusCondition(instance *searchv1alpha1.Search, podList *corev1.PodL
 	}
 	var podPresent bool // bool to check if status for this pod already exists in Search instance
 	for i, instanceCondition := range instance.Status.Conditions {
-		if instanceCondition.Type == readyType {
+		// replace only for "Ready" condition and if the podCondition is not empty
+		if instanceCondition.Type == readyType && (metav1.Condition{}) != podCondition {
 
 			podPresent = true // status for this pod already exists in Search instance
 			// replace instance with the latest condition for this pod
@@ -488,10 +489,12 @@ func updateStatusCondition(instance *searchv1alpha1.Search, podList *corev1.PodL
 			break
 		}
 	}
-	if !podPresent { // status for this pod doesn't exist in Search instance
+	// append if the podCondition is not empty
+	if !podPresent && (metav1.Condition{}) != podCondition { // status for this pod doesn't exist in Search instance
 		instance.Status.Conditions = append(instance.Status.Conditions,
 			podCondition)
 	}
+
 	return instance
 }
 
