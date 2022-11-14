@@ -202,17 +202,6 @@ func (r *SearchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *SearchReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	searchPods := predicate.Funcs{
-		CreateFunc: func(e event.CreateEvent) bool {
-			return true
-		},
-		UpdateFunc: func(e event.UpdateEvent) bool {
-			return true
-		},
-		DeleteFunc: func(e event.DeleteEvent) bool {
-			return true
-		},
-	}
 	pred := predicate.Funcs{
 		CreateFunc: func(e event.CreateEvent) bool {
 			return false
@@ -248,7 +237,7 @@ func (r *SearchReconciler) SetupWithManager(mgr ctrl.Manager) error {
 				}
 
 			}),
-			builder.WithPredicates(searchPods)).
+		).
 		Complete(r)
 }
 

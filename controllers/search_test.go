@@ -507,11 +507,6 @@ func TestSearch_controller_Status_Replicas0(t *testing.T) {
 		t.Errorf("error adding search scheme: (%v)", err)
 	}
 
-	err = addonv1alpha1.AddToScheme(s)
-	if err != nil {
-		t.Errorf("error adding addon scheme: (%v)", err)
-	}
-
 	objs := []runtime.Object{search, apiPod, indexerPod, postGresPod}
 	// Create a fake client to mock API calls.
 	cl := fake.NewClientBuilder().WithRuntimeObjects(objs...).Build()
@@ -582,11 +577,6 @@ func TestSearch_controller_Status_Update(t *testing.T) {
 	err := searchv1alpha1.SchemeBuilder.AddToScheme(s)
 	if err != nil {
 		t.Errorf("error adding search scheme: (%v)", err)
-	}
-
-	err = addonv1alpha1.AddToScheme(s)
-	if err != nil {
-		t.Errorf("error adding addon scheme: (%v)", err)
 	}
 
 	objs := []runtime.Object{search, apiPod, indexerPod, postGresPod}
