@@ -190,10 +190,10 @@ spec:
                     resources:
                       limits:
                         cpu: 200m
-                        memory: 100Mi
+                        memory: 1024Mi
                       requests:
                         cpu: 100m
-                        memory: 50Mi
+                        memory: 256Mi
                   - args:
                       - --health-probe-bind-address=:8081
                       - --metrics-bind-address=127.0.0.1:8080
@@ -260,6 +260,7 @@ spec:
                 - serviceaccounts
                 - services
                 - persistentvolumeclaims
+                - pods
               verbs:
                 - '*'
             - apiGroups:
