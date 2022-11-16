@@ -18,6 +18,7 @@ package controllers
 
 import (
 	"context"
+	"strings"
 	"sync"
 	"time"
 
@@ -25,6 +26,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	"github.com/stolostron/search-v2-operator/addon"
@@ -32,6 +34,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -65,7 +68,7 @@ var once sync.Once
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.10.0/pkg/reconcile
 func (r *SearchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	log.V(2).Info("Reconciling from search-v2-operator")
+	log.V(2).Info("Reconciling from search-v2-operator for ", req.Name, req.Namespace)
 	instance := &searchv1alpha1.Search{}
 	err := r.Client.Get(ctx, types.NamespacedName{Name: "search-v2-operator", Namespace: req.Namespace}, instance)
 	if err != nil {
@@ -74,7 +77,13 @@ func (r *SearchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		}
 		return ctrl.Result{}, err
 	}
-
+	// Update status
+	if strings.HasPrefix(req.Name, "Pod/") {
+		podName := strings.Split(req.Name, "/")[1]
+		log.V(2).Info("Received reconcile for pod", "Updating status for pod ", podName)
+		err := r.updateStatus(ctx, instance, podName)
+		return ctrl.Result{}, err
+	}
 	// Do not reconcile objects if this instance of search is labeled "paused"
 	if IsPaused(instance.GetAnnotations()) {
 		log.Info("Reconciliation is paused because the annotation 'search-pause: true' was found.")
@@ -96,7 +105,7 @@ func (r *SearchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 
 		pvcConfigured := r.configurePVC(ctx, instance)
 		if !pvcConfigured {
-			log.Info("Persistent Volume Claim is not ready yet , retyring in 10 seconds")
+			log.Info("Persistent Volume Claim is not ready yet, retrying in 10 seconds")
 			return ctrl.Result{
 				RequeueAfter: 10 * time.Second,
 				Requeue:      true,
@@ -211,7 +220,65 @@ func (r *SearchReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			IsController: true,
 			OwnerType:    &searchv1alpha1.Search{},
 		}, builder.WithPredicates(pred)).
+		Watches(&source.Kind{Type: &corev1.Pod{}}, handler.EnqueueRequestsFromMapFunc(
+			func(a client.Object) []reconcile.Request {
+				// Trigger reconcile if search pod
+				if searchLabels(a.GetLabels()) {
+					return []reconcile.Request{
+						{
+							NamespacedName: types.NamespacedName{
+								Name:      "Pod/" + a.GetName(),
+								Namespace: a.GetNamespace(),
+							},
+						},
+					}
+				} else {
+					return nil
+				}
+
+			}),
+		).
 		Complete(r)
+}
+
+func (r *SearchReconciler) updateStatus(ctx context.Context, instance *searchv1alpha1.Search, podName string) error {
+	deploymentName := strings.Join(strings.Split(podName, "-")[:2], "-")
+	opts := []client.ListOption{client.MatchingLabels{"app": "search", "name": deploymentName}}
+	// fetch the pods
+	podList := &corev1.PodList{}
+	err := r.Client.List(ctx, podList, opts...)
+	if err != nil {
+		log.Error(err, "Error listing pods for component", deploymentName)
+		return err
+	}
+	// if no pods are found, output an error message on the status
+	if len(podList.Items) == 0 {
+		podList.Items = append(podList.Items, corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{Name: podName},
+			Status: corev1.PodStatus{
+				Phase: corev1.PodRunning,
+				Conditions: []corev1.PodCondition{
+					{Type: corev1.PodReady, Status: corev1.ConditionFalse, LastTransitionTime: metav1.Now(),
+						Reason: "NoPodsFound", Message: "Check status of deployment: " + deploymentName}}},
+		})
+		log.Info("No pods found for deployment ", deploymentName, "listing pods failed")
+	}
+	instance = updateStatusCondition(instance, podList)
+	instance.Status.Storage = instance.Spec.DBStorage.StorageClassName
+	instance.Status.DB = DBNAME // This stored in the search-postgres secret, but currently it is a static value
+
+	// write instance with the new values
+	err = r.Client.Status().Update(ctx, instance)
+	if err != nil {
+		if errors.IsConflict(err) {
+			log.Error(err, "Failed to update status for Search CR instance: Object has been modified")
+		}
+		log.Error(err, "Failed to update status for Search CR instance")
+		return err
+	}
+	log.Info("Updated Search CR status successfully")
+
+	return nil
 }
 
 func (r *SearchReconciler) finalizeSearch(instance *searchv1alpha1.Search) error {
