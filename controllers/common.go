@@ -351,7 +351,17 @@ func (r *SearchReconciler) createConfigMap(ctx context.Context, cm *corev1.Confi
 			log.Error(err, "Could not create configmap")
 			return &reconcile.Result{}, err
 		}
+
+	} else {
+		if found.Data["postgresql-start.sh"] != cm.Data["postgresql-start.sh"] {
+			err = r.Update(ctx, cm)
+			if err != nil {
+				log.Error(err, "Could not update configmap")
+				return &reconcile.Result{}, err
+			}
+		}
 	}
+
 	log.V(2).Info("Created %s configmap ", cm.Name)
 	return nil, nil
 }
