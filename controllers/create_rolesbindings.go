@@ -163,6 +163,11 @@ func getRules() []rbacv1.PolicyRule {
 			Resources: []string{"users", "serviceaccounts", "groups"},
 			Verbs:     []string{"impersonate"},
 		},
+		{
+			APIGroups: []string{""},
+			Resources: []string{"pods"},
+			Verbs:     []string{"list"},
+		},
 	}
 }
 
