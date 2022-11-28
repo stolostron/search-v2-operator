@@ -2,12 +2,17 @@
 package controllers
 
 import (
+	"context"
 	"os"
 	"testing"
 
 	searchv1alpha1 "github.com/stolostron/search-v2-operator/api/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/kubernetes/scheme"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
 func TestGetDeploymentConfigForNil(t *testing.T) {
@@ -453,5 +458,76 @@ func TestPostgresCustomizationPVC(t *testing.T) {
 	actual_volume := getPostgresVolume(instance)
 	if actual_volume.VolumeSource.PersistentVolumeClaim.ClaimName != "test-search" {
 		t.Error("Incorrect Volume created")
+	}
+}
+
+func TestDefaultDBConfig(t *testing.T) {
+	var expectedMap = map[string]string{"POSTGRESQL_SHARED_BUFFERS": "64MB", "WORK_MEM": "16MB",
+		"POSTGRESQL_EFFECTIVE_CACHE_SIZE": "128MB",
+	}
+
+	var (
+		name = "search-v2-operator"
+	)
+	search := &searchv1alpha1.Search{
+		TypeMeta:   metav1.TypeMeta{Kind: "Search"},
+		ObjectMeta: metav1.ObjectMeta{Name: name},
+		Spec:       searchv1alpha1.SearchSpec{},
+	}
+	s := scheme.Scheme
+	err := searchv1alpha1.SchemeBuilder.AddToScheme(s)
+	if err != nil {
+		t.Errorf("error adding search scheme: (%v)", err)
+	}
+
+	objs := []runtime.Object{search}
+	// Create a fake client to mock API calls.
+	cl := fake.NewClientBuilder().WithRuntimeObjects(objs...).Build()
+
+	r := &SearchReconciler{Client: cl, Scheme: s}
+
+	for key, val := range expectedMap {
+		if val != r.GetDBConfig(context.TODO(), search, key) {
+			t.Errorf("Unexpected Default Config for %s", key)
+		}
+	}
+}
+
+func TestCustomDBConfig(t *testing.T) {
+	var expectedMap = map[string]string{"POSTGRESQL_SHARED_BUFFERS": "11MB", "WORK_MEM": "12MB",
+		"POSTGRESQL_EFFECTIVE_CACHE_SIZE": "13MB",
+	}
+
+	var (
+		name = "search-v2-operator"
+	)
+	search := &searchv1alpha1.Search{
+		TypeMeta:   metav1.TypeMeta{Kind: "Search"},
+		ObjectMeta: metav1.ObjectMeta{Name: name},
+		Spec: searchv1alpha1.SearchSpec{
+			DBConfig: "searchcustomization",
+		},
+	}
+	s := scheme.Scheme
+	err := searchv1alpha1.SchemeBuilder.AddToScheme(s)
+	if err != nil {
+		t.Errorf("error adding search scheme: (%v)", err)
+	}
+	//create for configmap
+	customConfigMap := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{Name: "searchcustomization"},
+		Data:       expectedMap,
+	}
+
+	objs := []runtime.Object{search, customConfigMap}
+	// Create a fake client to mock API calls.
+	cl := fake.NewClientBuilder().WithRuntimeObjects(objs...).Build()
+
+	r := &SearchReconciler{Client: cl, Scheme: s}
+
+	for key, val := range expectedMap {
+		if val != r.GetDBConfig(context.TODO(), search, key) {
+			t.Errorf("Unexpected Default Config for %s", key)
+		}
 	}
 }

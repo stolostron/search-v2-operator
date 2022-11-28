@@ -387,7 +387,7 @@ func (r *SearchReconciler) getDBConfigData(ctx context.Context, instance *search
 	return found.Data
 }
 
-func (r *SearchReconciler) getDBConfig(ctx context.Context, instance *searchv1alpha1.Search, configName string) string {
+func (r *SearchReconciler) GetDBConfig(ctx context.Context, instance *searchv1alpha1.Search, configName string) string {
 	customMap := r.getDBConfigData(ctx, instance)
 	if customMap != nil {
 		value, present := customMap[configName]
