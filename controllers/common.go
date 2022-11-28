@@ -493,3 +493,67 @@ func (r *SearchReconciler) createSecret(ctx context.Context, secret *corev1.Secr
 func DeploymentEquals(current, new *appsv1.Deployment) bool {
 	return equality.Semantic.DeepEqual(current.Spec, new.Spec)
 }
+
+// update status condition in search instance
+func updateStatusCondition(instance *searchv1alpha1.Search, podList *corev1.PodList) *searchv1alpha1.Search {
+	var podCondition metav1.Condition
+	var readyType string
+
+	for _, searchPod := range podList.Items {
+		readyType = "Ready--" + strings.Join(strings.Split(searchPod.Name, "-")[:2], "-")
+		for _, condition := range searchPod.Status.Conditions {
+			//check for condition type 'Ready'
+			if condition.Type == "Ready" &&
+				(((metav1.Condition{}) == podCondition) || // condition is empty
+					// status exists from a previous replica, but the new replica has a non-ready status
+					((metav1.Condition{}) != podCondition && condition.Status != corev1.ConditionTrue)) {
+				podCondition = metav1.Condition{
+					Type:   readyType,
+					Status: metav1.ConditionStatus(condition.Status),
+				}
+				// These are optional fields in the pod, but required in Search Instance
+				// Check before assigning to avoid Error:
+				// Invalid value: "": status.conditions.reason in body should be at least 1 chars long
+				if !condition.LastTransitionTime.IsZero() {
+					podCondition.LastTransitionTime = condition.LastTransitionTime
+				}
+				if len(condition.Reason) > 0 {
+					podCondition.Reason = condition.Reason
+				} else {
+					podCondition.Reason = "None"
+				}
+				if len(condition.Message) > 0 {
+					podCondition.Message = condition.Message
+				} else {
+					podCondition.Message = "None"
+				}
+				log.V(3).Info("podCondition: ", searchPod.Name, podCondition)
+				break
+			}
+		}
+	}
+	var podPresent bool // bool to check if status for this pod already exists in Search instance
+	for i, instanceCondition := range instance.Status.Conditions {
+		// replace only for "Ready" condition and if the podCondition is not empty
+		if instanceCondition.Type == readyType && (metav1.Condition{}) != podCondition {
+
+			podPresent = true // status for this pod already exists in Search instance
+			// replace instance with the latest condition for this pod
+			instance.Status.Conditions[i] = podCondition
+			break
+		}
+	}
+	// append if the podCondition is not empty
+	if !podPresent && (metav1.Condition{}) != podCondition { // status for this pod doesn't exist in Search instance
+		instance.Status.Conditions = append(instance.Status.Conditions,
+			podCondition)
+	}
+
+	return instance
+}
+
+// check if labels has 'component: search-operator'
+func searchLabels(labels map[string]string) bool {
+	value, ok := labels["component"]
+	return ok && value == "search-v2-operator"
+}

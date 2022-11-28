@@ -11,6 +11,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
+const DBNAME = "search"
+
 func (r *SearchReconciler) PGSecret(instance *searchv1alpha1.Search) *corev1.Secret {
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
@@ -22,7 +24,7 @@ func (r *SearchReconciler) PGSecret(instance *searchv1alpha1.Search) *corev1.Sec
 	secret.StringData = map[string]string{
 		"database-user":     "searchuser",
 		"database-password": generatePass(16),
-		"database-name":     "search",
+		"database-name":     DBNAME,
 	}
 
 	err := controllerutil.SetControllerReference(instance, secret, r.Scheme)
