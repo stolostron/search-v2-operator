@@ -30,18 +30,21 @@ const (
 	postgresConfigmapName = "search-postgres"
 	caCertConfigmapName   = "search-ca-crt"
 
-	apiSecretName             = "search-api-certs"
-	indexerSecretName         = "search-indexer-certs"
-	postgresSecretName        = "search-postgres-certs"
-	POSTGRESQL_SHARED_BUFFERS = "128MB"
-	WORK_MEM                  = "16MB"
+	apiSecretName                   = "search-api-certs"
+	indexerSecretName               = "search-indexer-certs"
+	postgresSecretName              = "search-postgres-certs"
+	POSTGRESQL_SHARED_BUFFERS       = "64MB"
+	POSTGRESQL_EFFECTIVE_CACHE_SIZE = "128MB"
+	WORK_MEM                        = "16MB"
 )
 
 var (
 	certDefaultMode       = int32(384)
 	AnnotationSearchPause = "search-pause"
 )
-var dbDefaultMap = map[string]string{"POSTGRESQL_SHARED_BUFFERS": POSTGRESQL_SHARED_BUFFERS, "WORK_MEM": WORK_MEM}
+var dbDefaultMap = map[string]string{"POSTGRESQL_SHARED_BUFFERS": POSTGRESQL_SHARED_BUFFERS, "WORK_MEM": WORK_MEM,
+	"POSTGRESQL_EFFECTIVE_CACHE_SIZE": POSTGRESQL_EFFECTIVE_CACHE_SIZE,
+}
 
 func generateLabels(key, val string) map[string]string {
 	allLabels := map[string]string{
@@ -353,6 +356,8 @@ func (r *SearchReconciler) createConfigMap(ctx context.Context, cm *corev1.Confi
 		}
 
 	} else {
+		log.V(3).Info("Found DB Config ", found.Data["postgresql-start.sh"])
+		log.V(3).Info("New DB Config ", cm.Data["postgresql-start.sh"])
 		if found.Data["postgresql-start.sh"] != cm.Data["postgresql-start.sh"] {
 			err = r.Update(ctx, cm)
 			if err != nil {

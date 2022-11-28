@@ -16,6 +16,8 @@ func (r *SearchReconciler) PGDeployment(instance *searchv1alpha1.Search) *appsv1
 	log.V(2).Info("Using postgres image ", image_sha)
 	deployment := getDeployment(deploymentName, instance)
 	Postgresql_Shared_Buffers := r.getDBConfig(context.TODO(), instance, "POSTGRESQL_SHARED_BUFFERS")
+	Postgresql_Effective_Cache_Size := r.getDBConfig(context.TODO(), instance, "POSTGRESQL_EFFECTIVE_CACHE_SIZE")
+	Postgresql_Work_Mem := r.getDBConfig(context.TODO(), instance, "WORK_MEM")
 	postgresContainer := corev1.Container{
 		Name:  deploymentName,
 		Image: image_sha,
@@ -28,6 +30,8 @@ func (r *SearchReconciler) PGDeployment(instance *searchv1alpha1.Search) *appsv1
 		},
 		Env: []corev1.EnvVar{
 			newEnvVar("POSTGRESQL_SHARED_BUFFERS", Postgresql_Shared_Buffers),
+			newEnvVar("POSTGRESQL_EFFECTIVE_CACHE_SIZE", Postgresql_Effective_Cache_Size),
+			newEnvVar("WORK_MEM", Postgresql_Work_Mem),
 			newSecretEnvVar("POSTGRESQL_USER", "database-user", "search-postgres"),
 			newSecretEnvVar("POSTGRESQL_PASSWORD", "database-password", "search-postgres"),
 			newSecretEnvVar("POSTGRESQL_DATABASE", "database-name", "search-postgres"),
