@@ -354,7 +354,7 @@ func TestSearch_controller_DBConfig(t *testing.T) {
 	if err != nil {
 		t.Errorf("error adding search scheme: (%v)", err)
 	}
-	//create for configmap
+	//create configmap which has the customization for postgres DB
 	customConfigMap := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{Name: "searchcustomization"},
 		Data:       expectedMap,
