@@ -356,9 +356,10 @@ func (r *SearchReconciler) createConfigMap(ctx context.Context, cm *corev1.Confi
 		}
 
 	} else {
-		log.V(3).Info("Found DB Config ", found.Data["postgresql-start.sh"])
-		log.V(3).Info("New DB Config ", cm.Data["postgresql-start.sh"])
-		if found.Data["postgresql-start.sh"] != cm.Data["postgresql-start.sh"] {
+		startScript := "postgresql-start.sh"
+		log.V(3).Info("Found DB Config ", found.Data[startScript])
+		log.V(3).Info("New DB Config ", cm.Data[startScript])
+		if found.Data[startScript] != cm.Data[startScript] {
 			err = r.Update(ctx, cm)
 			if err != nil {
 				log.Error(err, "Could not update configmap")
