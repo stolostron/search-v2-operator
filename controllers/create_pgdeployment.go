@@ -15,9 +15,9 @@ func (r *SearchReconciler) PGDeployment(instance *searchv1alpha1.Search) *appsv1
 	image_sha := getImageSha(deploymentName, instance)
 	log.V(2).Info("Using postgres image ", image_sha)
 	deployment := getDeployment(deploymentName, instance)
-	Postgresql_Shared_Buffers := r.GetDBConfig(context.TODO(), instance, "POSTGRESQL_SHARED_BUFFERS")
-	Postgresql_Effective_Cache_Size := r.GetDBConfig(context.TODO(), instance, "POSTGRESQL_EFFECTIVE_CACHE_SIZE")
-	Postgresql_Work_Mem := r.GetDBConfig(context.TODO(), instance, "WORK_MEM")
+	postgresql_shared_buffers := r.GetDBConfig(context.TODO(), instance, "POSTGRESQL_SHARED_BUFFERS")
+	postgresql_effective_cache_size := r.GetDBConfig(context.TODO(), instance, "POSTGRESQL_EFFECTIVE_CACHE_SIZE")
+	postgresql_work_mem := r.GetDBConfig(context.TODO(), instance, "WORK_MEM")
 	postgresContainer := corev1.Container{
 		Name:  deploymentName,
 		Image: image_sha,
@@ -29,9 +29,9 @@ func (r *SearchReconciler) PGDeployment(instance *searchv1alpha1.Search) *appsv1
 			},
 		},
 		Env: []corev1.EnvVar{
-			newEnvVar("POSTGRESQL_SHARED_BUFFERS", Postgresql_Shared_Buffers),
-			newEnvVar("POSTGRESQL_EFFECTIVE_CACHE_SIZE", Postgresql_Effective_Cache_Size),
-			newEnvVar("WORK_MEM", Postgresql_Work_Mem),
+			newEnvVar("POSTGRESQL_SHARED_BUFFERS", postgresql_shared_buffers),
+			newEnvVar("POSTGRESQL_EFFECTIVE_CACHE_SIZE", postgresql_effective_cache_size),
+			newEnvVar("WORK_MEM", postgresql_work_mem),
 			newSecretEnvVar("POSTGRESQL_USER", "database-user", "search-postgres"),
 			newSecretEnvVar("POSTGRESQL_PASSWORD", "database-password", "search-postgres"),
 			newSecretEnvVar("POSTGRESQL_DATABASE", "database-name", "search-postgres"),
