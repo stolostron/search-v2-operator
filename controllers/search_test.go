@@ -192,6 +192,10 @@ func TestSearch_controller(t *testing.T) {
 		Name: getClusterManagementAddonName(),
 	}, cma)
 
+	if err != nil {
+		t.Errorf("Failed to get ClusterManagementAddon %s: %v", getClusterManagementAddonName(), err)
+	}
+
 	//check for AddonDeploymentConfig
 	adc := &addonv1alpha1.AddOnDeploymentConfig{}
 	err = cl.Get(context.TODO(), types.NamespacedName{
