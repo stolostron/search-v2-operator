@@ -88,17 +88,15 @@ spec:
         secret:
           secretName: {{ .Values.hubKubeConfigSecret }}
       {{- end }}
-      {{- with .Values.global.nodeSelector }}
-      nodeSelector:
-{{ toYaml . | indent 8 }}
+      {{- if .Values.global.nodeSelector }}
+      nodeSelector: {{ toYaml .Values.global.nodeSelector | nindent 8 }}
       {{- end }}
       {{- with .Values.affinity }}
       affinity:
-{{ toYaml . | indent 8 }}
+      {{ toYaml . | indent 8 }}
       {{- end }}
-      {{- with .Values.tolerations }}
-      tolerations:
-{{ toYaml . | indent 8 }}
+      {{- if .Values.tolerations }}
+      tolerations: {{ toYaml .Values.tolerations | nindent 8 }}
       {{- end }}
       {{- if .Values.global.imagePullSecret }}
       imagePullSecrets:
