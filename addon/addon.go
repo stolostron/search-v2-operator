@@ -23,6 +23,7 @@ import (
 	"open-cluster-management.io/addon-framework/pkg/agent"
 	"open-cluster-management.io/addon-framework/pkg/utils"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 )
@@ -53,7 +54,6 @@ type GlobalValues struct {
 	ImagePullPolicy corev1.PullPolicy `json:"imagePullPolicy,"`
 	ImagePullSecret string            `json:"imagePullSecret"`
 	ImageOverrides  map[string]string `json:"imageOverrides,"`
-	NodeSelector    map[string]string `json:"nodeSelector,"`
 	ProxyConfig     map[string]string `json:"proxyConfig,"`
 }
 
@@ -80,7 +80,7 @@ func getValue(cluster *clusterv1.ManagedCluster,
 			ImageOverrides: map[string]string{
 				"search_collector": SearchCollectorImage,
 			},
-			NodeSelector: map[string]string{},
+
 			ProxyConfig: map[string]string{
 				"HTTP_PROXY":  "",
 				"HTTPS_PROXY": "",
@@ -204,14 +204,26 @@ func NewAddonManager(kubeConfig *rest.Config) (addonmanager.AddonManager, error)
 		klog.Errorf("unable to setup addon manager: %v", err)
 		return nil, err
 	}
+	addonClient, err := addonv1alpha1client.NewForConfig(kubeConfig)
+	if err != nil {
+		klog.Errorf("unable to setup addon client: %v", err)
+		return nil, err
+	}
 	kubeClient, err := kubernetes.NewForConfig(kubeConfig)
 	if err != nil {
 		klog.Errorf("unable to create kube client: %v", err)
-		return addonMgr, err
+		return nil, err
 	}
 	agentAddon, err := addonfactory.NewAgentAddonFactory(SearchAddonName, ChartFS, ChartDir).
-		WithGetValuesFuncs(getValue, addonfactory.GetValuesFromAddonAnnotation).
-		WithAgentRegistrationOption(newRegistrationOption(kubeClient, SearchAddonName)).
+		WithConfigGVRs(
+			addonfactory.AddOnDeploymentConfigGVR,
+		).WithGetValuesFuncs(
+		getValue,
+		addonfactory.GetValuesFromAddonAnnotation,
+		addonfactory.GetAddOnDeloymentConfigValues(
+			addonfactory.NewAddOnDeloymentConfigGetter(addonClient),
+			addonfactory.ToAddOnNodePlacementValues),
+	).WithAgentRegistrationOption(newRegistrationOption(kubeClient, SearchAddonName)).
 		BuildHelmAgentAddon()
 	if err != nil {
 		klog.Errorf("failed to build agent %v", err)
