@@ -49,6 +49,18 @@ func (r *SearchReconciler) newClusterManagementAddOn(instance *searchv1alpha1.Se
 				DisplayName: "Search Collector",
 				Description: "Collects cluster data to be indexed by search components on the hub cluster.",
 			},
+			SupportedConfigs: []addonv1alpha1.ConfigMeta{
+				{
+					ConfigGroupResource: addonv1alpha1.ConfigGroupResource{
+						Group:    "addon.open-cluster-management.io",
+						Resource: "addondeploymentconfigs",
+					},
+					DefaultConfig: &addonv1alpha1.ConfigReferent{
+						Name:      getClusterManagementAddonName(),
+						Namespace: instance.GetNamespace(),
+					},
+				},
+			},
 		},
 	}
 	err := controllerutil.SetControllerReference(instance, cma, r.Scheme)

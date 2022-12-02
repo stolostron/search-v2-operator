@@ -4,7 +4,9 @@ import (
 	"testing"
 
 	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	fakekube "k8s.io/client-go/kubernetes/fake"
@@ -13,11 +15,14 @@ import (
 	"open-cluster-management.io/addon-framework/pkg/addonfactory"
 	"open-cluster-management.io/addon-framework/pkg/agent"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	fakeaddon "open-cluster-management.io/api/client/addon/clientset/versioned/fake"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 )
 
 var (
-	scheme = runtime.NewScheme()
+	scheme       = runtime.NewScheme()
+	nodeSelector = map[string]string{"kubernetes.io/os": "linux"}
+	tolerations  = []corev1.Toleration{{Key: "foo", Operator: corev1.TolerationOpExists, Effect: corev1.TaintEffectNoExecute}}
 )
 
 func init() {
@@ -47,12 +52,17 @@ func newAddon(name, cluster, installNamespace string, annotationValues map[strin
 	return addon
 }
 
-func newAgentAddon(t *testing.T) agent.AgentAddon {
+func newAgentAddon(t *testing.T, objects []runtime.Object) agent.AgentAddon {
 	registrationOption := newRegistrationOption(nil, SearchAddonName)
 	getValuesFunc := getValue
+	fakeAddonClient := fakeaddon.NewSimpleClientset(objects...)
 	agentAddon, err := addonfactory.NewAgentAddonFactory(SearchAddonName, ChartFS, ChartDir).
 		WithScheme(scheme).
-		WithGetValuesFuncs(getValuesFunc, addonfactory.GetValuesFromAddonAnnotation).
+		WithGetValuesFuncs(getValuesFunc, addonfactory.GetValuesFromAddonAnnotation,
+			addonfactory.GetAddOnDeloymentConfigValues(
+				addonfactory.NewAddOnDeloymentConfigGetter(fakeAddonClient),
+				addonfactory.ToAddOnNodePlacementValues,
+			)).
 		WithAgentRegistrationOption(registrationOption).
 		WithInstallStrategy(agent.InstallAllStrategy("open-cluster-management-agent-addon")).
 		BuildHelmAgentAddon()
@@ -124,7 +134,7 @@ func TestManifest(t *testing.T) {
 	}
 
 	SearchCollectorImage = "quay.io/stolostron/search_collector:2.7.0"
-	agentAddon := newAgentAddon(t)
+	agentAddon := newAgentAddon(t, nil)
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			objects, err := agentAddon.Manifests(test.cluster, test.addon)
@@ -286,4 +296,186 @@ func TestCreateOrUpdateRoleBinding(t *testing.T) {
 			test.validateActions(t, kubeClient.Actions())
 		})
 	}
+}
+
+func TestManifestAddonAgent(t *testing.T) {
+	cases := []struct {
+		name                   string
+		managedCluster         *clusterv1.ManagedCluster
+		managedClusterAddOn    *addonapiv1alpha1.ManagedClusterAddOn
+		configMaps             []runtime.Object
+		addOnDeploymentConfigs []runtime.Object
+		verifyDeployment       func(t *testing.T, objs []runtime.Object)
+	}{
+		{
+			name:                   "no configs",
+			managedCluster:         newCluster("cluster1"),
+			managedClusterAddOn:    newAddon(SearchAddonName, "cluster1", "", nil),
+			configMaps:             []runtime.Object{},
+			addOnDeploymentConfigs: []runtime.Object{},
+			verifyDeployment: func(t *testing.T, objs []runtime.Object) {
+				deployment := findSearchDeployment(objs)
+				if deployment == nil {
+					t.Fatalf("expected deployment, but failed")
+				}
+
+				if deployment.Name != "klusterlet-addon-search" {
+					t.Errorf("unexpected deployment name  %s", deployment.Name)
+				}
+
+				if deployment.Namespace != addonfactory.AddonDefaultInstallNamespace {
+					t.Errorf("unexpected deployment namespace  %s", deployment.Namespace)
+				}
+
+			},
+		},
+		{
+			name:           "addondeploymentconfig",
+			managedCluster: newCluster("cluster1"),
+			managedClusterAddOn: func() *addonapiv1alpha1.ManagedClusterAddOn {
+				addon := newAddon(SearchAddonName, "cluster1", "", nil)
+				addon.Status.ConfigReferences = []addonapiv1alpha1.ConfigReference{
+					{
+						ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+							Group:    "addon.open-cluster-management.io",
+							Resource: "addondeploymentconfigs",
+						},
+						ConfigReferent: addonapiv1alpha1.ConfigReferent{
+							Namespace: "cluster1",
+							Name:      "deploy-config",
+						},
+					},
+				}
+				return addon
+			}(),
+			addOnDeploymentConfigs: []runtime.Object{
+				&addonapiv1alpha1.AddOnDeploymentConfig{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "deploy-config",
+						Namespace: "cluster1",
+					},
+					Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
+						NodePlacement: &addonapiv1alpha1.NodePlacement{
+							Tolerations:  tolerations,
+							NodeSelector: nodeSelector,
+						},
+					},
+				},
+			},
+			verifyDeployment: func(t *testing.T, objs []runtime.Object) {
+				deployment := findSearchDeployment(objs)
+				if deployment == nil {
+					t.Fatalf("expected deployment, but failed")
+				}
+
+				if deployment.Name != "klusterlet-addon-search" {
+					t.Errorf("unexpected deployment name  %s", deployment.Name)
+				}
+
+				if deployment.Namespace != addonfactory.AddonDefaultInstallNamespace {
+					t.Errorf("unexpected deployment namespace  %s", deployment.Namespace)
+				}
+
+				if deployment.Spec.Template.Spec.Containers[0].Image != "quay.io/stolostron/search_collector:2.7.0" {
+					t.Errorf("unexpected image  %s", deployment.Spec.Template.Spec.Containers[0].Image)
+				}
+
+				if !equality.Semantic.DeepEqual(deployment.Spec.Template.Spec.NodeSelector, nodeSelector) {
+					t.Errorf("unexpected nodeSeletor %v", deployment.Spec.Template.Spec.NodeSelector)
+				}
+
+				if !equality.Semantic.DeepEqual(deployment.Spec.Template.Spec.Tolerations, tolerations) {
+					t.Errorf("unexpected tolerations %v", deployment.Spec.Template.Spec.Tolerations)
+				}
+			},
+		},
+		{
+			name:           "addondeploymentconfig and annotation",
+			managedCluster: newCluster("cluster1"),
+			managedClusterAddOn: func() *addonapiv1alpha1.ManagedClusterAddOn {
+				addon := newAddon(SearchAddonName, "cluster1", "", nil)
+				addon.SetAnnotations(map[string]string{"addon.open-cluster-management.io/values": `{"global":{"imageOverrides":
+				{"search_collector":"quay.io/test/search_collector:test"}}}`})
+				addon.Status.ConfigReferences = []addonapiv1alpha1.ConfigReference{
+					{
+						ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+							Group:    "addon.open-cluster-management.io",
+							Resource: "addondeploymentconfigs",
+						},
+						ConfigReferent: addonapiv1alpha1.ConfigReferent{
+							Namespace: "cluster1",
+							Name:      "deploy-config",
+						},
+					},
+				}
+				return addon
+			}(),
+			addOnDeploymentConfigs: []runtime.Object{
+				&addonapiv1alpha1.AddOnDeploymentConfig{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "deploy-config",
+						Namespace: "cluster1",
+					},
+					Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
+						NodePlacement: &addonapiv1alpha1.NodePlacement{
+							Tolerations:  tolerations,
+							NodeSelector: nodeSelector,
+						},
+					},
+				},
+			},
+			verifyDeployment: func(t *testing.T, objs []runtime.Object) {
+				deployment := findSearchDeployment(objs)
+				if deployment == nil {
+					t.Fatalf("expected deployment, but failed")
+				}
+
+				if deployment.Name != "klusterlet-addon-search" {
+					t.Errorf("unexpected deployment name  %s", deployment.Name)
+				}
+
+				if deployment.Namespace != addonfactory.AddonDefaultInstallNamespace {
+					t.Errorf("unexpected deployment namespace  %s", deployment.Namespace)
+				}
+
+				if deployment.Spec.Template.Spec.Containers[0].Image != "quay.io/test/search_collector:test" {
+					t.Errorf("unexpected image  %s", deployment.Spec.Template.Spec.Containers[0].Image)
+				}
+
+				if !equality.Semantic.DeepEqual(deployment.Spec.Template.Spec.NodeSelector, nodeSelector) {
+					t.Errorf("unexpected nodeSeletor %v", deployment.Spec.Template.Spec.NodeSelector)
+				}
+
+				if !equality.Semantic.DeepEqual(deployment.Spec.Template.Spec.Tolerations, tolerations) {
+					t.Errorf("unexpected tolerations %v", deployment.Spec.Template.Spec.Tolerations)
+				}
+			},
+		},
+	}
+
+	for _, c := range cases {
+		agentAddon := newAgentAddon(t, c.addOnDeploymentConfigs)
+		objects, err := agentAddon.Manifests(c.managedCluster, c.managedClusterAddOn)
+		if err != nil {
+			t.Fatalf("failed to get manifests %v", err)
+		}
+
+		if len(objects) != 4 {
+			t.Fatalf("expected 4 manifests, but %v", objects)
+		}
+
+		c.verifyDeployment(t, objects)
+	}
+
+}
+
+func findSearchDeployment(objs []runtime.Object) *appsv1.Deployment {
+	for _, obj := range objs {
+		switch obj := obj.(type) {
+		case *appsv1.Deployment:
+			return obj
+		}
+	}
+
+	return nil
 }
