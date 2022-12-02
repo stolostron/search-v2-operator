@@ -217,13 +217,13 @@ func NewAddonManager(kubeConfig *rest.Config) (addonmanager.AddonManager, error)
 	agentAddon, err := addonfactory.NewAgentAddonFactory(SearchAddonName, ChartFS, ChartDir).
 		WithConfigGVRs(
 			addonfactory.AddOnDeploymentConfigGVR,
-		).
-		WithGetValuesFuncs(getValue,
-			addonfactory.GetAddOnDeloymentConfigValues(
-				addonfactory.NewAddOnDeloymentConfigGetter(addonClient),
-				addonfactory.ToAddOnNodePlacementValues,
-			), addonfactory.GetValuesFromAddonAnnotation).
-		WithAgentRegistrationOption(newRegistrationOption(kubeClient, SearchAddonName)).
+		).WithGetValuesFuncs(
+		getValue,
+		addonfactory.GetValuesFromAddonAnnotation,
+		addonfactory.GetAddOnDeloymentConfigValues(
+			addonfactory.NewAddOnDeloymentConfigGetter(addonClient),
+			addonfactory.ToAddOnNodePlacementValues),
+	).WithAgentRegistrationOption(newRegistrationOption(kubeClient, SearchAddonName)).
 		BuildHelmAgentAddon()
 	if err != nil {
 		klog.Errorf("failed to build agent %v", err)

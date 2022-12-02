@@ -1649,6 +1649,8 @@ open-cluster-management.io/addon-framework v0.4.0 h1:YV9v40ZN4ZAicI1rIvAZDS6x82E
 open-cluster-management.io/addon-framework v0.4.0/go.mod h1:jmhBGZCB7/dgFssh2w1o7JFSpzeEDdRE9olxAR8+fqw=
 open-cluster-management.io/addon-framework v0.5.0 h1:JsjzbS7gRvTbjxJdYGLJzJUO99zLQuOkyXL1fppcd5s=
 open-cluster-management.io/addon-framework v0.5.0/go.mod h1:Fymctw1tnmCTXnmAMgc0zdHetAw6UaiAsj1S6w5VW6s=
+open-cluster-management.io/addon-framework v0.5.1-0.20221202081919-610fa32e2167 h1:1umiRv6mkiML8w6SGranHBB/96kAyQKI9FkavSz2JrY=
+open-cluster-management.io/addon-framework v0.5.1-0.20221202081919-610fa32e2167/go.mod h1:Fymctw1tnmCTXnmAMgc0zdHetAw6UaiAsj1S6w5VW6s=
 open-cluster-management.io/api v0.8.0 h1:hQLNyvvdx0G0iNxq80RWp93epNsUtsqJdLmGbXiYG5o=
 open-cluster-management.io/api v0.8.0/go.mod h1:+OEARSAl2jIhuLItUcS30UgLA3khmA9ihygLVxzEn+U=
 open-cluster-management.io/api v0.9.0 h1:JQidCTMY3RdS0m3UDP24j6ykNpxWJ20LEdNtbxJApxo=

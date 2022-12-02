@@ -58,11 +58,11 @@ func newAgentAddon(t *testing.T, objects []runtime.Object) agent.AgentAddon {
 	fakeAddonClient := fakeaddon.NewSimpleClientset(objects...)
 	agentAddon, err := addonfactory.NewAgentAddonFactory(SearchAddonName, ChartFS, ChartDir).
 		WithScheme(scheme).
-		WithGetValuesFuncs(getValuesFunc,
+		WithGetValuesFuncs(getValuesFunc, addonfactory.GetValuesFromAddonAnnotation,
 			addonfactory.GetAddOnDeloymentConfigValues(
 				addonfactory.NewAddOnDeloymentConfigGetter(fakeAddonClient),
 				addonfactory.ToAddOnNodePlacementValues,
-			), addonfactory.GetValuesFromAddonAnnotation).
+			)).
 		WithAgentRegistrationOption(registrationOption).
 		WithInstallStrategy(agent.InstallAllStrategy("open-cluster-management-agent-addon")).
 		BuildHelmAgentAddon()
