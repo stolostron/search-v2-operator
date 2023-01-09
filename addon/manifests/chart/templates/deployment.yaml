@@ -88,14 +88,14 @@ spec:
         secret:
           secretName: {{ .Values.hubKubeConfigSecret }}
       {{- end }}
-      {{- if .Values.global.nodeSelector }}
+      {{- if and .Values.global (hasKey .Values.global "nodeSelector") }}
       nodeSelector: {{ toYaml .Values.global.nodeSelector | nindent 8 }}
       {{- end }}
       {{- with .Values.affinity }}
       affinity:
       {{ toYaml . | indent 8 }}
       {{- end }}
-      {{- if .Values.tolerations }}
+      {{- if and .Values (hasKey .Values "tolerations") }}
       tolerations: {{ toYaml .Values.tolerations | nindent 8 }}
       {{- end }}
       {{- if .Values.global.imagePullSecret }}
