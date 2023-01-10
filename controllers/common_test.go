@@ -609,3 +609,44 @@ func TestMemoryCpuLimitCustomization(t *testing.T) {
 		t.Error("Limit Memory Not expected")
 	}
 }
+
+func TestMemoryLimitCustomization(t *testing.T) {
+	testFor := "search-indexer"
+	tol := corev1.Toleration{
+		Key:      "node-role.kubernetes.io/infra",
+		Effect:   corev1.TaintEffectNoSchedule,
+		Operator: corev1.TolerationOpExists,
+	}
+	instance := &searchv1alpha1.Search{
+		Spec: searchv1alpha1.SearchSpec{
+			ImagePullPolicy: "IfNotPresent",
+			ImagePullSecret: "personal-pull-secret",
+			NodeSelector:    map[string]string{"key1": "val1"},
+			Tolerations:     []corev1.Toleration{tol},
+			Deployments: searchv1alpha1.SearchDeployments{
+				Indexer: searchv1alpha1.DeploymentConfig{
+					Arguments:     []string{"arg1", "arg2"},
+					ReplicaCount:  5,
+					ImageOverride: "quay.io/test-image:007",
+					Resources: &corev1.ResourceRequirements{
+						Limits: corev1.ResourceList{
+							"cpu": resource.MustParse("50m"),
+						},
+						Requests: corev1.ResourceList{
+							"cpu":    resource.MustParse("25m"),
+							"memory": resource.MustParse("10Mi"),
+						},
+					},
+				},
+			},
+		},
+	}
+
+	actualResourceRequirements := getResourceRequirements(testFor, instance)
+	if actualResourceRequirements.Limits.Cpu().String() != "50m" {
+		t.Error("Limit CPU Not expected")
+	}
+	if actualResourceRequirements.Limits.Memory().String() != "0" {
+		t.Error("Limit Memory Not expected")
+	}
+}
