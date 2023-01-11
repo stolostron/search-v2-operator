@@ -270,19 +270,19 @@ func getLimits(deployment string, instance *searchv1alpha1.Search) corev1.Resour
 	}
 
 	if cpu.CmpInt64(0) == 0 && memory.CmpInt64(0) == 0 {
-		log.Info("Limit not set for memory and cpu")
+		log.Info("Limit not set for memory and cpu on deployment %s", deployment)
 		return corev1.ResourceList{}
 	}
 
 	if cpu.String() == "<nil>" || cpu.CmpInt64(0) == 0 {
-		log.Info("Limit not set for cpu")
+		log.Info("Limit not set for cpu on deployment %s", deployment)
 		return corev1.ResourceList{
 			corev1.ResourceMemory: memory,
 		}
 	}
 
 	if memory.CmpInt64(0) == 0 {
-		log.Info("Limit not set for memory")
+		log.Info("Limit not set for memory on deployment %s", deployment)
 		return corev1.ResourceList{
 			corev1.ResourceCPU: cpu,
 		}
