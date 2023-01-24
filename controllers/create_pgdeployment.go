@@ -13,7 +13,7 @@ import (
 func (r *SearchReconciler) PGDeployment(instance *searchv1alpha1.Search) *appsv1.Deployment {
 	deploymentName := postgresDeploymentName
 	image_sha := getImageSha(deploymentName, instance)
-	log.V(2).Info("Using postgres image ", image_sha)
+	log.V(2).Info("Using postgres image ", "name", image_sha)
 	deployment := getDeployment(deploymentName, instance)
 	postgresql_shared_buffers := r.GetDBConfig(context.TODO(), instance, "POSTGRESQL_SHARED_BUFFERS")
 	postgresql_effective_cache_size := r.GetDBConfig(context.TODO(), instance, "POSTGRESQL_EFFECTIVE_CACHE_SIZE")

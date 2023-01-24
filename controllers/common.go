@@ -224,7 +224,7 @@ func getResourceRequirements(deploymentName string, instance *searchv1alpha1.Sea
 			Limits:   getLimits(postgresDeploymentName, instance),
 		}
 	}
-	log.V(2).Info("Unknown deployment %s ", deploymentName)
+	log.V(2).Info("Unknown deployment ", "name", deploymentName)
 	return corev1.ResourceRequirements{}
 }
 
@@ -333,7 +333,7 @@ func getImageSha(deploymentName string, instance *searchv1alpha1.Search) string 
 		}
 		return os.Getenv("POSTGRES_IMAGE")
 	}
-	log.V(2).Info("Unknown deployment %s ", deploymentName)
+	log.V(2).Info("Unknown deployment ", "name", deploymentName)
 	return ""
 }
 
@@ -372,8 +372,8 @@ func (r *SearchReconciler) createConfigMap(ctx context.Context, cm *corev1.Confi
 
 	} else {
 		startScript := "postgresql-start.sh"
-		log.V(3).Info("Found DB Config ", found.Data[startScript])
-		log.V(3).Info("New DB Config ", cm.Data[startScript])
+		log.V(3).Info("Found DB Config ", "startScript", found.Data[startScript])
+		log.V(3).Info("New DB Config ", "startScript", cm.Data[startScript])
 		if found.Data[startScript] != cm.Data[startScript] {
 			err = r.Update(ctx, cm)
 			if err != nil {
@@ -383,7 +383,7 @@ func (r *SearchReconciler) createConfigMap(ctx context.Context, cm *corev1.Confi
 		}
 	}
 
-	log.V(2).Info("Created %s configmap ", cm.Name)
+	log.V(2).Info("Created configmap ", "name", cm.Name)
 	return nil, nil
 }
 
@@ -443,7 +443,7 @@ func (r *SearchReconciler) createOrUpdateDeployment(ctx context.Context, deploy 
 				return &reconcile.Result{}, err
 			}
 			log.Info("Created  deployment " + deploy.Name)
-			log.V(9).Info("Created deployment %+v", deploy)
+			log.V(9).Info("Created deployment ", "name", deploy)
 			return nil, nil
 		}
 		log.Error(err, "Could not get deployment")
@@ -454,7 +454,7 @@ func (r *SearchReconciler) createOrUpdateDeployment(ctx context.Context, deploy 
 			log.Error(err, "Could not update deployment")
 			return nil, nil
 		}
-		log.V(9).Info("Updated deployment %+v", deploy)
+		log.V(9).Info("Updated deployment ", "name", deploy)
 	}
 	return nil, nil
 }
@@ -473,7 +473,7 @@ func (r *SearchReconciler) createService(ctx context.Context, svc *corev1.Servic
 				return &reconcile.Result{}, err
 			}
 			log.Info("Created service " + svc.Name)
-			log.V(9).Info("Created service %+v", svc)
+			log.V(9).Info("Created service ", "name", svc)
 			return nil, nil
 		}
 		log.Error(err, "Could not get service")

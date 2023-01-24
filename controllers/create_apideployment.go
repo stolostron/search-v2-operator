@@ -12,7 +12,7 @@ import (
 func (r *SearchReconciler) APIDeployment(instance *searchv1alpha1.Search) *appsv1.Deployment {
 	deploymentName := apiDeploymentName
 	image_sha := getImageSha(deploymentName, instance)
-	log.V(2).Info("Using api image ", image_sha)
+	log.V(2).Info("Using api image ", "name", image_sha)
 
 	deployment := getDeployment(deploymentName, instance)
 	apiContainer := corev1.Container{

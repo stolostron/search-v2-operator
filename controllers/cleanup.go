@@ -33,7 +33,7 @@ func (r *SearchReconciler) deleteClusterManagementAddon(instance *searchv1alpha1
 }
 
 func (r *SearchReconciler) deleteClusterRole(instance *searchv1alpha1.Search, resourceName string) error {
-	log.V(2).Info("Deleting ClusterRole ", resourceName)
+	log.V(2).Info("Deleting ClusterRole ", "resourceName", resourceName)
 	cr := &rbacv1.ClusterRole{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "ClusterRole",
@@ -49,12 +49,12 @@ func (r *SearchReconciler) deleteClusterRole(instance *searchv1alpha1.Search, re
 		log.Error(err, "Failed to delete ClusterRole", resourceName)
 		return err
 	}
-	log.V(2).Info("Deleted ClusterRole", cr)
+	log.V(2).Info("Deleted ClusterRole", "ClusterRole", cr)
 	return nil
 }
 
 func (r *SearchReconciler) deleteClusterRoleBinding(instance *searchv1alpha1.Search, resourceName string) error {
-	log.V(2).Info("Deleting ClusterRoleBinding ", resourceName)
+	log.V(2).Info("Deleting ClusterRoleBinding ", "resourceName", resourceName)
 	crb := &rbacv1.ClusterRoleBinding{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "ClusterRoleBinding",
@@ -70,6 +70,6 @@ func (r *SearchReconciler) deleteClusterRoleBinding(instance *searchv1alpha1.Sea
 		log.Error(err, "Failed to delete ClusterRoleBiding", resourceName)
 		return err
 	}
-	log.V(2).Info("Deleted ClusterRoleBinding", crb)
+	log.V(2).Info("Deleted ClusterRoleBinding", "ClusterRoleBinding", crb)
 	return nil
 }
