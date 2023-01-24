@@ -12,7 +12,7 @@ import (
 func (r *SearchReconciler) IndexerDeployment(instance *searchv1alpha1.Search) *appsv1.Deployment {
 	deploymentName := indexerDeploymentName
 	image_sha := getImageSha(deploymentName, instance)
-	log.V(2).Info("Using indexer image ", image_sha)
+	log.V(2).Info("Using indexer image ", "name", image_sha)
 
 	deployment := getDeployment(deploymentName, instance)
 	indexerContainer := corev1.Container{
