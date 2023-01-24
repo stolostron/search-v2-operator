@@ -94,9 +94,9 @@ func (r *SearchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	deleted, err := r.setFinalizer(ctx, instance)
 	if err != nil || deleted {
 		if deleted {
-			log.V(2).Info("Search Instance deleted, requeue request", err)
+			log.V(2).Info("Search Instance deleted, requeue request")
 		} else {
-			log.V(2).Info("Error setting Finalizer, requeue request ", err)
+			log.V(2).Info("Error setting Finalizer, requeue request ", "error", err.Error())
 		}
 		return ctrl.Result{}, err
 	}
@@ -345,7 +345,7 @@ func (r *SearchReconciler) setFinalizer(ctx context.Context, instance *searchv1a
 		controllerutil.AddFinalizer(instance, searchFinalizer)
 		err := r.Update(ctx, instance)
 		if err != nil {
-			log.V(2).Info("Error updating instance with Finalizer", err)
+			log.V(2).Info("Error updating instance with Finalizer", "error", err.Error())
 			return false, err
 		}
 	}

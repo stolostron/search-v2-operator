@@ -11,7 +11,7 @@ import (
 func (r *SearchReconciler) CollectorDeployment(instance *searchv1alpha1.Search) *appsv1.Deployment {
 	deploymentName := collectorDeploymentName
 	image_sha := getImageSha(deploymentName, instance)
-	log.V(2).Info("Using collector image ", image_sha)
+	log.V(2).Info("Using collector image ", "name", image_sha)
 
 	deployment := getDeployment(deploymentName, instance)
 	collectorContainer := corev1.Container{
@@ -80,7 +80,7 @@ func (r *SearchReconciler) CollectorDeployment(instance *searchv1alpha1.Search) 
 	}
 	err := controllerutil.SetControllerReference(instance, deployment, r.Scheme)
 	if err != nil {
-		log.V(2).Info("Could not set control for search-collector deployment", err)
+		log.V(2).Info("Could not set control for search-collector deployment")
 	}
 	return deployment
 }
