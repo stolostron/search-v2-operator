@@ -50,7 +50,7 @@ func (r *SearchReconciler) createRoleBinding(ctx context.Context,
 			return &reconcile.Result{}, err
 		}
 		log.Info("Created clusterrolebinding" + rolebinding.Name)
-		log.V(2).Info("Created %s clusterrolebinding ", "clusterrolebinding", rolebinding)
+		log.V(2).Info("Created clusterrolebinding ", "clusterrolebinding", rolebinding)
 	}
 	return nil, nil
 }
