@@ -29,7 +29,7 @@ func (r *SearchReconciler) createRoles(ctx context.Context,
 			return &reconcile.Result{}, err
 		}
 		log.Info("Created clusterrole" + crole.Name)
-		log.V(9).Info("Created  clusterrole %+v", crole)
+		log.V(9).Info("Created  clusterrole ", "clusterrole", crole)
 	}
 	return nil, nil
 }
@@ -50,7 +50,7 @@ func (r *SearchReconciler) createRoleBinding(ctx context.Context,
 			return &reconcile.Result{}, err
 		}
 		log.Info("Created clusterrolebinding" + rolebinding.Name)
-		log.V(2).Info("Created %s clusterrolebinding %+v", rolebinding)
+		log.V(2).Info("Created clusterrolebinding ", "clusterrolebinding", rolebinding)
 	}
 	return nil, nil
 }

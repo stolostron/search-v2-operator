@@ -29,7 +29,7 @@ func (r *SearchReconciler) createSearchServiceAccount(ctx context.Context,
 			return &reconcile.Result{}, err
 		}
 	}
-	log.V(2).Info("Created %s serviceaccount", sa.Name)
+	log.V(2).Info("Created serviceaccount", "ServiceAccount", sa.Name)
 	return nil, nil
 }
 
@@ -51,7 +51,7 @@ func (r *SearchReconciler) SearchServiceAccount(instance *searchv1alpha1.Search)
 
 	err := controllerutil.SetControllerReference(instance, sa, r.Scheme)
 	if err != nil {
-		log.V(2).Info("Could not set control for %s serviceaccount", getServiceAccountName())
+		log.V(2).Info("Could not set control for ", "serviceaccount", getServiceAccountName())
 	}
 	return sa
 }
