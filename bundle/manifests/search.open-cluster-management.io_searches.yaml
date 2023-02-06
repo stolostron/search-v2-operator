@@ -34,10 +34,6 @@ spec:
           spec:
             description: SearchSpec defines the desired state of Search
             properties:
-              availabilityConfig:
-                description: 'Specifies deployment replication for improved availability.
-                  Options are: Basic and High (default)'
-                type: string
               dbConfig:
                 description: Configmap name contains parameters to override default
                   db parameters
@@ -236,11 +232,6 @@ spec:
                         type: object
                     type: object
                 type: object
-              externalDBInstance:
-                description: Kubernetes secret name containing user provided db secret
-                  Secret should contain connection parameters [db_host, db_port, db_user,
-                  db_password, db_name, ca_cert] Not supported for development preview.
-                type: string
               imagePullPolicy:
                 description: ImagePullPolicy
                 type: string
