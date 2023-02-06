@@ -3,6 +3,7 @@ package controllers
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"strings"
 
@@ -246,10 +247,7 @@ func getRequests(deployment string, instance *searchv1alpha1.Search) corev1.Reso
 		memory = *deploymentConfig.Resources.Requests.Memory()
 	}
 
-	return corev1.ResourceList{
-		corev1.ResourceCPU:    cpu,
-		corev1.ResourceMemory: memory,
-	}
+	return limitRequestPopulatedCheck(cpu, memory, "request", deployment)
 }
 
 func getLimits(deployment string, instance *searchv1alpha1.Search) corev1.ResourceList {
@@ -269,20 +267,24 @@ func getLimits(deployment string, instance *searchv1alpha1.Search) corev1.Resour
 		memory = *deploymentConfig.Resources.Limits.Memory()
 	}
 
+	return limitRequestPopulatedCheck(cpu, memory, "limit", deployment)
+}
+
+func limitRequestPopulatedCheck(cpu, memory resource.Quantity, resource, deployment string) corev1.ResourceList {
 	if cpu.CmpInt64(0) == 0 && memory.CmpInt64(0) == 0 {
-		log.Info("Limit not set for memory and cpu on deployment", "deployment", deployment)
+		log.V(2).Info(fmt.Sprintf("%s not set for memory and cpu on deployment", resource), "deployment", deployment)
 		return corev1.ResourceList{}
 	}
 
 	if cpu.String() == "<nil>" || cpu.CmpInt64(0) == 0 {
-		log.Info("Limit not set for cpu on deployment", "deployment", deployment)
+		log.V(2).Info(fmt.Sprintf("%s not set for cpu on deployment", resource), "deployment", deployment)
 		return corev1.ResourceList{
 			corev1.ResourceMemory: memory,
 		}
 	}
 
 	if memory.CmpInt64(0) == 0 {
-		log.Info("Limit not set for memory on deployment", "deployment", deployment)
+		log.V(2).Info(fmt.Sprintf("%s not set for memory on deployment", resource), "deployment", deployment)
 		return corev1.ResourceList{
 			corev1.ResourceCPU: cpu,
 		}
