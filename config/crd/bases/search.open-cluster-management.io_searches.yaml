@@ -39,7 +39,7 @@ spec:
               availabilityConfig:
                 description: '[CURRENTLY UNAVAILABLE] Specifies deployment replication for improved availability.
                   Options are: Basic and High (default)'
-                type: string            
+                type: string
               dbConfig:
                 description: Configmap name contains parameters to override default
                   db parameters
