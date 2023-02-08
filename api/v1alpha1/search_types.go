@@ -41,7 +41,7 @@ type SearchSpec struct {
 	DBStorage StorageSpec `json:"dbStorage,omitempty"`
 
 	// +optional
-	//Configmap name contains parameters to override default db parameters
+	// Configmap name contains parameters to override default db parameters
 	DBConfig string `json:"dbConfig,omitempty"`
 
 	// +optional
@@ -49,11 +49,11 @@ type SearchSpec struct {
 	Deployments SearchDeployments `json:"deployments,omitempty"`
 
 	// +optional
-	// Specifies deployment replication for improved availability. Options are: Basic and High (default)
+	// [PLACEHOLDER, NOT IMPLEMENTED] Specifies deployment replication for improved availability. Options are: Basic and High (default)
 	AvailabilityConfig AvailabilityType `json:"availabilityConfig,omitempty"`
 
 	// +optional
-	// Kubernetes secret name containing user provided db secret
+	// [PLACEHOLDER, NOT IMPLEMENTED] Kubernetes secret name containing user provided db secret
 	// Secret should contain connection parameters [db_host, db_port, db_user, db_password, db_name, ca_cert]
 	// Not supported for development preview.
 	ExternalDBInstance string `json:"externalDBInstance,omitempty"`
