@@ -61,7 +61,8 @@ THEN
 END IF;
 IF (TG_OP = 'INSERT') OR (TG_OP = 'UPDATE')
 THEN
-    IF NEW.data->>'_hostingSubscription' is not null then
+	IF NEW.data->>'_hostingSubscription' is not null
+	THEN
 		INSERT INTO search.edges(sourceid ,sourcekind,destid ,destkind ,edgetype ,cluster)
 		SELECT NEW.uid AS sourceid, NEW.data ->> 'kind'::text AS sourcekind, res.uid AS destid,
 			res.data ->> 'kind'::text AS destkind,'interCluster'::text AS edgetype, NEW.cluster
