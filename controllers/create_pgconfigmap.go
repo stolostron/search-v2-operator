@@ -47,13 +47,13 @@ psql -d search -U searchuser -f /opt/app-root/src/postgresql-start/postgresql.sq
 	data[startScript] = data[startScript] + work_memquery
 	data["postgresql.sql"] = `
 CREATE OR REPLACE FUNCTION search.intercluster_edges()
-	RETURNS TRIGGER AS 
+	RETURNS TRIGGER AS
 $BODY$
-BEGIN 
+BEGIN
 IF (TG_OP = 'UPDATE')
-THEN 
+THEN
 	IF coalesce(NEW.data->>'_hostingSubscription','') <> coalesce(OLD.data->>'_hostingSubscription','')
-	THEN 
+	THEN
 		DELETE FROM search.edges where sourceid=OLD.uid OR destid=OLD.uid and edgetype='interCluster';
 	ELSE
 		RETURN NEW;
@@ -66,24 +66,24 @@ THEN
 		INSERT INTO search.edges(sourceid ,sourcekind,destid ,destkind ,edgetype ,cluster)
 		SELECT NEW.uid AS sourceid, NEW.data ->> 'kind'::text AS sourcekind, res.uid AS destid,
 			res.data ->> 'kind'::text AS destkind,'interCluster'::text AS edgetype, NEW.cluster
-		FROM search.resources res 
-		WHERE data->>'kind' = 'Subscription' and NEW.data->>'_hostingSubscription' is not null 
+		FROM search.resources res
+		WHERE data->>'kind' = 'Subscription' and NEW.data->>'_hostingSubscription' is not null
 		AND split_part(NEW.data ->> '_hostingSubscription'::text, '/'::text, 1) = res.data->>'namespace'
-		AND split_part(NEW.data ->> '_hostingSubscription'::text, '/'::text, 2) = res.data->>'name' 
-		AND res.uid <> NEW.uid and res.cluster <> NEW.cluster and res.data ->> '_hostingSubscription' IS NULL 
+		AND split_part(NEW.data ->> '_hostingSubscription'::text, '/'::text, 2) = res.data->>'name'
+		AND res.uid <> NEW.uid and res.cluster <> NEW.cluster and res.data ->> '_hostingSubscription' IS NULL
 		ON CONFLICT (sourceid, destid, edgetype) DO NOTHING;
 	ELSEIF NEW.data->>'_hostingSubscription' is null
 	THEN
 		INSERT INTO search.edges(sourceid ,sourcekind,destid ,destkind ,edgetype ,cluster)
-		SELECT res.uid AS sourceid, res.data ->> 'kind'::text AS sourcekind, NEW.uid AS destid, 
-			NEW.data ->> 'kind'::text AS destkind, 'interCluster'::text AS edgetype, res.cluster 
+		SELECT res.uid AS sourceid, res.data ->> 'kind'::text AS sourcekind, NEW.uid AS destid,
+			NEW.data ->> 'kind'::text AS destkind, 'interCluster'::text AS edgetype, res.cluster
 		FROM search.resources res
-		WHERE res.data->>'kind' = 'Subscription' 
-		AND split_part(res.data ->> '_hostingSubscription'::text, '/'::text, 1) = NEW.data->>'namespace' 
+		WHERE res.data->>'kind' = 'Subscription'
+		AND split_part(res.data ->> '_hostingSubscription'::text, '/'::text, 1) = NEW.data->>'namespace'
 		AND split_part(res.data ->> '_hostingSubscription'::text, '/'::text, 2) = NEW.data->>'name'
 		AND res.uid <> NEW.uid and res.cluster <> NEW.cluster
-		ON CONFLICT (sourceid, destid, edgetype) DO NOTHING; 
-	END IF; 
+		ON CONFLICT (sourceid, destid, edgetype) DO NOTHING;
+	END IF;
 	RETURN NEW;
 ELSEIF (TG_OP = 'DELETE')
 THEN
@@ -91,12 +91,13 @@ THEN
 	RETURN OLD;
 END IF;
 END;
-$BODY$ 
+$BODY$
 language plpgsql;
 DROP TRIGGER IF EXISTS resources_upsert on search.resources;
 CREATE TRIGGER resources_upsert AFTER INSERT OR UPDATE ON search.resources FOR EACH ROW WHEN (NEW.data->>'kind' = 'Subscription') EXECUTE PROCEDURE search.intercluster_edges();
 DROP TRIGGER IF EXISTS resources_delete on search.resources;
-CREATE TRIGGER resources_delete AFTER DELETE ON search.resources FOR EACH ROW WHEN (OLD.data->>'kind' = 'Subscription') EXECUTE PROCEDURE search.intercluster_edges();`
+CREATE TRIGGER resources_delete AFTER DELETE ON search.resources FOR EACH ROW WHEN (OLD.data->>'kind' = 'Subscription') EXECUTE PROCEDURE search.intercluster_edges();
+`
 	cm.Data = data
 	log.V(2).Info("configmap data populated")
 
