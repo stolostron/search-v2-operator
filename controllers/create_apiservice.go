@@ -16,6 +16,7 @@ func (r *SearchReconciler) APIService(instance *searchv1alpha1.Search) *corev1.S
 			Name:        "search-search-api",
 			Namespace:   instance.GetNamespace(),
 			Annotations: map[string]string{"service.beta.openshift.io/serving-cert-secret-name": "search-api-certs"},
+			Labels:      map[string]string{"search-monitor": "search-api"},
 		},
 	}
 	svc.Spec.Ports = append(svc.Spec.Ports, corev1.ServicePort{})

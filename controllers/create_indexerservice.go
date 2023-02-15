@@ -16,6 +16,7 @@ func (r *SearchReconciler) IndexerService(instance *searchv1alpha1.Search) *core
 			Name:        "search-indexer",
 			Namespace:   instance.GetNamespace(),
 			Annotations: map[string]string{"service.beta.openshift.io/serving-cert-secret-name": "search-indexer-certs"},
+			Labels:      map[string]string{"search-monitor": "search-indexer"},
 		},
 	}
 	svc.Spec.Ports = append(svc.Spec.Ports, corev1.ServicePort{})
