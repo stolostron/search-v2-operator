@@ -14,6 +14,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
+const SearchMetricsMonitor = "search-metrics-monitor"
+
 func (r *SearchReconciler) createMetricsRole(ctx context.Context,
 	crole *rbacv1.Role,
 ) (*reconcile.Result, error) {
@@ -63,14 +65,14 @@ func (r *SearchReconciler) MetricsRole(instance *searchv1alpha1.Search) *rbacv1.
 			APIVersion: rbacv1.SchemeGroupVersion.String(),
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "search-metrics-monitor",
+			Name:      SearchMetricsMonitor,
 			Namespace: instance.GetNamespace(),
 		},
 		Rules: getRules(),
 	}
 	err := controllerutil.SetControllerReference(instance, cr, r.Scheme)
 	if err != nil {
-		log.Info("Could not set control for Role ", "name", "search-metrics-monitor")
+		log.Info("Could not set control for Role ", "name", SearchMetricsMonitor)
 	}
 	return cr
 }
@@ -82,11 +84,11 @@ func (r *SearchReconciler) MetricsRoleBinding(instance *searchv1alpha1.Search) *
 			APIVersion: rbacv1.SchemeGroupVersion.String(),
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "search-metrics-monitor",
+			Name: SearchMetricsMonitor,
 		},
 		RoleRef: rbacv1.RoleRef{
 			Kind:     "Role",
-			Name:     "search-metrics-monitor",
+			Name:     SearchMetricsMonitor,
 			APIGroup: rbacv1.GroupName,
 		},
 		Subjects: []rbacv1.Subject{{
@@ -98,12 +100,13 @@ func (r *SearchReconciler) MetricsRoleBinding(instance *searchv1alpha1.Search) *
 	}
 	err := controllerutil.SetControllerReference(instance, crb, r.Scheme)
 	if err != nil {
-		log.Info("Could not set control for RoleBinding", "name", "search-metrics-monitor")
+		log.Info("Could not set control for RoleBinding", "name", SearchMetricsMonitor)
 	}
 	return crb
 }
 
-func (r *SearchReconciler) ServiceMonitor(instance *searchv1alpha1.Search, deployment string) *monitorv1.ServiceMonitor {
+func (r *SearchReconciler) ServiceMonitor(instance *searchv1alpha1.Search,
+	deployment string) *monitorv1.ServiceMonitor {
 	smName := deployment + "-monitor"
 	cr := &monitorv1.ServiceMonitor{
 		TypeMeta: metav1.TypeMeta{
@@ -153,7 +156,7 @@ func (r *SearchReconciler) createServiceMonitor(ctx context.Context,
 			return &reconcile.Result{}, err
 		}
 		log.Info("Created servicemonitor" + smonitor.Name)
-		log.V(9).Info("Created  servicemonitor ", "name", smonitor.Name)
+		log.V(9).Info("Created  servicemonitor ", "name", smonitor)
 	}
 	return nil, nil
 }
