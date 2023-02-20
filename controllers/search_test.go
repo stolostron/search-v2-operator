@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	monitorv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	searchv1alpha1 "github.com/stolostron/search-v2-operator/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -712,4 +713,98 @@ func TestSearch_controller_DBConfig(t *testing.T) {
 	verifyDeploymentEnv(t, dep, "WORK_MEM", "12MB")
 	verifyDeploymentEnv(t, dep, "POSTGRESQL_SHARED_BUFFERS", "11MB")
 	verifyDeploymentEnv(t, dep, "POSTGRESQL_EFFECTIVE_CACHE_SIZE", "13MB")
+}
+
+func TestSearch_controller_Metrics(t *testing.T) {
+	var (
+		name = "search-v2-operator"
+	)
+	search := &searchv1alpha1.Search{
+		TypeMeta:   metav1.TypeMeta{Kind: "Search"},
+		ObjectMeta: metav1.ObjectMeta{Name: name},
+		Spec: searchv1alpha1.SearchSpec{
+			DBStorage: searchv1alpha1.StorageSpec{
+				StorageClassName: "test",
+			},
+		},
+	}
+
+	runningCondition := corev1.PodCondition{Type: corev1.PodReady, Status: corev1.ConditionTrue, LastTransitionTime: metav1.Now()}
+	collectorPod := buildPod("search-collector-abc", runningCondition)
+	apiPod := buildPod("search-api-abc", runningCondition)
+	indexerPod := buildPod("search-indexer-abc", runningCondition)
+	postGresPod := buildPod("search-postgres-abc", runningCondition)
+
+	s := scheme.Scheme
+	err := searchv1alpha1.SchemeBuilder.AddToScheme(s)
+	if err != nil {
+		t.Errorf("error adding search scheme: (%v)", err)
+	}
+
+	err = addonv1alpha1.AddToScheme(s)
+	if err != nil {
+		t.Errorf("error adding addon scheme: (%v)", err)
+	}
+	err = monitorv1.AddToScheme(s)
+	if err != nil {
+		t.Errorf("error adding monitor scheme: (%v)", err)
+	}
+	err = rbacv1.AddToScheme(s)
+	if err != nil {
+		t.Errorf("error adding rbac scheme: (%v)", err)
+	}
+	objs := []runtime.Object{search, collectorPod, apiPod, indexerPod, postGresPod}
+	// Create a fake client to mock API calls.
+	cl := fake.NewClientBuilder().WithRuntimeObjects(objs...).Build()
+
+	r := &SearchReconciler{Client: cl, Scheme: s}
+
+	// Mock request to simulate Reconcile() being called on an event for a watched resource.
+	req := ctrl.Request{
+		NamespacedName: types.NamespacedName{
+			Name: "Role/search-metrics-monitor",
+		},
+	}
+
+	// trigger reconcile
+	_, err = r.Reconcile(context.TODO(), req)
+	if err != nil {
+		t.Errorf("reconcile: (%v)", err)
+	}
+
+	//wait for update status
+	time.Sleep(1 * time.Second)
+	sm := &monitorv1.ServiceMonitor{TypeMeta: metav1.TypeMeta{Kind: "ServiceMonitor"}}
+	roleb := &rbacv1.RoleBinding{TypeMeta: metav1.TypeMeta{Kind: "RoleBinding"}}
+	role := &rbacv1.Role{TypeMeta: metav1.TypeMeta{Kind: "Role"}}
+	// fetch search-service-monitor
+	smErr := cl.Get(context.TODO(), types.NamespacedName{
+		Name:      "search-api-monitor",
+		Namespace: "openshift-monitoring",
+	}, sm)
+	if smErr != nil {
+		t.Errorf("Failed to get ServiceMonitor SearchApiMonitor: (%v)", smErr)
+	}
+	// fetch search-service-monitor
+	smErr = cl.Get(context.TODO(), types.NamespacedName{
+		Name:      "search-indexer-monitor",
+		Namespace: "openshift-monitoring",
+	}, sm)
+	if smErr != nil {
+		t.Errorf("Failed to get ServiceMonitor SearchIndexerMonitor: (%v)", smErr)
+	}
+	// fetch metrics rolebinding
+	rbErr := cl.Get(context.TODO(), types.NamespacedName{
+		Name: SearchMetricsMonitor,
+	}, roleb)
+	if rbErr != nil {
+		t.Errorf("Failed to get RoleBinding SearchMonitor: (%v)", rbErr)
+	}
+	// fetch metrics role
+	roleErr := cl.Get(context.TODO(), types.NamespacedName{
+		Name: SearchMetricsMonitor,
+	}, role)
+	if roleErr != nil {
+		t.Errorf("Failed to get Role SearchMonitor: (%v)", roleErr)
+	}
 }
