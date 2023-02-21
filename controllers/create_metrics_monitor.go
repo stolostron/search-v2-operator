@@ -154,6 +154,8 @@ func (r *SearchReconciler) createServiceMonitor(ctx context.Context,
 		}
 		log.Info("Created servicemonitor" + smonitor.Name)
 		log.V(9).Info("Created  servicemonitor ", "name", smonitor)
+	} else {
+		log.Info("Error fetching servicemonitor"+smonitor.Name, "err", err)
 	}
 	return nil, nil
 }
