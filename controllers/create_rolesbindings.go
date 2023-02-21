@@ -171,7 +171,7 @@ func getMetricsRules() []rbacv1.PolicyRule {
 	return []rbacv1.PolicyRule{
 		{
 			APIGroups: []string{""},
-			Resources: []string{"pods", "services"},
+			Resources: []string{"pods", "services", "endpoints"},
 			Verbs:     []string{"get", "list", "watch"},
 		},
 	}
