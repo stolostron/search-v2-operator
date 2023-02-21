@@ -134,6 +134,10 @@ func (r *SearchReconciler) ServiceMonitor(instance *searchv1alpha1.Search,
 				MatchLabels: map[string]string{"search-monitor": deployment}},
 		},
 	}
+	err := controllerutil.SetControllerReference(instance, cr, r.Scheme)
+	if err != nil {
+		log.Info("Could not set control for ServiceMonitor ", "name", smName, "err", err)
+	}
 	return cr
 }
 
