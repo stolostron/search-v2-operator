@@ -49,10 +49,10 @@ func (r *SearchReconciler) createMetricsRoleBinding(ctx context.Context,
 	if err != nil && errors.IsNotFound(err) {
 		err = r.Create(ctx, rolebinding)
 		if err != nil {
-			log.Error(err, "Could not create rolebinding"+rolebinding.Name)
+			log.Error(err, "Could not create rolebinding "+rolebinding.Name)
 			return &reconcile.Result{}, err
 		}
-		log.Info("Created rolebinding" + rolebinding.Name)
+		log.Info("Created rolebinding " + rolebinding.Name)
 		log.V(2).Info("Created rolebinding ", "name", rolebinding)
 	}
 	return nil, nil
@@ -84,7 +84,8 @@ func (r *SearchReconciler) MetricsRoleBinding(instance *searchv1alpha1.Search) *
 			APIVersion: rbacv1.SchemeGroupVersion.String(),
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name: SearchMetricsMonitor,
+			Name:      SearchMetricsMonitor,
+			Namespace: instance.GetNamespace(),
 		},
 		RoleRef: rbacv1.RoleRef{
 			Kind:     "Role",
