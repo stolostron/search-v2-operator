@@ -49,10 +49,10 @@ func (r *SearchReconciler) createMetricsRoleBinding(ctx context.Context,
 	if err != nil && errors.IsNotFound(err) {
 		err = r.Create(ctx, rolebinding)
 		if err != nil {
-			log.Error(err, "Could not create rolebinding"+rolebinding.Name)
+			log.Error(err, "Could not create rolebinding "+rolebinding.Name)
 			return &reconcile.Result{}, err
 		}
-		log.Info("Created rolebinding" + rolebinding.Name)
+		log.Info("Created rolebinding " + rolebinding.Name)
 		log.V(2).Info("Created rolebinding ", "name", rolebinding)
 	}
 	return nil, nil
@@ -68,7 +68,7 @@ func (r *SearchReconciler) MetricsRole(instance *searchv1alpha1.Search) *rbacv1.
 			Name:      SearchMetricsMonitor,
 			Namespace: instance.GetNamespace(),
 		},
-		Rules: getRules(),
+		Rules: getMetricsRules(),
 	}
 	err := controllerutil.SetControllerReference(instance, cr, r.Scheme)
 	if err != nil {
@@ -84,7 +84,8 @@ func (r *SearchReconciler) MetricsRoleBinding(instance *searchv1alpha1.Search) *
 			APIVersion: rbacv1.SchemeGroupVersion.String(),
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name: SearchMetricsMonitor,
+			Name:      SearchMetricsMonitor,
+			Namespace: instance.GetNamespace(),
 		},
 		RoleRef: rbacv1.RoleRef{
 			Kind:     "Role",
@@ -132,10 +133,6 @@ func (r *SearchReconciler) ServiceMonitor(instance *searchv1alpha1.Search,
 			Selector: metav1.LabelSelector{
 				MatchLabels: map[string]string{"search-monitor": deployment}},
 		},
-	}
-	err := controllerutil.SetControllerReference(instance, cr, r.Scheme)
-	if err != nil {
-		log.Info("Could not set control for ServiceMonitor ", "name", smName)
 	}
 	return cr
 }
