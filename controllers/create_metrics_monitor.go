@@ -68,7 +68,7 @@ func (r *SearchReconciler) MetricsRole(instance *searchv1alpha1.Search) *rbacv1.
 			Name:      SearchMetricsMonitor,
 			Namespace: instance.GetNamespace(),
 		},
-		Rules: getRules(),
+		Rules: getMetricsRules(),
 	}
 	err := controllerutil.SetControllerReference(instance, cr, r.Scheme)
 	if err != nil {
