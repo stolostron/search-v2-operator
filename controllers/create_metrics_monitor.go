@@ -128,6 +128,8 @@ func (r *SearchReconciler) ServiceMonitor(instance *searchv1alpha1.Search,
 					ScrapeTimeout:   "10s",
 					Interval:        "60s",
 					BearerTokenFile: "/var/run/secrets/kubernetes.io/serviceaccount/token",
+					TLSConfig: &monitorv1.TLSConfig{
+						SafeTLSConfig: monitorv1.SafeTLSConfig{InsecureSkipVerify: true}},
 				},
 			},
 			Selector: metav1.LabelSelector{
@@ -146,14 +148,17 @@ func (r *SearchReconciler) createServiceMonitor(ctx context.Context,
 		Name:      smonitor.Name,
 		Namespace: smonitor.Namespace,
 	}, found)
+	log.Info("Error fetching servicemonitor "+smonitor.Namespace+"/"+smonitor.Name, "err", err)
 	if err != nil && errors.IsNotFound(err) {
-		err = r.Create(ctx, smonitor)
-		if err != nil {
+		err := r.Create(ctx, smonitor)
+		if err != nil && !errors.IsAlreadyExists(err) {
 			log.Error(err, "Could not create servicemonitor "+smonitor.Name)
 			return &reconcile.Result{}, err
 		}
-		log.Info("Created servicemonitor" + smonitor.Name)
+		log.Info("Created servicemonitor " + smonitor.Name)
 		log.V(9).Info("Created  servicemonitor ", "name", smonitor)
+	} else {
+		log.Info("Error fetching servicemonitor"+smonitor.Name, "err", err)
 	}
 	return nil, nil
 }
