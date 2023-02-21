@@ -128,6 +128,8 @@ func (r *SearchReconciler) ServiceMonitor(instance *searchv1alpha1.Search,
 					ScrapeTimeout:   "10s",
 					Interval:        "60s",
 					BearerTokenFile: "/var/run/secrets/kubernetes.io/serviceaccount/token",
+					TLSConfig: &monitorv1.TLSConfig{
+						SafeTLSConfig: monitorv1.SafeTLSConfig{InsecureSkipVerify: true}},
 				},
 			},
 			Selector: metav1.LabelSelector{
