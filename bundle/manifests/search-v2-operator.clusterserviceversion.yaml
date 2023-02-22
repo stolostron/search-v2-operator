@@ -37,7 +37,7 @@ spec:
     spec:
       clusterPermissions:
         - rules:
-              - apiGroups:
+            - apiGroups:
                 - monitoring.coreos.com
               resources:
                 - servicemonitors
