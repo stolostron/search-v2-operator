@@ -4,9 +4,9 @@ go 1.20
 
 require (
 	github.com/cloudflare/cfssl v1.6.4
-	k8s.io/api v0.27.0
-	k8s.io/apimachinery v0.27.0
-	k8s.io/client-go v0.27.0
+	k8s.io/api v0.26.2
+	k8s.io/apimachinery v0.26.2
+	k8s.io/client-go v0.26.2
 	k8s.io/klog/v2 v2.90.1
 	open-cluster-management.io/addon-framework v0.6.1
 	open-cluster-management.io/api v0.10.1
@@ -83,9 +83,9 @@ require (
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	helm.sh/helm/v3 v3.11.3 // indirect
-	k8s.io/apiextensions-apiserver v0.27.0 // indirect
-	k8s.io/apiserver v0.27.0 // indirect
-	k8s.io/component-base v0.27.0 // indirect
+	k8s.io/apiextensions-apiserver v0.26.1 // indirect
+	k8s.io/apiserver v0.26.2 // indirect
+	k8s.io/component-base v0.26.2 // indirect
 	k8s.io/kube-openapi v0.0.0-20230327201221-f5883ff37f0c // indirect
 	k8s.io/utils v0.0.0-20230406110748-d93618cff8a2 // indirect
 	sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd // indirect
