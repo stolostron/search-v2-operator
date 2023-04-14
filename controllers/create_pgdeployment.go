@@ -77,6 +77,10 @@ func (r *SearchReconciler) PGDeployment(instance *searchv1alpha1.Search) *appsv1
 	if args != nil {
 		postgresContainer.Args = args
 	}
+	env := getContainerEnvVar(deploymentName, instance)
+	if env != nil {
+		postgresContainer.Env = append(postgresContainer.Env, env...)
+	}
 	postgresContainer.Resources = getResourceRequirements(deploymentName, instance)
 	volumes := []corev1.Volume{
 		{
