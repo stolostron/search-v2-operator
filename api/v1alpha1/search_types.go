@@ -110,6 +110,10 @@ type DeploymentConfig struct {
 	// +optional
 	// Container Arguments
 	Arguments []string `json:"arguments,omitempty"`
+
+	// +optional
+	// Container Env variables
+	Env []corev1.EnvVar `json:"envVar,omitempty"`
 }
 
 type StorageSpec struct {
