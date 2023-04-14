@@ -23,3 +23,8 @@ testbin/*
 *.swp
 *.swo
 *~
+bundle/.DS_Store
+config/.DS_Store
+config/crd/.DS_Store
+config/manifests/.DS_Store
+.DS_Store
