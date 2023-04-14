@@ -42,7 +42,7 @@ const (
 )
 
 var (
-	certDefaultMode       = int32(384)
+	certDefaultMode       = int32(416)
 	AnnotationSearchPause = "search-pause"
 )
 var dbDefaultMap = map[string]string{"POSTGRESQL_SHARED_BUFFERS": POSTGRESQL_SHARED_BUFFERS, "WORK_MEM": WORK_MEM,
