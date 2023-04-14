@@ -11,7 +11,7 @@
 
 set -euo pipefail
 
-exec_to_check="operator-sdk oc yq"
+exec_to_check="operator-sdk yq"
 
 # default values
 INSTALL_NAMESPACE="open-cluster-management"
@@ -28,9 +28,9 @@ uninstaller() {
     echo "* Deleting operator"
     eval "$UNINSTALL_COMMAND"
     echo "* Deleting quay.io secret"
-    oc delete secret $EXPECTED_SECRET_NAME -n "$INSTALL_NAMESPACE" || true
+    $CLI_EXEC delete secret $EXPECTED_SECRET_NAME -n "$INSTALL_NAMESPACE" || true
     echo "* Reenable search v1"
-    oc patch mch "${mch_name}" -n "$INSTALL_NAMESPACE" --type=merge -p '{"spec":{"overrides":{"components":[{"name":"search","enabled": true}]}}}'
+    # oc patch mch "${mch_name}" -n "$INSTALL_NAMESPACE" --type=merge -p '{"spec":{"overrides":{"components":[{"name":"search","enabled": true}]}}}'
     echo "All done!"
 }
 
@@ -51,6 +51,21 @@ done
 shift $((OPTIND-1))
 
 echo "* Checking local prerequisites"
+# Check if the oc command exists
+if command -v oc >/dev/null 2>&1; then
+  CLI_EXEC="oc"
+else
+  # If oc doesn't exist, check if kubectl exists
+  if command -v kubectl >/dev/null 2>&1; then
+    CLI_EXEC="kubectl"
+  else
+    printf "Neither oc nor kubectl commands are found. Please install one of them."
+    exit 1
+  fi
+fi
+
+echo "* Using $CLI_EXEC for cluster interaction"
+
 for exec in $exec_to_check; do
     if ! command -v "$exec" &> /dev/null
     then
@@ -60,26 +75,35 @@ for exec in $exec_to_check; do
 done
 
 echo "* Testing the connection"
-oc -n openshift-console get routes console -o jsonpath='{.status.ingress[0].routerCanonicalHostname}' >/dev/null
-if [ $? -ne 0 ]; then
-    echo "**ERROR**: Make sure you are logged into an OpenShift Container Platform before running this script"
+if ! $CLI_EXEC cluster-info >/dev/null 2>&1; then
+    echo "**ERROR**: Make sure you are logged into an OpenShift Container Platform or a Kubernetes cluster before running this script"
     exit 2
 fi
 
-echo "* Checking cluster setup"
-mch_name="multiclusterhub" # TODO: search for name
-oc get mch -n "$INSTALL_NAMESPACE" $mch_name
-if [ $? -ne 0 ]; then
-  echo "**ERROR**: multiclusterhub not installed, please install it before!"
-  exit 3
+if $CLI_EXEC whoami >/dev/null 2>&1; then
+    cluster_type="OpenShift"
+else
+    cluster_type="Kubernetes"
 fi
 
-# check RHACM version
-major_version=$(oc get MulticlusterHub $mch_name -n "$INSTALL_NAMESPACE" -o jsonpath="{.status.currentVersion}" | cut -d'.' -f 1-2)
-if [ "$major_version" != "2.6" ]; then
-    echo "**ERROR**: This script applies currently only to ACM 2.6!"
+echo "Connected to a $cluster_type cluster."
+
+if [ "$cluster_type" == "OpenShift" ]; then
+    # echo "* Checking cluster setup"
+    mch_name="multiclusterhub" # TODO: search for name
+    $CLI_EXEC get mch -n "$INSTALL_NAMESPACE" $mch_name
+    if [ $? -ne 0 ]; then
+    echo "**ERROR**: multiclusterhub not installed, please install it before!"
     exit 3
+    fi
+    # check RHACM version
+    major_version=$($CLI_EXEC get MulticlusterHub $mch_name -n "$INSTALL_NAMESPACE" -o jsonpath="{.status.currentVersion}" | cut -d'.' -f 1-2)
+    if [ "$major_version" != "2.6" ]; then
+        echo "**ERROR**: This script applies currently only to ACM 2.6!"
+        exit 3
+    fi
 fi
+
 
 # launch uninstall if requested
 if [ $uninstall -eq 1 ]; then
@@ -113,7 +137,7 @@ fi
 
 # check the operator is not already installed
 EXIT_CODE=0
-oc get catalogsources.operators.coreos.com -n "$INSTALL_NAMESPACE" search-v2-operator-catalog > /dev/null 2>&1  || EXIT_CODE=$?
+$CLI_EXEC get catalogsources.operators.coreos.com -n "$INSTALL_NAMESPACE" search-v2-operator-catalog > /dev/null 2>&1  || EXIT_CODE=$?
 if [ $EXIT_CODE -eq 0 ]; then
     # we could try to upgrade if we have a different version, keep it simple for now
     echo "**ERROR**: operator already installed, please uninstall it before with \"$0 -u\"!"
@@ -121,12 +145,20 @@ if [ $EXIT_CODE -eq 0 ]; then
 fi
 echo "All good, proceeding with install"
 
-# disable search v1
-echo "* Disable search v1"
-oc patch mch ${mch_name} -n "$INSTALL_NAMESPACE" --type=merge -p '{"spec":{"overrides":{"components":[{"name":"search","enabled": false}]}}}'
+if [ "$cluster_type" == "OpenShift" ]; then
+    # disable search v1
+    echo "* Disable search v1"
+    $CLI_EXEC patch mch ${mch_name} -n "$INSTALL_NAMESPACE" --type=merge -p '{"spec":{"overrides":{"components":[{"name":"search","enabled": false}]}}}'
+fi
 
 echo "* Apply quay.io secret"
-oc apply -f quay_secret.yaml -n "$INSTALL_NAMESPACE"
+$CLI_EXEC apply -f quay_secret.yaml -n "$INSTALL_NAMESPACE"
+
+# Kubernetes missing generating certs: https://docs.openshift.com/container-platform/4.9/security/certificates/service-serving-certificate.html
+if [ "$cluster_type" == "Kubernetes" ]; then
+    echo "* Apply certs"
+    $CLI_EXEC apply -f certs.yaml -n "$INSTALL_NAMESPACE"
+fi
 
 # deploy operator
 echo "* Deploy search v2"
@@ -136,10 +168,10 @@ read -r SNAPSHOT_CHOICE
 if [ "${SNAPSHOT_CHOICE}" == "" ]; then
     SNAPSHOT_CHOICE=${DEFAULT_SNAPSHOT}
 fi
-operator-sdk run bundle quay.io/stolostron/search-operator-bundle:${SNAPSHOT_CHOICE} --pull-secret-name $EXPECTED_SECRET_NAME -n "$INSTALL_NAMESPACE"
+operator-sdk run bundle quay.io/stolostron/search-operator-bundle:${SNAPSHOT_CHOICE} --pull-secret-name $EXPECTED_SECRET_NAME -n "$INSTALL_NAMESPACE" --timeout 5m0s
 
 # apply CR
-oc apply -f "$CR_PATH" -n "$INSTALL_NAMESPACE"
+$CLI_EXEC apply -f "$CR_PATH" -n "$INSTALL_NAMESPACE"
 
 echo "* Done! Search v2 pods can be found in $INSTALL_NAMESPACE"
 echo "* To uninstall, please run \"$0 -u\"."
