@@ -13,13 +13,13 @@ func (r *SearchReconciler) PGDeployment(instance *searchv1alpha1.Search) *appsv1
 	image_sha := getImageSha(deploymentName, instance)
 	log.V(2).Info("Using postgres image ", "name", image_sha)
 	deployment := getDeployment(deploymentName, instance)
-	postgresql_shared_buffers := getDefaultDBConfig("POSTGRESQL_SHARED_BUFFERS")
-	postgresql_effective_cache_size := getDefaultDBConfig("POSTGRESQL_EFFECTIVE_CACHE_SIZE")
-	postgresql_work_mem := getDefaultDBConfig("WORK_MEM")
+	postgresqlSharedBuffers := getDefaultDBConfig("POSTGRESQL_SHARED_BUFFERS")
+	postgresqlEffectiveCacheSize := getDefaultDBConfig("POSTGRESQL_EFFECTIVE_CACHE_SIZE")
+	postgresqlWorkMem := getDefaultDBConfig("WORK_MEM")
 	postGresDefaultEnvVars := []corev1.EnvVar{
-		newEnvVar("POSTGRESQL_SHARED_BUFFERS", postgresql_shared_buffers),
-		newEnvVar("POSTGRESQL_EFFECTIVE_CACHE_SIZE", postgresql_effective_cache_size),
-		newEnvVar("WORK_MEM", postgresql_work_mem),
+		newEnvVar("POSTGRESQL_SHARED_BUFFERS", postgresqlSharedBuffers),
+		newEnvVar("POSTGRESQL_EFFECTIVE_CACHE_SIZE", postgresqlEffectiveCacheSize),
+		newEnvVar("WORK_MEM", postgresqlWorkMem),
 	}
 	postgresContainer := corev1.Container{
 		Name:  deploymentName,
@@ -88,6 +88,9 @@ func (r *SearchReconciler) PGDeployment(instance *searchv1alpha1.Search) *appsv1
 	}
 	for _, envVar := range postGresDefaultEnvVars {
 		// if default env vars are not added by the user, add them
+		// These env vars are recognized by the image - refer to
+		// doc: https://github.com/sclorg/postgresql-container/tree/master/13#environment-variables-and-volumes
+		// WORK_MEM - we change the startup script to alter it.
 		if _, ok := postgresCurrEnvMap[envVar]; !ok {
 			env = append(env, envVar)
 		}

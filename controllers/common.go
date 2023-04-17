@@ -416,8 +416,9 @@ func (r *SearchReconciler) getDBConfigData(ctx context.Context, instance *search
 	return found.Data
 }
 
-func (r *SearchReconciler) GetDBConfigFromSearchCR(ctx context.Context, instance *searchv1alpha1.Search, configName string) string {
-	postgresDeployConfig := getDeploymentConfig("search-postgres", instance)
+func (r *SearchReconciler) GetDBConfigFromSearchCR(ctx context.Context,
+	instance *searchv1alpha1.Search, configName string) string {
+	postgresDeployConfig := getDeploymentConfig(postgresDeploymentName, instance)
 	for _, env := range postgresDeployConfig.Env {
 		if env.Name == configName {
 			return env.Value
