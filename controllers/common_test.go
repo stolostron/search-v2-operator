@@ -4,6 +4,7 @@ package controllers
 import (
 	"context"
 	"os"
+	"reflect"
 	"testing"
 
 	searchv1alpha1 "github.com/stolostron/search-v2-operator/api/v1alpha1"
@@ -123,6 +124,10 @@ func TestAPICustomization(t *testing.T) {
 							"memory": resource.MustParse("10Mi"),
 						},
 					},
+					Env: []corev1.EnvVar{
+						{Name: "env1", Value: "value1"},
+						{Name: "env2", Value: "value2"},
+					},
 				},
 			},
 		},
@@ -171,6 +176,10 @@ func TestAPICustomization(t *testing.T) {
 		t.Error("ImageOverride with incorrect image")
 	}
 
+	envVars := getContainerEnvVar("search-api", instance)
+	if len(envVars) != 2 || envVars[0].Name != "env1" || envVars[0].Value != "value1" {
+		t.Error("Env vars not set for search-api")
+	}
 }
 
 func TestIndexerCustomization(t *testing.T) {
@@ -200,6 +209,10 @@ func TestIndexerCustomization(t *testing.T) {
 							"cpu":    resource.MustParse("25m"),
 							"memory": resource.MustParse("10Mi"),
 						},
+					},
+					Env: []corev1.EnvVar{
+						{Name: "env1", Value: "value1"},
+						{Name: "env2", Value: "value2"},
 					},
 				},
 			},
@@ -252,7 +265,10 @@ func TestIndexerCustomization(t *testing.T) {
 	if actual_args == nil || len(actual_args) != 2 || actual_args[0] != "arg1" || actual_args[1] != "arg2" {
 		t.Error("Incorrect Args parsed")
 	}
-
+	envVars := getContainerEnvVar(testFor, instance)
+	if len(envVars) != 2 || envVars[0].Name != "env1" || envVars[0].Value != "value1" {
+		t.Errorf("Env vars not set for %s", testFor)
+	}
 }
 func TestCollectorCustomization(t *testing.T) {
 	testFor := "search-collector"
@@ -280,6 +296,10 @@ func TestCollectorCustomization(t *testing.T) {
 							"cpu":    resource.MustParse("25m"),
 							"memory": resource.MustParse("10Mi"),
 						},
+					},
+					Env: []corev1.EnvVar{
+						{Name: "env1", Value: "value1"},
+						{Name: "env2", Value: "value2"},
 					},
 				},
 			},
@@ -332,7 +352,10 @@ func TestCollectorCustomization(t *testing.T) {
 	if actual_args != nil {
 		t.Error("Incorrect Args parsed")
 	}
-
+	envVars := getContainerEnvVar(testFor, instance)
+	if len(envVars) != 2 || envVars[0].Name != "env1" || envVars[0].Value != "value1" {
+		t.Errorf("Env vars not set for %s", testFor)
+	}
 }
 
 func TestPostgresCustomization(t *testing.T) {
@@ -362,6 +385,10 @@ func TestPostgresCustomization(t *testing.T) {
 							"cpu":    resource.MustParse("25m"),
 							"memory": resource.MustParse("10Mi"),
 						},
+					},
+					Env: []corev1.EnvVar{
+						{Name: "env1", Value: "value1"},
+						{Name: "env2", Value: "value2"},
 					},
 				},
 			},
@@ -419,6 +446,10 @@ func TestPostgresCustomization(t *testing.T) {
 	if actual_volume.VolumeSource.EmptyDir == nil {
 		t.Error("Incorrect Volume created")
 	}
+	envVars := getContainerEnvVar(testFor, instance)
+	if len(envVars) != 2 || envVars[0].Name != "env1" || envVars[0].Value != "value1" {
+		t.Errorf("Env vars not set for %s", testFor)
+	}
 }
 
 func TestPostgresCustomizationPVC(t *testing.T) {
@@ -461,42 +492,8 @@ func TestPostgresCustomizationPVC(t *testing.T) {
 	}
 }
 
-func TestDefaultDBConfig(t *testing.T) {
-	var expectedMap = map[string]string{"POSTGRESQL_SHARED_BUFFERS": "64MB", "WORK_MEM": "16MB",
-		"POSTGRESQL_EFFECTIVE_CACHE_SIZE": "128MB",
-	}
-
-	var (
-		name = "search-v2-operator"
-	)
-	search := &searchv1alpha1.Search{
-		TypeMeta:   metav1.TypeMeta{Kind: "Search"},
-		ObjectMeta: metav1.ObjectMeta{Name: name},
-		Spec:       searchv1alpha1.SearchSpec{},
-	}
-	s := scheme.Scheme
-	err := searchv1alpha1.SchemeBuilder.AddToScheme(s)
-	if err != nil {
-		t.Errorf("error adding search scheme: (%v)", err)
-	}
-
-	objs := []runtime.Object{search}
-	// Create a fake client to mock API calls.
-	cl := fake.NewClientBuilder().WithRuntimeObjects(objs...).Build()
-
-	r := &SearchReconciler{Client: cl, Scheme: s}
-
-	for key, val := range expectedMap {
-		if val != r.GetDBConfig(context.TODO(), search, key) {
-			t.Errorf("Unexpected Default Config for %s", key)
-		}
-	}
-}
-
 func TestCustomDBConfig(t *testing.T) {
-	var expectedMap = map[string]string{"POSTGRESQL_SHARED_BUFFERS": "11MB", "WORK_MEM": "12MB",
-		"POSTGRESQL_EFFECTIVE_CACHE_SIZE": "13MB",
-	}
+	var expectedMap = map[string]string{"postgresConfigMapPath": "SomePath"}
 
 	var (
 		name = "search-v2-operator"
@@ -525,10 +522,12 @@ func TestCustomDBConfig(t *testing.T) {
 
 	r := &SearchReconciler{Client: cl, Scheme: s}
 
-	for key, val := range expectedMap {
-		if val != r.GetDBConfig(context.TODO(), search, key) {
-			t.Errorf("Unexpected Default Config for %s", key)
-		}
+	actualMap := r.getDBConfigData(context.TODO(), search)
+	if len(actualMap) != len(expectedMap) {
+		t.Errorf("Unexpected data in configmap. Expected: %d, Got:%d", len(expectedMap), len(actualMap))
+	}
+	if !reflect.DeepEqual(expectedMap, actualMap) {
+		t.Errorf("Unexpected data content in configmap")
 	}
 }
 

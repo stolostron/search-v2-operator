@@ -2,8 +2,6 @@
 package controllers
 
 import (
-	"context"
-
 	searchv1alpha1 "github.com/stolostron/search-v2-operator/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -15,9 +13,14 @@ func (r *SearchReconciler) PGDeployment(instance *searchv1alpha1.Search) *appsv1
 	image_sha := getImageSha(deploymentName, instance)
 	log.V(2).Info("Using postgres image ", "name", image_sha)
 	deployment := getDeployment(deploymentName, instance)
-	postgresql_shared_buffers := r.GetDBConfig(context.TODO(), instance, "POSTGRESQL_SHARED_BUFFERS")
-	postgresql_effective_cache_size := r.GetDBConfig(context.TODO(), instance, "POSTGRESQL_EFFECTIVE_CACHE_SIZE")
-	postgresql_work_mem := r.GetDBConfig(context.TODO(), instance, "WORK_MEM")
+	postgresql_shared_buffers := getDefaultDBConfig("POSTGRESQL_SHARED_BUFFERS")
+	postgresql_effective_cache_size := getDefaultDBConfig("POSTGRESQL_EFFECTIVE_CACHE_SIZE")
+	postgresql_work_mem := getDefaultDBConfig("WORK_MEM")
+	postGresDefaultEnvVars := []corev1.EnvVar{
+		newEnvVar("POSTGRESQL_SHARED_BUFFERS", postgresql_shared_buffers),
+		newEnvVar("POSTGRESQL_EFFECTIVE_CACHE_SIZE", postgresql_effective_cache_size),
+		newEnvVar("WORK_MEM", postgresql_work_mem),
+	}
 	postgresContainer := corev1.Container{
 		Name:  deploymentName,
 		Image: image_sha,
@@ -29,9 +32,6 @@ func (r *SearchReconciler) PGDeployment(instance *searchv1alpha1.Search) *appsv1
 			},
 		},
 		Env: []corev1.EnvVar{
-			newEnvVar("POSTGRESQL_SHARED_BUFFERS", postgresql_shared_buffers),
-			newEnvVar("POSTGRESQL_EFFECTIVE_CACHE_SIZE", postgresql_effective_cache_size),
-			newEnvVar("WORK_MEM", postgresql_work_mem),
 			newSecretEnvVar("POSTGRESQL_USER", "database-user", "search-postgres"),
 			newSecretEnvVar("POSTGRESQL_PASSWORD", "database-password", "search-postgres"),
 			newSecretEnvVar("POSTGRESQL_DATABASE", "database-name", "search-postgres"),
@@ -78,9 +78,21 @@ func (r *SearchReconciler) PGDeployment(instance *searchv1alpha1.Search) *appsv1
 		postgresContainer.Args = args
 	}
 	env := getContainerEnvVar(deploymentName, instance)
+	postgresCurrEnvMap := map[corev1.EnvVar]struct{}{}
+
 	if env != nil {
-		postgresContainer.Env = append(postgresContainer.Env, env...)
+		// Store the env vars in a map for easy lookup
+		for _, envVar := range postgresContainer.Env {
+			postgresCurrEnvMap[envVar] = struct{}{}
+		}
 	}
+	for _, envVar := range postGresDefaultEnvVars {
+		// if default env vars are not added by the user, add them
+		if _, ok := postgresCurrEnvMap[envVar]; !ok {
+			env = append(env, envVar)
+		}
+	}
+	postgresContainer.Env = append(postgresContainer.Env, env...)
 	postgresContainer.Resources = getResourceRequirements(deploymentName, instance)
 	volumes := []corev1.Volume{
 		{

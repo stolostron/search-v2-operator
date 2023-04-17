@@ -648,9 +648,7 @@ func verifyDeploymentEnv(t *testing.T, dep *appsv1.Deployment, expectedKey strin
 	t.Errorf("Failed to find EnvVar: %s in deployment: %s", expectedKey, dep.Name)
 }
 func TestSearch_controller_DBConfig(t *testing.T) {
-	var expectedMap = map[string]string{"POSTGRESQL_SHARED_BUFFERS": "11MB", "WORK_MEM": "12MB",
-		"POSTGRESQL_EFFECTIVE_CACHE_SIZE": "13MB",
-	}
+	var expectedMap = map[string]string{}
 	var (
 		name = "search-v2-operator"
 	)
@@ -665,6 +663,10 @@ func TestSearch_controller_DBConfig(t *testing.T) {
 	err := searchv1alpha1.SchemeBuilder.AddToScheme(s)
 	if err != nil {
 		t.Errorf("error adding search scheme: (%v)", err)
+	}
+	err = addonv1alpha1.AddToScheme(s)
+	if err != nil {
+		t.Errorf("error adding addon scheme: (%v)", err)
 	}
 	//create configmap which has the customization for postgres DB
 	customConfigMap := &corev1.ConfigMap{
@@ -699,7 +701,7 @@ func TestSearch_controller_DBConfig(t *testing.T) {
 	}
 
 	verifyConfigmapDataContent(t, configmap, "postgresql.conf", "ssl = 'on'")
-	verifyConfigmapDataContent(t, configmap, "postgresql-start.sh", "ALTER ROLE searchuser set work_mem='12MB'")
+	verifyConfigmapDataContent(t, configmap, "postgresql-start.sh", "ALTER ROLE searchuser set work_mem='16MB'")
 
 	//check for created search-postgres deployment
 	dep := &appsv1.Deployment{}
@@ -710,9 +712,10 @@ func TestSearch_controller_DBConfig(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to get deployment %s: %v", "search-postgres", err)
 	}
-	verifyDeploymentEnv(t, dep, "WORK_MEM", "12MB")
-	verifyDeploymentEnv(t, dep, "POSTGRESQL_SHARED_BUFFERS", "11MB")
-	verifyDeploymentEnv(t, dep, "POSTGRESQL_EFFECTIVE_CACHE_SIZE", "13MB")
+	//Should be the default constant values set in common.go
+	verifyDeploymentEnv(t, dep, "WORK_MEM", "16MB")
+	verifyDeploymentEnv(t, dep, "POSTGRESQL_SHARED_BUFFERS", "64MB")
+	verifyDeploymentEnv(t, dep, "POSTGRESQL_EFFECTIVE_CACHE_SIZE", "128MB")
 }
 
 func TestSearch_controller_Metrics(t *testing.T) {
@@ -807,4 +810,86 @@ func TestSearch_controller_Metrics(t *testing.T) {
 	if roleErr != nil {
 		t.Errorf("Failed to get Role SearchMonitor: (%v)", roleErr)
 	}
+}
+
+func TestSearch_controller_DBConfigAndEnvOverlap(t *testing.T) {
+	var expectedMap = map[string]string{"POSTGRESQL_SHARED_BUFFERS": "11MB", "WORK_MEM": "12MB",
+		"POSTGRESQL_EFFECTIVE_CACHE_SIZE": "23MB",
+	}
+	var (
+		name = "search-v2-operator"
+	)
+	search := &searchv1alpha1.Search{
+		TypeMeta:   metav1.TypeMeta{Kind: "Search"},
+		ObjectMeta: metav1.ObjectMeta{Name: name},
+		Spec: searchv1alpha1.SearchSpec{
+			DBConfig: "searchcustomization",
+			Deployments: searchv1alpha1.SearchDeployments{
+				Database: searchv1alpha1.DeploymentConfig{
+					Env: []corev1.EnvVar{
+						{Name: "POSTGRESQL_SHARED_BUFFERS", Value: "22MB"},
+						{Name: "WORK_MEM", Value: "33MB"},
+						{Name: "POSTGRESQL_EFFECTIVE_CACHE_SIZE", Value: "13MB"},
+					},
+				},
+			},
+		},
+	}
+	s := scheme.Scheme
+	err := searchv1alpha1.SchemeBuilder.AddToScheme(s)
+	if err != nil {
+		t.Errorf("error adding search scheme: (%v)", err)
+	}
+	err = addonv1alpha1.AddToScheme(s)
+	if err != nil {
+		t.Errorf("error adding addon scheme: (%v)", err)
+	}
+	//configmap customization won't be applied to postgres
+	customConfigMap := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{Name: "searchcustomization"},
+		Data:       expectedMap,
+	}
+
+	objs := []runtime.Object{search, customConfigMap}
+	// Create a fake client to mock API calls.
+	cl := fake.NewClientBuilder().WithRuntimeObjects(objs...).Build()
+
+	r := &SearchReconciler{Client: cl, Scheme: s}
+	// Mock request to simulate Reconcile() being called on an event for a watched resource .
+	req := ctrl.Request{
+		NamespacedName: types.NamespacedName{
+			Name: name,
+		},
+	}
+	// trigger reconcile
+	_, err = r.Reconcile(context.TODO(), req)
+	if err != nil {
+		t.Errorf("reconcile: (%v)", err)
+	}
+	//check for created search-postgres configmap
+	configmap := &corev1.ConfigMap{}
+	err = cl.Get(context.TODO(), types.NamespacedName{
+		Name: "search-postgres",
+	}, configmap)
+
+	if err != nil {
+		t.Fatalf("Failed to get configmap %s: %v", "search-postgres", err)
+	}
+
+	verifyConfigmapDataContent(t, configmap, "postgresql.conf", "ssl = 'on'")
+	verifyConfigmapDataContent(t, configmap, "postgresql-start.sh", "ALTER ROLE searchuser set work_mem='33MB'")
+
+	//check for created search-postgres deployment
+	dep := &appsv1.Deployment{}
+	err = cl.Get(context.TODO(), types.NamespacedName{
+		Name: "search-postgres",
+	}, dep)
+
+	if err != nil {
+		t.Fatalf("Failed to get deployment %s: %v", "search-postgres", err)
+	}
+
+	verifyDeploymentEnv(t, dep, "WORK_MEM", "33MB")
+	verifyDeploymentEnv(t, dep, "POSTGRESQL_SHARED_BUFFERS", "22MB")
+	verifyDeploymentEnv(t, dep, "POSTGRESQL_EFFECTIVE_CACHE_SIZE", "13MB")
 }
