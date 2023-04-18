@@ -79,12 +79,9 @@ func (r *SearchReconciler) PGDeployment(instance *searchv1alpha1.Search) *appsv1
 	}
 	env := getContainerEnvVar(deploymentName, instance)
 	postgresCurrEnvMap := map[string]struct{}{}
-
-	if env != nil {
-		// Store the env var names in a map for easy lookup
-		for _, envVar := range env {
-			postgresCurrEnvMap[envVar.Name] = struct{}{}
-		}
+	// Store the env var names in a map for easy lookup
+	for _, envVar := range env {
+		postgresCurrEnvMap[envVar.Name] = struct{}{}
 	}
 	for _, envVar := range postGresDefaultEnvVars {
 		// if default env vars are not added by the user, add them
