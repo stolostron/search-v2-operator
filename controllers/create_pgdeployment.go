@@ -78,12 +78,12 @@ func (r *SearchReconciler) PGDeployment(instance *searchv1alpha1.Search) *appsv1
 		postgresContainer.Args = args
 	}
 	env := getContainerEnvVar(deploymentName, instance)
-	postgresCurrEnvMap := map[corev1.EnvVar]struct{}{}
+	postgresCurrEnvMap := map[string]struct{}{}
 
 	if env != nil {
-		// Store the env vars in a map for easy lookup
+		// Store the env var names in a map for easy lookup
 		for _, envVar := range postgresContainer.Env {
-			postgresCurrEnvMap[envVar] = struct{}{}
+			postgresCurrEnvMap[envVar.Name] = struct{}{}
 		}
 	}
 	for _, envVar := range postGresDefaultEnvVars {
@@ -91,7 +91,7 @@ func (r *SearchReconciler) PGDeployment(instance *searchv1alpha1.Search) *appsv1
 		// These env vars are recognized by the image - refer to
 		// doc: https://github.com/sclorg/postgresql-container/tree/master/13#environment-variables-and-volumes
 		// WORK_MEM - we change the startup script to alter it.
-		if _, ok := postgresCurrEnvMap[envVar]; !ok {
+		if _, ok := postgresCurrEnvMap[envVar.Name]; !ok {
 			env = append(env, envVar)
 		}
 	}
