@@ -635,7 +635,7 @@ func TestSearch_controller_Status_Update(t *testing.T) {
 	}
 }
 
-// Verifies that the expected Environment value is present in Deployment.
+// Verifies that the expected Environment value is present in Deployment
 func verifyDeploymentEnv(t *testing.T, dep *appsv1.Deployment, expectedKey string, expectedValue string) {
 	for _, val := range dep.Spec.Template.Spec.Containers[0].Env {
 		if val.Name == expectedKey {
@@ -646,6 +646,16 @@ func verifyDeploymentEnv(t *testing.T, dep *appsv1.Deployment, expectedKey strin
 		}
 	}
 	t.Errorf("Failed to find EnvVar: %s in deployment: %s", expectedKey, dep.Name)
+}
+
+// Verifies that the expected argument is present in Deployment
+func verifyDeploymentArgs(t *testing.T, dep *appsv1.Deployment, expectedVal string) {
+	for _, val := range dep.Spec.Template.Spec.Containers[0].Args {
+		if val == expectedVal {
+			return
+		}
+	}
+	t.Errorf("Failed to find Args: %s in deployment: %s", expectedVal, dep.Name)
 }
 func TestSearch_controller_DBConfig(t *testing.T) {
 	var expectedMap = map[string]string{}
@@ -826,10 +836,29 @@ func TestSearch_controller_DBConfigAndEnvOverlap(t *testing.T) {
 			DBConfig: "searchcustomization",
 			Deployments: searchv1alpha1.SearchDeployments{
 				Database: searchv1alpha1.DeploymentConfig{
-					Env: []corev1.EnvVar{
+					Arguments: []string{"-v=1"},
+					Env: []corev1.EnvVar{ // These are the values that goes into the ENV
 						{Name: "POSTGRESQL_SHARED_BUFFERS", Value: "22MB"},
 						{Name: "WORK_MEM", Value: "33MB"},
 						{Name: "POSTGRESQL_EFFECTIVE_CACHE_SIZE", Value: "13MB"},
+					},
+				},
+				Collector: searchv1alpha1.DeploymentConfig{
+					Arguments: []string{"-v=2"},
+					Env: []corev1.EnvVar{
+						{Name: "collEnv", Value: "collEnvValue"},
+					},
+				},
+				QueryAPI: searchv1alpha1.DeploymentConfig{
+					Arguments: []string{"-v=3"},
+					Env: []corev1.EnvVar{
+						{Name: "apiEnv", Value: "apiEnvValue"},
+					},
+				},
+				Indexer: searchv1alpha1.DeploymentConfig{
+					Arguments: []string{"-v=4"},
+					Env: []corev1.EnvVar{
+						{Name: "indEnv", Value: "indEnvValue"},
 					},
 				},
 			},
@@ -875,21 +904,56 @@ func TestSearch_controller_DBConfigAndEnvOverlap(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to get configmap %s: %v", "search-postgres", err)
 	}
-
 	verifyConfigmapDataContent(t, configmap, "postgresql.conf", "ssl = 'on'")
 	verifyConfigmapDataContent(t, configmap, "postgresql-start.sh", "ALTER ROLE searchuser set work_mem='33MB'")
 
 	//check for created search-postgres deployment
-	dep := &appsv1.Deployment{}
+	dep1 := &appsv1.Deployment{}
 	err = cl.Get(context.TODO(), types.NamespacedName{
 		Name: "search-postgres",
-	}, dep)
+	}, dep1)
 
 	if err != nil {
 		t.Fatalf("Failed to get deployment %s: %v", "search-postgres", err)
 	}
+	verifyDeploymentEnv(t, dep1, "WORK_MEM", "33MB")
+	verifyDeploymentEnv(t, dep1, "POSTGRESQL_SHARED_BUFFERS", "22MB")
+	verifyDeploymentEnv(t, dep1, "POSTGRESQL_EFFECTIVE_CACHE_SIZE", "13MB")
+	verifyDeploymentArgs(t, dep1, "-v=1")
 
-	verifyDeploymentEnv(t, dep, "WORK_MEM", "33MB")
-	verifyDeploymentEnv(t, dep, "POSTGRESQL_SHARED_BUFFERS", "22MB")
-	verifyDeploymentEnv(t, dep, "POSTGRESQL_EFFECTIVE_CACHE_SIZE", "13MB")
+	//check for created search-collector deployment
+	dep2 := &appsv1.Deployment{}
+	err = cl.Get(context.TODO(), types.NamespacedName{
+		Name: "search-collector",
+	}, dep2)
+
+	if err != nil {
+		t.Fatalf("Failed to get deployment %s: %v", "search-collector", err)
+	}
+	verifyDeploymentEnv(t, dep2, "collEnv", "collEnvValue")
+	verifyDeploymentArgs(t, dep2, "-v=2")
+
+	//check for created search-api deployment
+	dep3 := &appsv1.Deployment{}
+	err = cl.Get(context.TODO(), types.NamespacedName{
+		Name: "search-api",
+	}, dep3)
+
+	if err != nil {
+		t.Fatalf("Failed to get deployment %s: %v", "search-api", err)
+	}
+	verifyDeploymentEnv(t, dep3, "apiEnv", "apiEnvValue")
+	verifyDeploymentArgs(t, dep3, "-v=3")
+
+	//check for created search-indexer deployment
+	dep4 := &appsv1.Deployment{}
+	err = cl.Get(context.TODO(), types.NamespacedName{
+		Name: "search-indexer",
+	}, dep4)
+
+	if err != nil {
+		t.Fatalf("Failed to get deployment %s: %v", "search-indexer", err)
+	}
+	verifyDeploymentEnv(t, dep4, "indEnv", "indEnvValue")
+	verifyDeploymentArgs(t, dep4, "-v=4")
 }
