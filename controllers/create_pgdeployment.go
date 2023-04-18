@@ -82,7 +82,7 @@ func (r *SearchReconciler) PGDeployment(instance *searchv1alpha1.Search) *appsv1
 
 	if env != nil {
 		// Store the env var names in a map for easy lookup
-		for _, envVar := range postgresContainer.Env {
+		for _, envVar := range env {
 			postgresCurrEnvMap[envVar.Name] = struct{}{}
 		}
 	}
