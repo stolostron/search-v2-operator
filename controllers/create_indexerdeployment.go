@@ -59,6 +59,10 @@ func (r *SearchReconciler) IndexerDeployment(instance *searchv1alpha1.Search) *a
 	if args != nil {
 		indexerContainer.Args = args
 	}
+	env := getContainerEnvVar(deploymentName, instance)
+	if env != nil {
+		indexerContainer.Env = append(indexerContainer.Env, env...)
+	}
 	indexerContainer.Resources = getResourceRequirements(deploymentName, instance)
 	volumes := []corev1.Volume{
 		{

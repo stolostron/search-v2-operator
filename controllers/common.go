@@ -18,7 +18,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
-/* #nosec G101
+/*
+	#nosec G101
+
 gosec will flag the "secrets" as security violations. This flag will allow us to ignore it as a false positive.
 */
 const (
@@ -165,6 +167,15 @@ func getContainerArgs(deploymentName string, instance *searchv1alpha1.Search) []
 	deploymentConfig := getDeploymentConfig(deploymentName, instance)
 	if deploymentConfig.Arguments != nil {
 		return deploymentConfig.Arguments
+	}
+	return result
+}
+
+func getContainerEnvVar(deploymentName string, instance *searchv1alpha1.Search) []corev1.EnvVar {
+	var result []corev1.EnvVar
+	deploymentConfig := getDeploymentConfig(deploymentName, instance)
+	if deploymentConfig.Env != nil {
+		return deploymentConfig.Env
 	}
 	return result
 }
@@ -405,12 +416,12 @@ func (r *SearchReconciler) getDBConfigData(ctx context.Context, instance *search
 	return found.Data
 }
 
-func (r *SearchReconciler) GetDBConfig(ctx context.Context, instance *searchv1alpha1.Search, configName string) string {
-	customMap := r.getDBConfigData(ctx, instance)
-	if customMap != nil {
-		value, present := customMap[configName]
-		if present {
-			return value
+func (r *SearchReconciler) GetDBConfigFromSearchCR(ctx context.Context,
+	instance *searchv1alpha1.Search, configName string) string {
+	postgresDeployConfig := getDeploymentConfig(postgresDeploymentName, instance)
+	for _, env := range postgresDeployConfig.Env {
+		if env.Name == configName {
+			return env.Value
 		}
 	}
 	return getDefaultDBConfig(configName)
