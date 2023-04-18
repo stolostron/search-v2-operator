@@ -52,6 +52,10 @@ func (r *SearchReconciler) CollectorDeployment(instance *searchv1alpha1.Search) 
 	if args != nil {
 		collectorContainer.Args = args
 	}
+	env := getContainerEnvVar(deploymentName, instance)
+	if env != nil {
+		collectorContainer.Env = append(collectorContainer.Env, env...)
+	}
 	collectorContainer.Resources = getResourceRequirements(deploymentName, instance)
 	volumes := []corev1.Volume{
 		{

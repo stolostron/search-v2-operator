@@ -20,7 +20,7 @@ func (r *SearchReconciler) PostgresConfigmap(instance *searchv1alpha1.Search) *c
 			Namespace: ns,
 		},
 	}
-	work_mem := r.GetDBConfig(context.TODO(), instance, "WORK_MEM")
+	work_mem := r.GetDBConfigFromSearchCR(context.TODO(), instance, "WORK_MEM")
 	data := map[string]string{}
 	data["postgresql.conf"] = `
 ssl = 'on'

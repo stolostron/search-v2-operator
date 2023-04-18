@@ -57,6 +57,10 @@ func (r *SearchReconciler) APIDeployment(instance *searchv1alpha1.Search) *appsv
 	if args != nil {
 		apiContainer.Args = args
 	}
+	env := getContainerEnvVar(deploymentName, instance)
+	if env != nil {
+		apiContainer.Env = append(apiContainer.Env, env...)
+	}
 	apiContainer.Resources = getResourceRequirements(apiDeploymentName, instance)
 	volumes := []corev1.Volume{
 		{
