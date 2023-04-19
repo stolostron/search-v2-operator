@@ -30,7 +30,9 @@ uninstaller() {
     echo "* Deleting quay.io secret"
     $CLI_EXEC delete secret $EXPECTED_SECRET_NAME -n "$INSTALL_NAMESPACE" || true
     echo "* Reenable search v1"
-    # oc patch mch "${mch_name}" -n "$INSTALL_NAMESPACE" --type=merge -p '{"spec":{"overrides":{"components":[{"name":"search","enabled": true}]}}}'
+    if [ "$cluster_type" == "OpenShift" ]; then
+      oc patch mch "${mch_name}" -n "$INSTALL_NAMESPACE" --type=merge -p '{"spec":{"overrides":{"components":[{"name":"search","enabled": true}]}}}'
+    fi
     echo "All done!"
 }
 
