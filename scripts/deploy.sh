@@ -156,12 +156,6 @@ fi
 echo "* Apply quay.io secret"
 $CLI_EXEC apply -f quay_secret.yaml -n "$INSTALL_NAMESPACE"
 
-# Kubernetes missing generating certs: https://docs.openshift.com/container-platform/4.9/security/certificates/service-serving-certificate.html
-if [ "$cluster_type" == "Kubernetes" ]; then
-    echo "* Apply certs"
-    $CLI_EXEC apply -f certs.yaml -n "$INSTALL_NAMESPACE"
-fi
-
 # deploy operator
 echo "* Deploy search v2"
 # compute version
