@@ -6,7 +6,6 @@
 
 # DESCRIPTION:
 # This script collects data from the Postgres instance usage by RHACM to debug issues with the search service.
-# Output data is anonymized and only shows total counts of different resources.
 
 # DATA COLLECTED:
 # 1. POSTGRESQL DEBUG DATA
