@@ -77,10 +77,10 @@ printf "\n>>> Edge count by type:\n\n"
 psql -d search -U searchuser -c "SELECT edgetype, count(*) FROM search.edges GROUP BY edgetype ORDER BY count DESC;"
 
 printf "\n>>> Intercluster edge count by cluster:\n\n"
-psql -d search -U searchuser -c "SELECT cluster, count(*) FROM search.edges WHERE edgetype = 'intercluster' GROUP BY cluster ORDER BY count DESC;"
+psql -d search -U searchuser -c "SELECT cluster, count(*) FROM search.edges WHERE edgetype = 'interCluster' GROUP BY cluster ORDER BY count DESC;"
 
-printf "/n>>> Total intercluster edge count:\n\n"
-psql -d search -U searchuser -c "SELECT count(*) FROM search.edges WHERE edgetype = 'intercluster';"
+printf "/n>>> Total interCluster edge count:\n\n"
+psql -d search -U searchuser -c "SELECT count(*) FROM search.edges WHERE edgetype = 'interCluster';"
 
 
 printf "\n----- COLLECTING DEBUG DATA FROM POSTGRESQL -----\n"
