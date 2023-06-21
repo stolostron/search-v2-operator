@@ -11,7 +11,8 @@
 # 1. POSTGRESQL DEBUG DATA
 #    - POSTGRESQL configuration
 #    - POSTGRESQL database size
-#    - POSTGRESQL resource table size
+#    - POSTGRESQL resources table size
+#    - POSTGRESQL edges table size
 #    - POSTGRESQL query activity
 #    - POSTGRESQL running queries
 #    - POSTGRESQL idle queries
@@ -40,8 +41,11 @@ psql -d search -U searchuser -c "SHOW all;"
 printf "\n>>> POSTGRESQL Database size:\n\n"
 psql -d search -U searchuser -c "SELECT datname, pg_size_pretty(pg_database_size(datname)) from pg_database order by pg_database_size(datname) desc;"
 
-printf "\n>>> POSTGRESQL resource table size:\n\n"
+printf "\n>>> POSTGRESQL resources table size:\n\n"
 psql -d search -U searchuser -c "SELECT pg_size_pretty(pg_total_relation_size('search.resources'));"
+
+printf "\n>>> POSTGRESQL edges table size:\n\n"
+psql -d search -U searchuser -c "SELECT pg_size_pretty(pg_total_relation_size('search.edges'));"
 
 printf "\n>>> POSTGRESQL Query activity by state:\n\n"
 psql -d search -U searchuser -c "SELECT count(*),state FROM pg_stat_activity group by state;"
