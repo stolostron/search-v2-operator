@@ -206,21 +206,6 @@ func getAddonRules() []rbacv1.PolicyRule {
 	}
 }
 
-func getFederatedRules() []rbacv1.PolicyRule {
-	return []rbacv1.PolicyRule{
-		{
-			APIGroups: []string{"proxy.open-cluster-management.io"},
-			Resources: []string{"clusterstatuses/aggregator"},
-			Verbs:     []string{"create"},
-		},
-		{
-			APIGroups: []string{"coordination.k8s.io"},
-			Resources: []string{"leases"},
-			Verbs:     []string{"create", "get", "list", "watch", "patch", "update"},
-		},
-	}
-}
-
 func getSearchUserRules() []rbacv1.PolicyRule {
 	return []rbacv1.PolicyRule{
 		{
