@@ -112,6 +112,20 @@ func (r *SearchReconciler) AddonClusterRole(instance *searchv1alpha1.Search) *rb
 	}
 }
 
+func (r *SearchReconciler) SearchUserClusterRole(instance *searchv1alpha1.Search) *rbacv1.ClusterRole {
+	return &rbacv1.ClusterRole{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "ClusterRole",
+			APIVersion: rbacv1.SchemeGroupVersion.String(),
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      getSearchUserRoleName(),
+			Namespace: instance.GetNamespace(),
+		},
+		Rules: getSearchUserRules(),
+	}
+}
+
 func getSubjects(namespace string) []rbacv1.Subject {
 	return []rbacv1.Subject{{
 		Kind:      "ServiceAccount",
@@ -188,6 +202,31 @@ func getAddonRules() []rbacv1.PolicyRule {
 			APIGroups: []string{"coordination.k8s.io"},
 			Resources: []string{"leases"},
 			Verbs:     []string{"create", "get", "list", "watch", "patch", "update"},
+		},
+	}
+}
+
+func getFederatedRules() []rbacv1.PolicyRule {
+	return []rbacv1.PolicyRule{
+		{
+			APIGroups: []string{"proxy.open-cluster-management.io"},
+			Resources: []string{"clusterstatuses/aggregator"},
+			Verbs:     []string{"create"},
+		},
+		{
+			APIGroups: []string{"coordination.k8s.io"},
+			Resources: []string{"leases"},
+			Verbs:     []string{"create", "get", "list", "watch", "patch", "update"},
+		},
+	}
+}
+
+func getSearchUserRules() []rbacv1.PolicyRule {
+	return []rbacv1.PolicyRule{
+		{
+			APIGroups: []string{"search.open-cluster-management.io"},
+			Resources: []string{"searches", "search.search.open-cluster-management.io/unrestricted"},
+			Verbs:     []string{"get"},
 		},
 	}
 }
