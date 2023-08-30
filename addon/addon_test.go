@@ -164,22 +164,22 @@ func TestManifest(t *testing.T) {
 					if object.Spec.Template.Spec.Containers[0].Args[0] != test.expectedArgs {
 						t.Errorf("expected args is %s, but got %s", test.expectedLimit, object.Spec.Template.Spec.Containers[0].Args[0])
 					}
-					if object.Spec.Template.Spec.Containers[0].Env[4].Name != "REDISCOVER_RATE_MS" {
+					if object.Spec.Template.Spec.Containers[0].Env[3].Name != "REDISCOVER_RATE_MS" {
 						t.Errorf("expected env is REDISCOVER_RATE_MS, but got %s", object.Spec.Template.Spec.Containers[0].Env[4].Name)
 					}
-					if object.Spec.Template.Spec.Containers[0].Env[5].Name != "HEARTBEAT_MS" {
+					if object.Spec.Template.Spec.Containers[0].Env[4].Name != "HEARTBEAT_MS" {
 						t.Errorf("expected env is HEARTBEAT_MS, but got %s", object.Spec.Template.Spec.Containers[0].Env[5].Name)
 					}
-					if object.Spec.Template.Spec.Containers[0].Env[6].Name != "REPORT_RATE_MS" {
+					if object.Spec.Template.Spec.Containers[0].Env[5].Name != "REPORT_RATE_MS" {
 						t.Errorf("expected env is REPORT_RATE_MS, but got %s", object.Spec.Template.Spec.Containers[0].Env[6].Name)
 					}
-					if object.Spec.Template.Spec.Containers[0].Env[4].Value != "4000" {
+					if object.Spec.Template.Spec.Containers[0].Env[3].Value != "4000" {
 						t.Errorf("expected value is 4000, but got %s", object.Spec.Template.Spec.Containers[0].Env[4].Value)
 					}
-					if object.Spec.Template.Spec.Containers[0].Env[5].Value != "3000" {
+					if object.Spec.Template.Spec.Containers[0].Env[4].Value != "3000" {
 						t.Errorf("expected value is 3000, but got %s", object.Spec.Template.Spec.Containers[0].Env[5].Value)
 					}
-					if object.Spec.Template.Spec.Containers[0].Env[6].Value != "2000" {
+					if object.Spec.Template.Spec.Containers[0].Env[5].Value != "2000" {
 						t.Errorf("expected value is 2000, but got %s", object.Spec.Template.Spec.Containers[0].Env[6].Value)
 					}
 
