@@ -79,7 +79,7 @@ psql -d search -U searchuser -c "SELECT edgetype, count(*) FROM search.edges GRO
 printf "\n>>> Intercluster edge count by cluster:\n\n"
 psql -d search -U searchuser -c "SELECT cluster, count(*) FROM search.edges WHERE edgetype = 'interCluster' GROUP BY cluster ORDER BY count DESC;"
 
-printf "/n>>> Total interCluster edge count:\n\n"
+printf "\n>>> Total interCluster edge count:\n\n"
 psql -d search -U searchuser -c "SELECT count(*) FROM search.edges WHERE edgetype = 'interCluster';"
 
 

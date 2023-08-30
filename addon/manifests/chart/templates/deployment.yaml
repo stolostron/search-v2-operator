@@ -31,8 +31,6 @@ spec:
         env:
         - name: CLUSTER_NAME
           value: "{{ .Values.clusterName }}"
-        - name: CLUSTER_NAMESPACE
-          value: "{{ .Values.clusterName }}"
         - name: HUB_CONFIG
           value: /hubconfig/kubeconfig
         - name: POD_NAMESPACE
