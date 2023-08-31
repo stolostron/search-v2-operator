@@ -28,7 +28,7 @@ func (r *SearchReconciler) createRoles(ctx context.Context,
 			log.Error(err, "Could not create clusterrole "+crole.Name)
 			return &reconcile.Result{}, err
 		}
-		log.Info("Created clusterrole" + crole.Name)
+		log.Info("Created clusterrole " + crole.Name)
 		log.V(9).Info("Created  clusterrole ", "clusterrole", crole)
 	}
 	return nil, nil
@@ -49,7 +49,7 @@ func (r *SearchReconciler) createRoleBinding(ctx context.Context,
 			log.Error(err, "Could not create clusterrolebinding"+rolebinding.Name)
 			return &reconcile.Result{}, err
 		}
-		log.Info("Created clusterrolebinding" + rolebinding.Name)
+		log.Info("Created clusterrolebinding " + rolebinding.Name)
 		log.V(2).Info("Created clusterrolebinding ", "clusterrolebinding", rolebinding)
 	}
 	return nil, nil
@@ -109,6 +109,20 @@ func (r *SearchReconciler) AddonClusterRole(instance *searchv1alpha1.Search) *rb
 			Namespace: instance.GetNamespace(),
 		},
 		Rules: getAddonRules(),
+	}
+}
+
+func (r *SearchReconciler) GlobalSearchUserClusterRole(instance *searchv1alpha1.Search) *rbacv1.ClusterRole {
+	return &rbacv1.ClusterRole{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "ClusterRole",
+			APIVersion: rbacv1.SchemeGroupVersion.String(),
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      getSearchUserRoleName(),
+			Namespace: instance.GetNamespace(),
+		},
+		Rules: getGlobalSearchUserRules(),
 	}
 }
 
@@ -188,6 +202,16 @@ func getAddonRules() []rbacv1.PolicyRule {
 			APIGroups: []string{"coordination.k8s.io"},
 			Resources: []string{"leases"},
 			Verbs:     []string{"create", "get", "list", "watch", "patch", "update"},
+		},
+	}
+}
+
+func getGlobalSearchUserRules() []rbacv1.PolicyRule {
+	return []rbacv1.PolicyRule{
+		{
+			APIGroups: []string{"search.open-cluster-management.io"},
+			Resources: []string{"searches", "searches/allManagedData"},
+			Verbs:     []string{"get"},
 		},
 	}
 }
