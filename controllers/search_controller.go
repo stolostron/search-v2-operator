@@ -132,9 +132,9 @@ func (r *SearchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		log.Error(err, "MetricsRole setup failed")
 		return *result, err
 	}
-	result, err = r.createRoles(ctx, r.SearchUserClusterRole(instance))
+	result, err = r.createRoles(ctx, r.GlobalSearchUserClusterRole(instance))
 	if result != nil {
-		log.Error(err, "SearchUserClusterRole setup failed")
+		log.Error(err, "GlobalSearchUserClusterRole setup failed")
 		return *result, err
 	}
 	result, err = r.createClusterManagementAddOn(ctx, instance)

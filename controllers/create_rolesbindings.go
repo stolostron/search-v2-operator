@@ -112,7 +112,7 @@ func (r *SearchReconciler) AddonClusterRole(instance *searchv1alpha1.Search) *rb
 	}
 }
 
-func (r *SearchReconciler) SearchUserClusterRole(instance *searchv1alpha1.Search) *rbacv1.ClusterRole {
+func (r *SearchReconciler) GlobalSearchUserClusterRole(instance *searchv1alpha1.Search) *rbacv1.ClusterRole {
 	return &rbacv1.ClusterRole{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "ClusterRole",
@@ -122,7 +122,7 @@ func (r *SearchReconciler) SearchUserClusterRole(instance *searchv1alpha1.Search
 			Name:      getSearchUserRoleName(),
 			Namespace: instance.GetNamespace(),
 		},
-		Rules: getSearchUserRules(),
+		Rules: getGlobalSearchUserRules(),
 	}
 }
 
@@ -206,7 +206,7 @@ func getAddonRules() []rbacv1.PolicyRule {
 	}
 }
 
-func getSearchUserRules() []rbacv1.PolicyRule {
+func getGlobalSearchUserRules() []rbacv1.PolicyRule {
 	return []rbacv1.PolicyRule{
 		{
 			APIGroups: []string{"search.open-cluster-management.io"},
