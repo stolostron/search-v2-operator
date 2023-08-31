@@ -194,6 +194,10 @@ func getAddonRoleName() string {
 	return "open-cluster-management:addons:search-collector"
 }
 
+func getSearchUserRoleName() string {
+	return "global-search-user"
+}
+
 func getDeployment(deploymentName string, instance *searchv1alpha1.Search) *appsv1.Deployment {
 	deploymentLabels := generateLabels("name", deploymentName)
 	return &appsv1.Deployment{
