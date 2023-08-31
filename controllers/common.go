@@ -195,7 +195,7 @@ func getAddonRoleName() string {
 }
 
 func getSearchUserRoleName() string {
-	return "search-superuser"
+	return "global-search-user"
 }
 
 func getDeployment(deploymentName string, instance *searchv1alpha1.Search) *appsv1.Deployment {

@@ -210,7 +210,7 @@ func getSearchUserRules() []rbacv1.PolicyRule {
 	return []rbacv1.PolicyRule{
 		{
 			APIGroups: []string{"search.open-cluster-management.io"},
-			Resources: []string{"searches", "search.search.open-cluster-management.io/unrestricted"},
+			Resources: []string{"searches", "search.search.open-cluster-management.io/allManagedData"},
 			Verbs:     []string{"get"},
 		},
 	}
