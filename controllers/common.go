@@ -423,11 +423,24 @@ func (r *SearchReconciler) getDBConfigData(ctx context.Context, instance *search
 func (r *SearchReconciler) GetDBConfigFromSearchCR(ctx context.Context,
 	instance *searchv1alpha1.Search, configName string) string {
 	postgresDeployConfig := getDeploymentConfig(postgresDeploymentName, instance)
+	// get value from env var section if present
 	for _, env := range postgresDeployConfig.Env {
 		if env.Name == configName {
+			log.Info("Set ", configName, " from search CR Environment variables for postgres")
 			return env.Value
 		}
 	}
+	// get value from dbconfig configmap if present
+	customMap := r.getDBConfigData(ctx, instance)
+	if customMap != nil {
+		value, present := customMap[configName]
+		if present {
+			log.Info("Set ", configName, " from dbconfig configMap ", instance.Spec.DBConfig)
+			return value
+		}
+	}
+	// get default value
+	log.V(2).Info("Set ", configName, " with default value")
 	return getDefaultDBConfig(configName)
 }
 
