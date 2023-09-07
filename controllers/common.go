@@ -426,7 +426,7 @@ func (r *SearchReconciler) GetDBConfigFromSearchCR(ctx context.Context,
 	// get value from env var section if present
 	for _, env := range postgresDeployConfig.Env {
 		if env.Name == configName {
-			log.Info("Set ", configName, " from search CR Environment variables for postgres")
+			log.Info("Set config from search CR Environment variables for postgres", configName, env.Value)
 			return env.Value
 		}
 	}
@@ -435,13 +435,14 @@ func (r *SearchReconciler) GetDBConfigFromSearchCR(ctx context.Context,
 	if customMap != nil {
 		value, present := customMap[configName]
 		if present {
-			log.Info("Set ", configName, " from dbconfig configMap ", instance.Spec.DBConfig)
+			log.Info("Set config from dbconfig configMap ", instance.Spec.DBConfig, value)
 			return value
 		}
 	}
 	// get default value
-	log.V(2).Info("Set ", configName, " with default value")
-	return getDefaultDBConfig(configName)
+	defaultValue := getDefaultDBConfig(configName)
+	log.V(2).Info("Set config with default value", configName, defaultValue)
+	return defaultValue
 }
 
 func getDeploymentConfig(name string, instance *searchv1alpha1.Search) searchv1alpha1.DeploymentConfig {
