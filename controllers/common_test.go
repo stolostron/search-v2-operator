@@ -649,3 +649,54 @@ func TestMemoryLimitCustomization(t *testing.T) {
 		t.Error("Limit Memory Not expected")
 	}
 }
+
+func TestPGDeployment(t *testing.T) {
+	var expectedMap = map[string]string{"POSTGRESQL_SHARED_BUFFERS": "64MB",
+		"POSTGRESQL_EFFECTIVE_CACHE_SIZE": POSTGRESQL_EFFECTIVE_CACHE_SIZE,
+		"WORK_MEM":                        "32MB"}
+
+	var configValueMap = map[string]string{"POSTGRESQL_SHARED_BUFFERS": "64MB",
+		"WORK_MEM": "25MB", //this value is trumped by the envVar
+	}
+
+	var (
+		name = "search-v2-operator"
+	)
+	search := &searchv1alpha1.Search{
+		TypeMeta:   metav1.TypeMeta{Kind: "Search"},
+		ObjectMeta: metav1.ObjectMeta{Name: name},
+		Spec: searchv1alpha1.SearchSpec{
+			DBConfig: "searchcustomization",
+			Deployments: searchv1alpha1.SearchDeployments{
+				Database: searchv1alpha1.DeploymentConfig{
+					Env: []corev1.EnvVar{
+						{Name: "WORK_MEM", Value: "32MB"},
+					},
+				},
+			},
+		},
+	}
+	s := scheme.Scheme
+	err := searchv1alpha1.SchemeBuilder.AddToScheme(s)
+	if err != nil {
+		t.Errorf("error adding search scheme: (%v)", err)
+	}
+	//create configmap which has custom values for postgres DB
+	customConfigMap := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{Name: "searchcustomization"},
+		Data:       configValueMap,
+	}
+
+	objs := []runtime.Object{search, customConfigMap}
+	// Create a fake client to mock API calls.
+	cl := fake.NewClientBuilder().WithRuntimeObjects(objs...).Build()
+
+	r := &SearchReconciler{Client: cl, Scheme: s}
+	actualDep := r.PGDeployment(search)
+
+	for _, env := range actualDep.Spec.Template.Spec.Containers[0].Env {
+		if env.Value != expectedMap[env.Name] {
+			t.Errorf("Expected %s for %s, but got %s", expectedMap[env.Name], env.Name, env.Value)
+		}
+	}
+}
