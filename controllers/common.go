@@ -431,7 +431,7 @@ func (r *SearchReconciler) GetDBConfigFromSearchCR(ctx context.Context,
 	if customMap != nil {
 		value, present := customMap[configName]
 		if present {
-			log.Info("Set config from dbconfig configMap ", instance.Spec.DBConfig, value)
+			log.Info("Set config from dbconfig configMap ", "configMap", instance.Spec.DBConfig, configName, value)
 			return value
 		}
 	}
