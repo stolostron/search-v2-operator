@@ -46,7 +46,8 @@ import (
 // SearchReconciler reconciles a Search object
 type SearchReconciler struct {
 	client.Client
-	Scheme *runtime.Scheme
+	Scheme  *runtime.Scheme
+	context context.Context
 }
 
 const searchFinalizer = "search.open-cluster-management.io/finalizer"
@@ -69,6 +70,7 @@ var once sync.Once
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.10.0/pkg/reconcile
 func (r *SearchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log.V(2).Info("Reconciling from search-v2-operator for ", req.Name, req.Namespace)
+	r.context = ctx
 	instance := &searchv1alpha1.Search{}
 	err := r.Client.Get(ctx, types.NamespacedName{Name: "search-v2-operator", Namespace: req.Namespace}, instance)
 	if err != nil {

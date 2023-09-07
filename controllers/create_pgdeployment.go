@@ -13,9 +13,9 @@ func (r *SearchReconciler) PGDeployment(instance *searchv1alpha1.Search) *appsv1
 	image_sha := getImageSha(deploymentName, instance)
 	log.V(2).Info("Using postgres image ", "name", image_sha)
 	deployment := getDeployment(deploymentName, instance)
-	postgresqlSharedBuffers := getDefaultDBConfig("POSTGRESQL_SHARED_BUFFERS")
-	postgresqlEffectiveCacheSize := getDefaultDBConfig("POSTGRESQL_EFFECTIVE_CACHE_SIZE")
-	postgresqlWorkMem := getDefaultDBConfig("WORK_MEM")
+	postgresqlSharedBuffers := r.GetDBConfigFromSearchCR(r.context, instance, "POSTGRESQL_SHARED_BUFFERS")
+	postgresqlEffectiveCacheSize := r.GetDBConfigFromSearchCR(r.context, instance, "POSTGRESQL_EFFECTIVE_CACHE_SIZE")
+	postgresqlWorkMem := r.GetDBConfigFromSearchCR(r.context, instance, "WORK_MEM")
 	postGresDefaultEnvVars := []corev1.EnvVar{
 		newEnvVar("POSTGRESQL_SHARED_BUFFERS", postgresqlSharedBuffers),
 		newEnvVar("POSTGRESQL_EFFECTIVE_CACHE_SIZE", postgresqlEffectiveCacheSize),
