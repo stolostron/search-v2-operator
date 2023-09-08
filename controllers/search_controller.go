@@ -116,17 +116,17 @@ func (r *SearchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	}
 	result, err := r.createSearchServiceAccount(ctx, r.SearchServiceAccount(instance))
 	if result != nil {
-		log.Error(err, "SearchServiceAccount  setup failed")
+		log.Error(err, "SearchServiceAccount setup failed")
 		return *result, err
 	}
 	result, err = r.createRoles(ctx, r.ClusterRole(instance))
 	if result != nil {
-		log.Error(err, "ClusterRole  setup failed")
+		log.Error(err, "ClusterRole setup failed")
 		return *result, err
 	}
 	result, err = r.createRoles(ctx, r.AddonClusterRole(instance))
 	if result != nil {
-		log.Error(err, "AddonClusterRole  setup failed")
+		log.Error(err, "AddonClusterRole setup failed")
 		return *result, err
 	}
 	result, err = r.createMetricsRole(ctx, r.MetricsRole(instance))
@@ -219,7 +219,7 @@ func (r *SearchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	}
 	result, err = r.createConfigMap(ctx, r.SearchCACert(instance))
 	if result != nil {
-		log.Error(err, "Search CACert  setup failed")
+		log.Error(err, "Search CACert setup failed")
 		return *result, err
 	}
 
