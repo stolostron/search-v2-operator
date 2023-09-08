@@ -19,6 +19,10 @@ spec:
       labels:
         component: "search"
     spec:
+      tolerations: 
+      - key: node-role.kubernetes.io/dummy
+        operator: Exists
+        effect: NoSchedule 
       serviceAccountName: {{ template "search.fullname" . }}
       containers:
       {{- if not (or (.Capabilities.APIVersions.Has "operator.open-cluster-management.io/v1/MultiClusterHub") (.Capabilities.APIVersions.Has "operator.open-cluster-management.io/v1beta1/MultiClusterHub")) }}

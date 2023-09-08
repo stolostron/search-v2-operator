@@ -29,16 +29,14 @@ tolerations:
 - key: node-role.kubernetes.io/infra
   operator: Exists
   effect: NoSchedule
-- key: node-role.kubernetes.io/dummy
-  operator: Exists
-  effect: NoSchedule 
 
 global: 
   imagePullPolicy: IfNotPresent
   imagePullSecret: open-cluster-management-image-pull-credentials
   imageOverrides:
     search_collector: quay.io/stolostron/search_collector:latest
-  nodeSelector: {}
+  nodeSelector: 
+    kubernetes.io/os: linux
   proxyConfig:
     HTTP_PROXY: null
     HTTPS_PROXY: null
