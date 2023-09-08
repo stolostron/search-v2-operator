@@ -31,7 +31,7 @@ tolerations:
   effect: NoSchedule
 
 global: 
-  imagePullPolicy: IfNotPresent
+  imagePullPolicy: Always
   imagePullSecret: open-cluster-management-image-pull-credentials
   imageOverrides:
     search_collector: quay.io/stolostron/search_collector:latest
