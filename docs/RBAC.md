@@ -1,7 +1,6 @@
 # Role Based Access Control (RBAC)
 
-### Status: DRAFT (April 22, 2022)
-**This feature is not fully implemented. This document describes the desired imlpementation for Odyssey (search v2).**
+**This document describes the implementation for Odyssey (search v2).**
 
 The search service collects data using a service account with wide cluster access and stores all resources in the database. The Search API must enforce that results for each user (or service account) only contain resources that they are authorized to access.
 
@@ -154,3 +153,7 @@ Once we have the access rules for the user, we use the data to query the databas
 >    - Additional storage or memory to store data.
 > 3. Save the user's rules in a table and use a JOIN.
 >    - [TODO: Sherin needs to explain this option.]
+
+### Status Changes: 
+COMPLETED (February 8, 2023 - ACM 2.7)   
+DRAFT (April 22, 2022)
