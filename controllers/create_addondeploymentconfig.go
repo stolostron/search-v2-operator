@@ -44,7 +44,10 @@ func (r *SearchReconciler) newAddOnDeploymentConfig(instance *searchv1alpha1.Sea
 			Namespace: instance.GetNamespace(),
 		},
 		Spec: addonv1alpha1.AddOnDeploymentConfigSpec{
-			NodePlacement: &addonv1alpha1.NodePlacement{},
+			NodePlacement: &addonv1alpha1.NodePlacement{
+				NodeSelector: instance.Spec.NodeSelector,
+				Tolerations:  instance.Spec.Tolerations,
+			},
 		},
 	}
 
