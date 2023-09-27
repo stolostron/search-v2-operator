@@ -107,7 +107,7 @@ func (r *SearchReconciler) MetricsRoleBinding(instance *searchv1alpha1.Search) *
 }
 
 func (r *SearchReconciler) ServiceMonitor(instance *searchv1alpha1.Search,
-	deployment string) *monitorv1.ServiceMonitor {
+	deployment string, namespace string) *monitorv1.ServiceMonitor {
 	smName := deployment + "-monitor"
 	cr := &monitorv1.ServiceMonitor{
 		TypeMeta: metav1.TypeMeta{
@@ -116,7 +116,7 @@ func (r *SearchReconciler) ServiceMonitor(instance *searchv1alpha1.Search,
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      smName,
-			Namespace: "openshift-monitoring",
+			Namespace: namespace,
 		},
 		Spec: monitorv1.ServiceMonitorSpec{
 			JobLabel:          deployment,

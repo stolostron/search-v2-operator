@@ -129,11 +129,6 @@ func (r *SearchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		log.Error(err, "AddonClusterRole setup failed")
 		return *result, err
 	}
-	result, err = r.createMetricsRole(ctx, r.MetricsRole(instance))
-	if result != nil {
-		log.Error(err, "MetricsRole setup failed")
-		return *result, err
-	}
 	result, err = r.createRoles(ctx, r.GlobalSearchUserClusterRole(instance))
 	if result != nil {
 		log.Error(err, "GlobalSearchUserClusterRole setup failed")
@@ -152,11 +147,6 @@ func (r *SearchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	result, err = r.createRoleBinding(ctx, r.ClusterRoleBinding(instance))
 	if result != nil {
 		log.Error(err, "ClusterRoleBinding  setup failed")
-		return *result, err
-	}
-	result, err = r.createMetricsRoleBinding(ctx, r.MetricsRoleBinding(instance))
-	if result != nil {
-		log.Error(err, "MetricsRoleBinding setup failed")
 		return *result, err
 	}
 	result, err = r.createSecret(ctx, r.PGSecret(instance))
@@ -185,12 +175,17 @@ func (r *SearchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		log.Error(err, "API Service  setup failed")
 		return *result, err
 	}
-	result, err = r.createServiceMonitor(ctx, r.ServiceMonitor(instance, "search-indexer"))
+	result, err = r.deleteLegacyServiceMonitorSetup(instance)
+	if result != nil {
+		log.Error(err, "Deleting legacy ServiceMonitor setup failed")
+		return *result, err
+	}
+	result, err = r.createServiceMonitor(ctx, r.ServiceMonitor(instance, "search-indexer", instance.Namespace))
 	if result != nil {
 		log.Error(err, "ServiceMonitor setup failed for search-indexer")
 		return *result, err
 	}
-	result, err = r.createServiceMonitor(ctx, r.ServiceMonitor(instance, "search-api"))
+	result, err = r.createServiceMonitor(ctx, r.ServiceMonitor(instance, "search-api", instance.Namespace))
 	if result != nil {
 		log.Error(err, "ServiceMonitor setup failed for search-api")
 		return *result, err

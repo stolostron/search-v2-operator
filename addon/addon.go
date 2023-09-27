@@ -236,17 +236,17 @@ func NewAddonManager(kubeConfig *rest.Config) (addonmanager.AddonManager, error)
 func startAddon(ctx context.Context) {
 	kubeConfig, err := ctrl.GetConfig()
 	if err != nil {
-		klog.Error(err, "unable to get kubeConfig , addon cannot be installed", "controller", "SearchOperator")
+		klog.Error(err, "unable to get kubeConfig , addon cannot be installed ", "controller: ", "SearchOperator")
 		return
 	}
 	addonMgr, err := NewAddonManager(kubeConfig)
 	if err != nil {
-		klog.Error(err, "unable to create a new  addon manager", "controller", "SearchOperator")
+		klog.Error(err, " unable to create a new  addon manager ", "controller: ", "SearchOperator")
 	} else {
 		klog.Info("starting search addon manager")
 		err = addonMgr.Start(ctx)
 		if err != nil {
-			klog.Error(err, "unable to start a new  addon manager", "controller", "SearchOperator")
+			klog.Error(err, "unable to start a new  addon manager ", "controller: ", "SearchOperator")
 		}
 	}
 }
