@@ -54,6 +54,9 @@ const searchFinalizer = "search.open-cluster-management.io/finalizer"
 
 var log = logf.Log.WithName("searchoperator")
 var once sync.Once
+var cleanOnce sync.Once
+
+var cleanupComplete bool
 
 //+kubebuilder:rbac:groups=search.open-cluster-management.io,resources=searches,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=search.open-cluster-management.io,resources=searches/status,verbs=get;update;patch
@@ -175,11 +178,6 @@ func (r *SearchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		log.Error(err, "API Service  setup failed")
 		return *result, err
 	}
-	result, err = r.deleteLegacyServiceMonitorSetup(instance)
-	if result != nil {
-		log.Error(err, "Deleting legacy ServiceMonitor setup failed")
-		return *result, err
-	}
 	result, err = r.createServiceMonitor(ctx, r.ServiceMonitor(instance, "search-indexer", instance.Namespace))
 	if result != nil {
 		log.Error(err, "ServiceMonitor setup failed for search-indexer")
@@ -225,6 +223,25 @@ func (r *SearchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	once.Do(func() {
 		addon.CreateAddonOnce(ctx, instance)
 	})
+	cleanUpFunc := func() {
+		// delete legacy servicemonitor setup
+		result, err = r.deleteLegacyServiceMonitorSetup(instance)
+		cleanupComplete = true
+		log.Info("cleanupComplete. Setting cleanupComplete to ", "cleanupComplete", cleanupComplete)
+		if result != nil {
+			cleanupComplete = false
+			log.Info("cleanup not complete. Setting cleanupComplete to ", "cleanupComplete", cleanupComplete)
+			log.Error(err, "Failed to remove legacy ServiceMonitor setup ")
+		}
+	}
+	if !cleanupComplete {
+		cleanOnce.Do(cleanUpFunc)
+		//To retry if cleanup fails
+		if !cleanupComplete {
+			return *result, err
+		}
+	}
+
 	return ctrl.Result{}, nil
 }
 
