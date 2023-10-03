@@ -37,7 +37,7 @@ const (
 	indexerSecretName               = "search-indexer-certs"
 	postgresSecretName              = "search-postgres-certs"
 	POSTGRESQL_SHARED_BUFFERS       = "512MB"
-	POSTGRESQL_EFFECTIVE_CACHE_SIZE = "1024MB"
+	POSTGRESQL_EFFECTIVE_CACHE_SIZE = "1GB"
 	WORK_MEM                        = "32MB"
 )
 
