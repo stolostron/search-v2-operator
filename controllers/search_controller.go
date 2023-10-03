@@ -242,7 +242,7 @@ func (r *SearchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		cleanOnce.Do(cleanUpFunc)
 		//To retry if cleanup fails
 		if !cleanupComplete {
-			return *result, err
+			return ctrl.Result{}, err
 		}
 	}
 
