@@ -91,6 +91,6 @@ func (r *SearchReconciler) deleteLegacyServiceMonitorSetup(instance *searchv1alp
 	if err == nil {
 		log.Info("Deleted legacy ServiceMonitor Setup from openshift-monitoring namespace")
 	} else {
-		log.Error(err, "Failed to remove legacy ServiceMonitor setup from openshift-monitoring namespace")
+		log.Info("Failed to remove legacy ServiceMonitor setup from openshift-monitoring namespace")
 	}
 }
