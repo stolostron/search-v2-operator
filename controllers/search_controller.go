@@ -223,15 +223,19 @@ func (r *SearchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	once.Do(func() {
 		addon.CreateAddonOnce(ctx, instance)
 	})
+	// Starting with ACM 2.9, ServiceMonitors are created in the open-cluster-management namespace.
+	// This migration function removes the service monitors that were previously created in the openshift-monitoring namespace.
+	// We can remove this migration step after ACM 2.8 End of Life.
 	cleanUpFunc := func() {
 		// delete legacy servicemonitor setup
 		result, err = r.deleteLegacyServiceMonitorSetup(instance)
 		cleanupComplete = true
-		log.Info("cleanupComplete. Setting cleanupComplete to ", "cleanupComplete", cleanupComplete)
 		if result != nil {
 			cleanupComplete = false
-			log.Info("cleanup not complete. Setting cleanupComplete to ", "cleanupComplete", cleanupComplete)
+			log.Info("cleanup not complete. Setting cleanupComplete flag to ", "cleanupComplete", cleanupComplete)
 			log.Error(err, "Failed to remove legacy ServiceMonitor setup ")
+		} else {
+			log.Info("cleanup complete. Setting cleanupComplete flag to ", "cleanupComplete", cleanupComplete)
 		}
 	}
 	if !cleanupComplete {
