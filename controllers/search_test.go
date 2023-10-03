@@ -9,8 +9,6 @@ import (
 	"testing"
 	"time"
 
-	errv1 "errors"
-
 	monitorv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	searchv1alpha1 "github.com/stolostron/search-v2-operator/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
@@ -19,7 +17,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
@@ -848,16 +845,6 @@ func TestSearch_controller_Metrics(t *testing.T) {
 	}, role)
 	if roleErr == nil {
 		t.Errorf("Found Role SearchMonitor: (%v) when not expected", roleErr)
-	}
-}
-
-func TestSearch_controller_checkErrPresent(t *testing.T) {
-	if shouldBeTrue := errPresent(errv1.New("Some error")); !shouldBeTrue {
-		t.Errorf("Expected bool to be false, but got %t", shouldBeTrue)
-	}
-	smonitor := schema.GroupVersion{Group: "monitoring.coreos.com", Version: "v1"}.WithResource("servicemonitors").GroupResource()
-	if shouldBeFalse := errPresent(errors.NewNotFound(smonitor, "search-api-monitor")); shouldBeFalse {
-		t.Errorf("Expected bool to be true, but got %t", shouldBeFalse)
 	}
 }
 

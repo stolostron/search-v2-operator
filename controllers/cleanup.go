@@ -9,7 +9,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 func (r *SearchReconciler) deleteClusterManagementAddon(instance *searchv1alpha1.Search) error {
@@ -74,24 +73,19 @@ func (r *SearchReconciler) deleteClusterRoleBinding(instance *searchv1alpha1.Sea
 	log.V(2).Info("Deleted ClusterRoleBinding", "ClusterRoleBinding", crb)
 	return nil
 }
-func errPresent(err error) bool {
-	if err != nil {
-		return !errors.IsNotFound(err)
-	}
-	return false
-}
 
 func (r *SearchReconciler) deleteLegacyServiceMonitorSetup(instance *searchv1alpha1.Search) {
 	var err error
 	for _, sm := range []string{"search-api", "search-indexer"} {
-		if err = r.deleteObject(r.ServiceMonitor(instance, sm, "openshift-monitoring")); err != nil && errPresent(err) {
+		if err = r.Delete(r.context,
+			r.ServiceMonitor(instance, sm, "openshift-monitoring")); err != nil && !errors.IsNotFound(err) {
 			log.Error(err, "Failed to remove ServiceMonitor from openshift-monitoring namespace")
 		}
 	}
-	if err := r.deleteObject(r.MetricsRole(instance)); err != nil && errPresent(err) {
+	if err := r.Delete(r.context, r.MetricsRole(instance)); err != nil && !errors.IsNotFound(err) {
 		log.Error(err, "Failed to remove Role")
 	}
-	if err = r.deleteObject(r.MetricsRoleBinding(instance)); err != nil && errPresent(err) {
+	if err = r.Delete(r.context, r.MetricsRoleBinding(instance)); err != nil && !errors.IsNotFound(err) {
 		log.Error(err, "Failed to remove RoleBinding")
 	}
 	if err == nil {
@@ -99,15 +93,4 @@ func (r *SearchReconciler) deleteLegacyServiceMonitorSetup(instance *searchv1alp
 	} else {
 		log.Error(err, "Failed to remove legacy ServiceMonitor setup from openshift-monitoring namespace")
 	}
-}
-
-func (r *SearchReconciler) deleteObject(obj client.Object) error {
-	log.V(2).Info("Deleting object ", "Kind:", obj.GetObjectKind(), "Name:", obj.GetName())
-
-	err := r.Delete(r.context, obj)
-	if err != nil && !errors.IsNotFound(err) {
-		log.Error(err, "Failed to delete object ", "Kind:", obj.GetObjectKind(), "Name:", obj.GetName())
-	}
-	log.V(2).Info("Deleted object", "Kind:", obj.GetObjectKind(), "Name:", obj.GetName())
-	return err
 }
