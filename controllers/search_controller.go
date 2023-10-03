@@ -242,6 +242,7 @@ func (r *SearchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		cleanOnce.Do(cleanUpFunc)
 		//To retry if cleanup fails
 		if !cleanupComplete {
+			log.Error(err, "Failed to remove legacy ServiceMonitor setup - returning error ")
 			return ctrl.Result{}, err
 		}
 	}
