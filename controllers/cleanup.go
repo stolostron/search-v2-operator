@@ -10,7 +10,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
 func (r *SearchReconciler) deleteClusterManagementAddon(instance *searchv1alpha1.Search) error {
@@ -82,26 +81,24 @@ func errPresent(err error) bool {
 	return false
 }
 
-func (r *SearchReconciler) deleteLegacyServiceMonitorSetup(instance *searchv1alpha1.Search) (*reconcile.Result, error) {
+func (r *SearchReconciler) deleteLegacyServiceMonitorSetup(instance *searchv1alpha1.Search) {
 	var err error
-	errs := []error{}
 	for _, sm := range []string{"search-api", "search-indexer"} {
 		if err = r.deleteObject(r.ServiceMonitor(instance, sm, "openshift-monitoring")); err != nil && errPresent(err) {
-			errs = append(errs, err)
+			log.Error(err, "Failed to remove ServiceMonitor from openshift-monitoring namespace")
 		}
 	}
 	if err := r.deleteObject(r.MetricsRole(instance)); err != nil && errPresent(err) {
-		errs = append(errs, err)
+		log.Error(err, "Failed to remove Role")
 	}
 	if err = r.deleteObject(r.MetricsRoleBinding(instance)); err != nil && errPresent(err) {
-		errs = append(errs, err)
+		log.Error(err, "Failed to remove RoleBinding")
 	}
-	if len(errs) > 0 { //if there are errors, return the first one
-		return &reconcile.Result{}, errs[0]
+	if err == nil {
+		log.Info("Deleted legacy ServiceMonitor Setup from openshift-monitoring namespace")
+	} else {
+		log.Error(err, "Failed to remove legacy ServiceMonitor setup from openshift-monitoring namespace")
 	}
-
-	log.Info("Deleted legacy ServiceMonitor Setup from openshift-monitoring namespace")
-	return nil, nil
 }
 
 func (r *SearchReconciler) deleteObject(obj client.Object) error {

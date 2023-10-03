@@ -56,8 +56,6 @@ var log = logf.Log.WithName("searchoperator")
 var once sync.Once
 var cleanOnce sync.Once
 
-var cleanupComplete bool
-
 //+kubebuilder:rbac:groups=search.open-cluster-management.io,resources=searches,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=search.open-cluster-management.io,resources=searches/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=search.open-cluster-management.io,resources=searches/finalizers,verbs=update
@@ -226,26 +224,10 @@ func (r *SearchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	// Starting with ACM 2.9, ServiceMonitors are created in the open-cluster-management namespace.
 	// This migration function removes the service monitors that were previously created in the openshift-monitoring namespace.
 	// We can remove this migration step after ACM 2.8 End of Life.
-	cleanUpFunc := func() {
+	cleanOnce.Do(func() {
 		// delete legacy servicemonitor setup
-		result, err = r.deleteLegacyServiceMonitorSetup(instance)
-		cleanupComplete = true
-		if result != nil {
-			cleanupComplete = false
-			log.Info("cleanup not complete. Setting cleanupComplete flag to ", "cleanupComplete", cleanupComplete)
-			log.Error(err, "Failed to remove legacy ServiceMonitor setup ")
-		} else {
-			log.Info("cleanup complete. Setting cleanupComplete flag to ", "cleanupComplete", cleanupComplete)
-		}
-	}
-	if !cleanupComplete {
-		cleanOnce.Do(cleanUpFunc)
-		//To retry if cleanup fails
-		if !cleanupComplete {
-			log.Error(err, "Failed to remove legacy ServiceMonitor setup - returning error ")
-			return ctrl.Result{}, err
-		}
-	}
+		r.deleteLegacyServiceMonitorSetup(instance)
+	})
 
 	return ctrl.Result{}, nil
 }
