@@ -73,3 +73,24 @@ func (r *SearchReconciler) deleteClusterRoleBinding(instance *searchv1alpha1.Sea
 	log.V(2).Info("Deleted ClusterRoleBinding", "ClusterRoleBinding", crb)
 	return nil
 }
+
+func (r *SearchReconciler) deleteLegacyServiceMonitorSetup(instance *searchv1alpha1.Search) {
+	var err error
+	for _, sm := range []string{"search-api", "search-indexer"} {
+		if err = r.Delete(r.context,
+			r.ServiceMonitor(instance, sm, "openshift-monitoring")); err != nil && !errors.IsNotFound(err) {
+			log.Error(err, "Failed to remove ServiceMonitor from openshift-monitoring namespace")
+		}
+	}
+	if err := r.Delete(r.context, r.MetricsRole(instance)); err != nil && !errors.IsNotFound(err) {
+		log.Error(err, "Failed to remove Role")
+	}
+	if err = r.Delete(r.context, r.MetricsRoleBinding(instance)); err != nil && !errors.IsNotFound(err) {
+		log.Error(err, "Failed to remove RoleBinding")
+	}
+	if err == nil {
+		log.Info("Deleted legacy ServiceMonitor Setup from openshift-monitoring namespace")
+	} else {
+		log.Info("Failed to remove legacy ServiceMonitor setup from openshift-monitoring namespace")
+	}
+}
