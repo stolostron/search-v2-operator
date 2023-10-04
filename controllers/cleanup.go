@@ -88,7 +88,7 @@ func (r *SearchReconciler) deleteLegacyServiceMonitorSetup(instance *searchv1alp
 	if err = r.Delete(r.context, r.MetricsRoleBinding(instance)); err != nil && !errors.IsNotFound(err) {
 		log.Error(err, "Failed to remove RoleBinding")
 	}
-	if err == nil {
+	if err == nil || (err != nil && errors.IsNotFound(err)) {
 		log.Info("Deleted legacy ServiceMonitor Setup from openshift-monitoring namespace")
 	} else {
 		log.Info("Failed to remove legacy ServiceMonitor setup from openshift-monitoring namespace")
