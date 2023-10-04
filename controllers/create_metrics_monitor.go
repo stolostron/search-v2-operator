@@ -16,48 +16,6 @@ import (
 
 const SearchMetricsMonitor = "search-metrics-monitor"
 
-func (r *SearchReconciler) createMetricsRole(ctx context.Context,
-	crole *rbacv1.Role,
-) (*reconcile.Result, error) {
-
-	found := &rbacv1.Role{}
-	err := r.Get(ctx, types.NamespacedName{
-		Name:      crole.Name,
-		Namespace: crole.Namespace,
-	}, found)
-	if err != nil && errors.IsNotFound(err) {
-		err = r.Create(ctx, crole)
-		if err != nil {
-			log.Error(err, "Could not create role "+crole.Name)
-			return &reconcile.Result{}, err
-		}
-		log.Info("Created role" + crole.Name)
-		log.V(9).Info("Created  role ", "name", crole)
-	}
-	return nil, nil
-}
-
-func (r *SearchReconciler) createMetricsRoleBinding(ctx context.Context,
-	rolebinding *rbacv1.RoleBinding,
-) (*reconcile.Result, error) {
-
-	found := &rbacv1.RoleBinding{}
-	err := r.Get(ctx, types.NamespacedName{
-		Name:      rolebinding.Name,
-		Namespace: rolebinding.Namespace,
-	}, found)
-	if err != nil && errors.IsNotFound(err) {
-		err = r.Create(ctx, rolebinding)
-		if err != nil {
-			log.Error(err, "Could not create rolebinding "+rolebinding.Name)
-			return &reconcile.Result{}, err
-		}
-		log.Info("Created rolebinding " + rolebinding.Name)
-		log.V(2).Info("Created rolebinding ", "name", rolebinding)
-	}
-	return nil, nil
-}
-
 func (r *SearchReconciler) MetricsRole(instance *searchv1alpha1.Search) *rbacv1.Role {
 	cr := &rbacv1.Role{
 		TypeMeta: metav1.TypeMeta{
@@ -107,7 +65,7 @@ func (r *SearchReconciler) MetricsRoleBinding(instance *searchv1alpha1.Search) *
 }
 
 func (r *SearchReconciler) ServiceMonitor(instance *searchv1alpha1.Search,
-	deployment string) *monitorv1.ServiceMonitor {
+	deployment string, namespace string) *monitorv1.ServiceMonitor {
 	smName := deployment + "-monitor"
 	cr := &monitorv1.ServiceMonitor{
 		TypeMeta: metav1.TypeMeta{
@@ -116,7 +74,7 @@ func (r *SearchReconciler) ServiceMonitor(instance *searchv1alpha1.Search,
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      smName,
-			Namespace: "openshift-monitoring",
+			Namespace: namespace,
 		},
 		Spec: monitorv1.ServiceMonitorSpec{
 			JobLabel:          deployment,
@@ -148,17 +106,14 @@ func (r *SearchReconciler) createServiceMonitor(ctx context.Context,
 		Name:      smonitor.Name,
 		Namespace: smonitor.Namespace,
 	}, found)
-	log.Info("Error fetching servicemonitor "+smonitor.Namespace+"/"+smonitor.Name, "err", err)
 	if err != nil && errors.IsNotFound(err) {
 		err := r.Create(ctx, smonitor)
-		if err != nil && !errors.IsAlreadyExists(err) {
+		if err != nil {
 			log.Error(err, "Could not create servicemonitor "+smonitor.Name)
 			return &reconcile.Result{}, err
 		}
-		log.Info("Created servicemonitor " + smonitor.Name)
+		log.Info("Created servicemonitor " + smonitor.Namespace + "/" + smonitor.Name)
 		log.V(9).Info("Created  servicemonitor ", "name", smonitor)
-	} else {
-		log.Info("Error fetching servicemonitor"+smonitor.Name, "err", err)
 	}
 	return nil, nil
 }

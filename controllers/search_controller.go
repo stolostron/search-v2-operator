@@ -54,6 +54,7 @@ const searchFinalizer = "search.open-cluster-management.io/finalizer"
 
 var log = logf.Log.WithName("searchoperator")
 var once sync.Once
+var cleanOnce sync.Once
 
 //+kubebuilder:rbac:groups=search.open-cluster-management.io,resources=searches,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=search.open-cluster-management.io,resources=searches/status,verbs=get;update;patch
@@ -129,11 +130,6 @@ func (r *SearchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		log.Error(err, "AddonClusterRole setup failed")
 		return *result, err
 	}
-	result, err = r.createMetricsRole(ctx, r.MetricsRole(instance))
-	if result != nil {
-		log.Error(err, "MetricsRole setup failed")
-		return *result, err
-	}
 	result, err = r.createRoles(ctx, r.GlobalSearchUserClusterRole(instance))
 	if result != nil {
 		log.Error(err, "GlobalSearchUserClusterRole setup failed")
@@ -152,11 +148,6 @@ func (r *SearchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	result, err = r.createRoleBinding(ctx, r.ClusterRoleBinding(instance))
 	if result != nil {
 		log.Error(err, "ClusterRoleBinding  setup failed")
-		return *result, err
-	}
-	result, err = r.createMetricsRoleBinding(ctx, r.MetricsRoleBinding(instance))
-	if result != nil {
-		log.Error(err, "MetricsRoleBinding setup failed")
 		return *result, err
 	}
 	result, err = r.createSecret(ctx, r.PGSecret(instance))
@@ -185,12 +176,12 @@ func (r *SearchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		log.Error(err, "API Service  setup failed")
 		return *result, err
 	}
-	result, err = r.createServiceMonitor(ctx, r.ServiceMonitor(instance, "search-indexer"))
+	result, err = r.createServiceMonitor(ctx, r.ServiceMonitor(instance, "search-indexer", instance.Namespace))
 	if result != nil {
 		log.Error(err, "ServiceMonitor setup failed for search-indexer")
 		return *result, err
 	}
-	result, err = r.createServiceMonitor(ctx, r.ServiceMonitor(instance, "search-api"))
+	result, err = r.createServiceMonitor(ctx, r.ServiceMonitor(instance, "search-api", instance.Namespace))
 	if result != nil {
 		log.Error(err, "ServiceMonitor setup failed for search-api")
 		return *result, err
@@ -230,6 +221,14 @@ func (r *SearchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	once.Do(func() {
 		addon.CreateAddonOnce(ctx, instance)
 	})
+	// Starting with ACM 2.9, ServiceMonitors are created in the open-cluster-management namespace.
+	// This function removes the service monitors that were previously created in the openshift-monitoring namespace.
+	// We can remove this migration step after ACM 2.8 End of Life.
+	cleanOnce.Do(func() {
+		// delete legacy servicemonitor setup
+		r.deleteLegacyServiceMonitorSetup(instance)
+	})
+
 	return ctrl.Result{}, nil
 }
 

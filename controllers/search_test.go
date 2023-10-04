@@ -69,6 +69,10 @@ func TestSearch_controller(t *testing.T) {
 		t.Errorf("error adding addon scheme: (%v)", err)
 	}
 
+	err = monitorv1.AddToScheme(s)
+	if err != nil {
+		t.Errorf("error adding monitor scheme: (%v)", err)
+	}
 	objs := []runtime.Object{search}
 	// Create a fake client to mock API calls.
 	cl := fake.NewClientBuilder().WithRuntimeObjects(objs...).Build()
@@ -674,6 +678,10 @@ func TestSearch_controller_DBConfig(t *testing.T) {
 	if err != nil {
 		t.Errorf("error adding search scheme: (%v)", err)
 	}
+	err = monitorv1.AddToScheme(s)
+	if err != nil {
+		t.Errorf("error adding monitor scheme: (%v)", err)
+	}
 	err = addonv1alpha1.AddToScheme(s)
 	if err != nil {
 		t.Errorf("error adding addon scheme: (%v)", err)
@@ -734,7 +742,7 @@ func TestSearch_controller_Metrics(t *testing.T) {
 	)
 	search := &searchv1alpha1.Search{
 		TypeMeta:   metav1.TypeMeta{Kind: "Search"},
-		ObjectMeta: metav1.ObjectMeta{Name: name},
+		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: "ocm"},
 		Spec: searchv1alpha1.SearchSpec{
 			DBStorage: searchv1alpha1.StorageSpec{
 				StorageClassName: "test",
@@ -766,16 +774,19 @@ func TestSearch_controller_Metrics(t *testing.T) {
 	if err != nil {
 		t.Errorf("error adding rbac scheme: (%v)", err)
 	}
-	objs := []runtime.Object{search, collectorPod, apiPod, indexerPod, postGresPod}
+	r := &SearchReconciler{Scheme: s}
+	// legacy servicemonitor - should get deleted after reconcile
+	// searchApiMonitor := r.ServiceMonitor(search, "search-api", "openshift-monitoring")
+	objs := []runtime.Object{search, collectorPod, apiPod, indexerPod, postGresPod} //, searchApiMonitor}
 	// Create a fake client to mock API calls.
 	cl := fake.NewClientBuilder().WithRuntimeObjects(objs...).Build()
-
-	r := &SearchReconciler{Client: cl, Scheme: s}
+	r.Client = cl
 
 	// Mock request to simulate Reconcile() being called on an event for a watched resource.
 	req := ctrl.Request{
 		NamespacedName: types.NamespacedName{
-			Name: "Role/search-metrics-monitor",
+			Name:      "ServiceMonitor/search-api-monitor",
+			Namespace: search.Namespace,
 		},
 	}
 
@@ -784,7 +795,6 @@ func TestSearch_controller_Metrics(t *testing.T) {
 	if err != nil {
 		t.Errorf("reconcile: (%v)", err)
 	}
-
 	//wait for update status
 	time.Sleep(1 * time.Second)
 	sm := &monitorv1.ServiceMonitor{TypeMeta: metav1.TypeMeta{Kind: "ServiceMonitor"}}
@@ -793,15 +803,31 @@ func TestSearch_controller_Metrics(t *testing.T) {
 	// fetch search-service-monitor
 	smErr := cl.Get(context.TODO(), types.NamespacedName{
 		Name:      "search-api-monitor",
-		Namespace: "openshift-monitoring",
+		Namespace: search.Namespace,
 	}, sm)
 	if smErr != nil {
 		t.Errorf("Failed to get ServiceMonitor SearchApiMonitor: (%v)", smErr)
 	}
-	// fetch search-service-monitor
+	//service monitor should not be present in openshift-monitoring namespace
+	smErr = cl.Get(context.TODO(), types.NamespacedName{
+		Name:      "search-api-monitor",
+		Namespace: "openshift-monitoring",
+	}, sm)
+	if smErr == nil && errors.IsNotFound(smErr) {
+		t.Errorf("ServiceMonitor SearchApiMonitor present in openshift-monitoring namespace: (%v)", smErr)
+	}
+	//service monitor should not be present in openshift-monitoring namespace
 	smErr = cl.Get(context.TODO(), types.NamespacedName{
 		Name:      "search-indexer-monitor",
 		Namespace: "openshift-monitoring",
+	}, sm)
+	if smErr == nil && errors.IsNotFound(smErr) {
+		t.Errorf("ServiceMonitor SearchIndexerMonitor present in openshift-monitoring namespace: (%v)", smErr)
+	}
+	// fetch search-service-monitor
+	smErr = cl.Get(context.TODO(), types.NamespacedName{
+		Name:      "search-indexer-monitor",
+		Namespace: search.Namespace,
 	}, sm)
 	if smErr != nil {
 		t.Errorf("Failed to get ServiceMonitor SearchIndexerMonitor: (%v)", smErr)
@@ -810,15 +836,15 @@ func TestSearch_controller_Metrics(t *testing.T) {
 	rbErr := cl.Get(context.TODO(), types.NamespacedName{
 		Name: SearchMetricsMonitor,
 	}, roleb)
-	if rbErr != nil {
-		t.Errorf("Failed to get RoleBinding SearchMonitor: (%v)", rbErr)
+	if rbErr == nil {
+		t.Errorf("Found RoleBinding SearchMonitor: (%v) when not expected", rbErr)
 	}
 	// fetch metrics role
 	roleErr := cl.Get(context.TODO(), types.NamespacedName{
 		Name: SearchMetricsMonitor,
 	}, role)
-	if roleErr != nil {
-		t.Errorf("Failed to get Role SearchMonitor: (%v)", roleErr)
+	if roleErr == nil {
+		t.Errorf("Found Role SearchMonitor: (%v) when not expected", roleErr)
 	}
 }
 
