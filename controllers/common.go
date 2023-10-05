@@ -36,9 +36,9 @@ const (
 	apiSecretName                   = "search-api-certs"
 	indexerSecretName               = "search-indexer-certs"
 	postgresSecretName              = "search-postgres-certs"
-	POSTGRESQL_SHARED_BUFFERS       = "64MB"
-	POSTGRESQL_EFFECTIVE_CACHE_SIZE = "128MB"
-	WORK_MEM                        = "16MB"
+	POSTGRESQL_SHARED_BUFFERS       = "512MB"
+	POSTGRESQL_EFFECTIVE_CACHE_SIZE = "1GB"
+	WORK_MEM                        = "32MB"
 )
 
 var (
