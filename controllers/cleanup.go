@@ -88,4 +88,5 @@ func (r *SearchReconciler) deleteLegacyServiceMonitorSetup(instance *searchv1alp
 	if err = r.Delete(r.context, r.MetricsRoleBinding(instance)); err != nil && !errors.IsNotFound(err) {
 		log.Error(err, "Failed to remove RoleBinding")
 	}
+	log.Info("Done deleting legacy service monitors.")
 }
