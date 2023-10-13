@@ -5,6 +5,7 @@ import (
 	searchv1alpha1 "github.com/stolostron/search-v2-operator/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
@@ -52,6 +53,10 @@ func (r *SearchReconciler) PGDeployment(instance *searchv1alpha1.Search) *appsv1
 			{
 				Name:      "search-postgres-certs",
 				MountPath: "/sslcert",
+			},
+			{
+				Name:      "dshm",
+				MountPath: "/dev/shm",
 			},
 		},
 		ReadinessProbe: &corev1.Probe{
@@ -121,6 +126,17 @@ func (r *SearchReconciler) PGDeployment(instance *searchv1alpha1.Search) *appsv1
 				Secret: &corev1.SecretVolumeSource{
 					DefaultMode: &certDefaultMode,
 					SecretName:  postgresSecretName,
+				},
+			},
+		},
+		{
+			Name: "dshm",
+			VolumeSource: corev1.VolumeSource{
+				EmptyDir: &corev1.EmptyDirVolumeSource{
+					Medium: corev1.StorageMediumMemory,
+					SizeLimit: &resource.Quantity{
+						Format: "1Gi", // TODO: Should it be 1/4 of memory limit Or POSGRESQL_SHARED_BUFFERS?
+					},
 				},
 			},
 		},
