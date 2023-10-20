@@ -36,8 +36,9 @@ const (
 	apiSecretName                   = "search-api-certs"
 	indexerSecretName               = "search-indexer-certs"
 	postgresSecretName              = "search-postgres-certs"
+	POSTGRESQL_CONTAINER_SHARED_MEM = "1Gi"  // Postgres container Memory * 0.25
 	POSTGRESQL_EFFECTIVE_CACHE_SIZE = "1GB"  // Postgres container Memory * 0.5
-	POSTGRESQL_SHARED_BUFFERS       = "1GB"  // Postgres container Memory * 0.25 - Also used for container shared memory.
+	POSTGRESQL_SHARED_BUFFERS       = "1GB"  // Postgres container Memory * 0.25
 	WORK_MEM                        = "64MB" // Postgres container Memory * 0.25 / max_connections
 )
 

@@ -135,7 +135,7 @@ func (r *SearchReconciler) PGDeployment(instance *searchv1alpha1.Search) *appsv1
 				EmptyDir: &corev1.EmptyDirVolumeSource{
 					Medium: corev1.StorageMediumMemory,
 					SizeLimit: &resource.Quantity{
-						Format: resource.MustParse(postgresqlSharedBuffers).Format, // Default to 1GB
+						Format: resource.MustParse(POSTGRESQL_CONTAINER_SHARED_MEM).Format, // Default to 1GB
 					},
 				},
 			},
