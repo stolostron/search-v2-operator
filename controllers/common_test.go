@@ -652,7 +652,7 @@ func TestMemoryLimitCustomization(t *testing.T) {
 
 func TestPGDeployment(t *testing.T) {
 	var expectedMap = map[string]string{"POSTGRESQL_SHARED_BUFFERS": "64MB",
-		"POSTGRESQL_EFFECTIVE_CACHE_SIZE": POSTGRESQL_EFFECTIVE_CACHE_SIZE,
+		"POSTGRESQL_EFFECTIVE_CACHE_SIZE": default_POSTGRESQL_EFFECTIVE_CACHE_SIZE,
 		"WORK_MEM":                        "32MB"}
 
 	var configValueMap = map[string]string{"POSTGRESQL_SHARED_BUFFERS": "64MB",
