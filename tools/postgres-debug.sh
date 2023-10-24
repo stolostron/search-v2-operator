@@ -32,6 +32,8 @@
 #    - POSTGRESQL idle queries
 #    - POSTGRESQL index usage
 #    - POSTGRESQL vacuum and table stats
+# 4. Gather execution data for queries used by the search service.
+#
 
 psql -d search -U searchuser -c "SELECT NOW() as script_start_time;"
 psql -d search -U searchuser -c "SELECT version();"
@@ -127,5 +129,39 @@ printf "\n>>> POSTGRESQL Vacuum and table stats:\n\n"
 psql -d search -U searchuser -c "SELECT relname,n_dead_tup,n_live_tup,last_vacuum,last_analyze,last_autovacuum,last_autoanalyze 
     FROM pg_stat_all_tables 
     WHERE schemaname = 'search';"
+
+
+printf "\n\n----- GATHER EXECUTION DATA FOR QUERIES USED BY SEARCH -----\n\n"
+
+# Select a random cluster name and UID to use in the queries.
+RANDOM_CLUSTER=$(psql -d search -U searchuser --csv -c "SELECT cluster from search.resources ORDER BY RANDOM() LIMIT 1;" | tail -1)
+RANDOM_UID=$(psql -d search -U searchuser --csv -c "SELECT uid from search.resources ORDER BY RANDOM() LIMIT 1;" | tail -1)
+echo "Using CLUSTER: ${RANDOM_CLUSTER}"
+echo "Using UID: ${RANDOM_UID}"
+
+QUERY_INVENTORY=(
+    "EXPLAIN ANALYZE SELECT uid, data FROM search.resources WHERE cluster='${RANDOM_CLUSTER}' AND uid!='cluster__${RANDOM_CLUSTER}';"
+    "EXPLAIN ANALYZE SELECT count(*) FROM search.resources WHERE cluster='${RANDOM_CLUSTER}' AND data->'_hubClusterResource' IS NOT NULL;"
+    "EXPLAIN ANALYZE SELECT sourceid, edgetype, destid FROM search.edges WHERE edgetype!='interCluster' AND cluster='${RANDOM_CLUSTER}';"
+    "EXPLAIN DELETE from search.resources WHERE uid IN ('${RANDOM_UID}');"
+    "EXPLAIN ANALYZE SELECT DISTINCT data->'name' from search.resources;"
+    "EXPLAIN ANALYZE SELECT DISTINCT data->'name' as d from search.resources ORDER BY d ASC LIMIT 1000000;"
+    "EXPLAIN ANALYZE SELECT DISTINCT data->'name' as d from search.resources ORDER BY d ASC;"
+    "EXPLAIN ANALYZE SELECT DISTINCT data->'status' from search.resources;"
+    "EXPLAIN ANALYZE SELECT DISTINCT data->'status' as d from search.resources ORDER BY d ASC;"
+    "EXPLAIN ANALYZE SELECT * from search.resources WHERE data->'kind' ? 'Secret';"
+    "EXPLAIN ANALYZE SELECT * from search.resources WHERE data->>'kind' = 'Secret';"
+    "EXPLAIN ANALYZE SELECT * from search.resources WHERE data->>'kind' ILIKE 'secret';"
+    "EXPLAIN ANALYZE SELECT * from search.resources WHERE data->'kind' ?| ARRAY['Secret','Pod'];"
+    "EXPLAIN ANALYZE SELECT * from search.resources WHERE data->'status' ?| ARRAY['Running','Failed'];"
+    "EXPLAIN ANALYZE SELECT * from search.resources WHERE data->'label' @> '{\"app\":\"search\"}';"
+   )
+
+# Execute the queries in the inventory.
+for query in "${QUERY_INVENTORY[@]}"
+do
+    psql -d search -U searchuser -e -c "$query"
+done
+
 
 psql -d search -U searchuser -c "SELECT NOW() as script_end_time;"
