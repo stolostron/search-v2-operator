@@ -17,7 +17,7 @@ func (r *SearchReconciler) PGDeployment(instance *searchv1alpha1.Search) *appsv1
 	postgresqlSharedBuffers := r.GetDBConfigFromSearchCR(r.context, instance, "POSTGRESQL_SHARED_BUFFERS")
 	postgresqlEffectiveCacheSize := r.GetDBConfigFromSearchCR(r.context, instance, "POSTGRESQL_EFFECTIVE_CACHE_SIZE")
 	postgresqlWorkMem := r.GetDBConfigFromSearchCR(r.context, instance, "WORK_MEM")
-	postGresDefaultEnvVars := []corev1.EnvVar{
+	postgresDefaultEnvVars := []corev1.EnvVar{
 		newEnvVar("POSTGRESQL_SHARED_BUFFERS", postgresqlSharedBuffers),
 		newEnvVar("POSTGRESQL_EFFECTIVE_CACHE_SIZE", postgresqlEffectiveCacheSize),
 		newEnvVar("WORK_MEM", postgresqlWorkMem),
@@ -88,7 +88,7 @@ func (r *SearchReconciler) PGDeployment(instance *searchv1alpha1.Search) *appsv1
 	for _, envVar := range env {
 		postgresCurrEnvMap[envVar.Name] = struct{}{}
 	}
-	for _, envVar := range postGresDefaultEnvVars {
+	for _, envVar := range postgresDefaultEnvVars {
 		// if default env vars are not added by the user, add them
 		// These env vars are recognized by the image - refer to
 		// doc: https://github.com/sclorg/postgresql-container/tree/master/13#environment-variables-and-volumes
@@ -99,6 +99,9 @@ func (r *SearchReconciler) PGDeployment(instance *searchv1alpha1.Search) *appsv1
 	}
 	postgresContainer.Env = append(postgresContainer.Env, env...)
 	postgresContainer.Resources = getResourceRequirements(deploymentName, instance)
+	shmSizeLimit := resource.Quantity{
+		Format: resource.MustParse(default_Postgres_SharedMemory).Format,
+	}
 	volumes := []corev1.Volume{
 		{
 			Name: "postgresql-cfg",
@@ -133,10 +136,8 @@ func (r *SearchReconciler) PGDeployment(instance *searchv1alpha1.Search) *appsv1
 			Name: "dshm",
 			VolumeSource: corev1.VolumeSource{
 				EmptyDir: &corev1.EmptyDirVolumeSource{
-					Medium: corev1.StorageMediumMemory,
-					SizeLimit: &resource.Quantity{
-						Format: resource.MustParse(default_Postgres_SharedMemory).Format,
-					},
+					Medium:    corev1.StorageMediumMemory,
+					SizeLimit: &shmSizeLimit,
 				},
 			},
 		},
