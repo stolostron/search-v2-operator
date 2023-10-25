@@ -694,6 +694,13 @@ func TestPGDeployment(t *testing.T) {
 	r := &SearchReconciler{Client: cl, Scheme: s}
 	actualDep := r.PGDeployment(search)
 
+	vols := actualDep.Spec.Template.Spec.Volumes
+	for _, vol := range vols {
+		if vol.Name == "dshm" && !vol.VolumeSource.EmptyDir.SizeLimit.Equal(resource.MustParse("1Gi")) {
+			t.Errorf("Expected shared volume SizeLimit to be 1Gi, but got: %+v ", vol.VolumeSource.EmptyDir.SizeLimit)
+		}
+	}
+
 	for _, env := range actualDep.Spec.Template.Spec.Containers[0].Env {
 		if env.Value != expectedMap[env.Name] {
 			t.Errorf("Expected %s for %s, but got %s", expectedMap[env.Name], env.Name, env.Value)
