@@ -694,16 +694,25 @@ func TestPGDeployment(t *testing.T) {
 	r := &SearchReconciler{Client: cl, Scheme: s}
 	actualDep := r.PGDeployment(search)
 
-	vols := actualDep.Spec.Template.Spec.Volumes
-	for _, vol := range vols {
-		if vol.Name == "dshm" && !vol.VolumeSource.EmptyDir.SizeLimit.Equal(resource.MustParse("1Gi")) {
-			t.Errorf("Expected shared volume SizeLimit to be 1Gi, but got: %+v ", vol.VolumeSource.EmptyDir.SizeLimit)
-		}
-	}
-
+	// Validate Env variables
 	for _, env := range actualDep.Spec.Template.Spec.Containers[0].Env {
 		if env.Value != expectedMap[env.Name] {
 			t.Errorf("Expected %s for %s, but got %s", expectedMap[env.Name], env.Name, env.Value)
 		}
+	}
+
+	// Validate the shared memory volume.
+	var sharedMemoryVolume corev1.Volume
+	for _, vol := range actualDep.Spec.Template.Spec.Volumes {
+		if vol.Name == "dshm" {
+			sharedMemoryVolume = vol
+			break
+		}
+	}
+	if sharedMemoryVolume.Name != "dshm" {
+		t.Errorf("Expected shared volume dshm to be present, but got: %+v ", sharedMemoryVolume)
+	}
+	if !sharedMemoryVolume.VolumeSource.EmptyDir.SizeLimit.Equal(resource.MustParse("1Gi")) {
+		t.Errorf("Expected shared volume SizeLimit to be 1Gi, but got: %+v ", sharedMemoryVolume.VolumeSource.EmptyDir.SizeLimit)
 	}
 }
