@@ -17,10 +17,10 @@ const (
 	default_Postgres_CPURequest             = "25m"
 	default_Postgres_MemoryLimit            = "4Gi"
 	default_Postgres_MemoryRequest          = "1Gi"
-	default_Postgres_SharedMemory           = "1Gi"  // Postgres container MemoryLimit * 0.25
-	default_POSTGRESQL_EFFECTIVE_CACHE_SIZE = "1GB"  // Postgres container MemoryLimit * 0.5
-	default_POSTGRESQL_SHARED_BUFFERS       = "1GB"  // Postgres container MemoryLimit * 0.25
-	default_WORK_MEM                        = "64MB" // Postgres container MemoryLimit * 0.25 / max_connections
+	default_Postgres_SharedMemory           = "1Gi"  // Container MemoryLimit * 0.25
+	default_POSTGRESQL_EFFECTIVE_CACHE_SIZE = "2GB"  // Container MemoryLimit * 0.5
+	default_POSTGRESQL_SHARED_BUFFERS       = "1GB"  // Container MemoryLimit * 0.25
+	default_WORK_MEM                        = "64MB" // Container MemoryLimit * 0.25 / max_connections
 
 	default_API_Replicas       = 1
 	default_Indexer_Replicas   = 1
