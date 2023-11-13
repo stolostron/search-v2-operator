@@ -33,20 +33,19 @@ const (
 	postgresConfigmapName = "search-postgres"
 	caCertConfigmapName   = "search-ca-crt"
 
-	apiSecretName                   = "search-api-certs"
-	indexerSecretName               = "search-indexer-certs"
-	postgresSecretName              = "search-postgres-certs"
-	POSTGRESQL_SHARED_BUFFERS       = "64MB"
-	POSTGRESQL_EFFECTIVE_CACHE_SIZE = "128MB"
-	WORK_MEM                        = "16MB"
+	apiSecretName      = "search-api-certs"
+	indexerSecretName  = "search-indexer-certs"
+	postgresSecretName = "search-postgres-certs"
 )
 
 var (
 	certDefaultMode       = int32(416)
 	AnnotationSearchPause = "search-pause"
 )
-var dbDefaultMap = map[string]string{"POSTGRESQL_SHARED_BUFFERS": POSTGRESQL_SHARED_BUFFERS, "WORK_MEM": WORK_MEM,
-	"POSTGRESQL_EFFECTIVE_CACHE_SIZE": POSTGRESQL_EFFECTIVE_CACHE_SIZE,
+var dbDefaultMap = map[string]string{
+	"POSTGRESQL_EFFECTIVE_CACHE_SIZE": default_POSTGRESQL_EFFECTIVE_CACHE_SIZE,
+	"POSTGRESQL_SHARED_BUFFERS":       default_POSTGRESQL_SHARED_BUFFERS,
+	"WORK_MEM":                        default_WORK_MEM,
 }
 
 func generateLabels(key, val string) map[string]string {

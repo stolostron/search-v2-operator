@@ -711,7 +711,7 @@ func TestSearch_controller_DBConfig(t *testing.T) {
 	}
 
 	verifyConfigmapDataContent(t, configmap, "postgresql.conf", "ssl = 'on'")
-	verifyConfigmapDataContent(t, configmap, "postgresql-start.sh", "ALTER ROLE searchuser set work_mem='16MB'")
+	verifyConfigmapDataContent(t, configmap, "postgresql-start.sh", "ALTER ROLE searchuser set work_mem='64MB'")
 
 	//check for created search-postgres deployment
 	dep := &appsv1.Deployment{}
@@ -723,9 +723,9 @@ func TestSearch_controller_DBConfig(t *testing.T) {
 		t.Fatalf("Failed to get deployment %s: %v", "search-postgres", err)
 	}
 	//Should be the default constant values set in common.go
-	verifyDeploymentEnv(t, dep, "WORK_MEM", "16MB")
-	verifyDeploymentEnv(t, dep, "POSTGRESQL_SHARED_BUFFERS", "64MB")
-	verifyDeploymentEnv(t, dep, "POSTGRESQL_EFFECTIVE_CACHE_SIZE", "128MB")
+	verifyDeploymentEnv(t, dep, "WORK_MEM", "64MB")
+	verifyDeploymentEnv(t, dep, "POSTGRESQL_SHARED_BUFFERS", "1GB")
+	verifyDeploymentEnv(t, dep, "POSTGRESQL_EFFECTIVE_CACHE_SIZE", "2GB")
 }
 
 func TestSearch_controller_Metrics(t *testing.T) {
