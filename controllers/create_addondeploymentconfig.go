@@ -43,7 +43,8 @@ func (r *SearchReconciler) createAddOnDeploymentConfig(ctx context.Context,
 	return nil, nil
 }
 
-func (r *SearchReconciler) NewAddOnDeploymentConfig(instance *searchv1alpha1.Search) *addonv1alpha1.AddOnDeploymentConfig {
+func (r *SearchReconciler) NewAddOnDeploymentConfig(instance *searchv1alpha1.Search,
+) *addonv1alpha1.AddOnDeploymentConfig {
 	adc := &addonv1alpha1.AddOnDeploymentConfig{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      getClusterManagementAddonName(),
