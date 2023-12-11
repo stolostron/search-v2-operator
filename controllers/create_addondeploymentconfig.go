@@ -13,15 +13,14 @@ import (
 )
 
 func (r *SearchReconciler) createAddOnDeploymentConfig(ctx context.Context,
-	instance *searchv1alpha1.Search,
+	adc *addonv1alpha1.AddOnDeploymentConfig,
 ) (*reconcile.Result, error) {
 	found := &addonv1alpha1.AddOnDeploymentConfig{}
 	err := r.Get(ctx, types.NamespacedName{
 		Name:      getClusterManagementAddonName(),
-		Namespace: instance.Namespace,
+		Namespace: adc.Namespace,
 	}, found)
 	if err != nil && errors.IsNotFound(err) {
-		adc := r.newAddOnDeploymentConfig(instance)
 		err = r.Create(ctx, adc)
 		if err != nil {
 			log.Error(err, "Could not create AddOnDeploymentConfig")
@@ -34,10 +33,17 @@ func (r *SearchReconciler) createAddOnDeploymentConfig(ctx context.Context,
 		log.Error(err, "Error getting AddOnDeploymentConfig")
 		return &reconcile.Result{}, err
 	}
+	if !AddonDeploymentConfigEquals(found, adc) {
+		if err := r.Update(ctx, adc); err != nil {
+			log.Error(err, "Could not update AddOnDeploymentConfig")
+			return nil, nil
+		}
+		log.V(9).Info("Updated AddOnDeploymentConfig ", "name", adc)
+	}
 	return nil, nil
 }
 
-func (r *SearchReconciler) newAddOnDeploymentConfig(instance *searchv1alpha1.Search) *addonv1alpha1.AddOnDeploymentConfig {
+func (r *SearchReconciler) NewAddOnDeploymentConfig(instance *searchv1alpha1.Search) *addonv1alpha1.AddOnDeploymentConfig {
 	adc := &addonv1alpha1.AddOnDeploymentConfig{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      getClusterManagementAddonName(),
