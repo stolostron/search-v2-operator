@@ -216,7 +216,7 @@ func NewAddonManager(kubeConfig *rest.Config) (addonmanager.AddonManager, error)
 	}
 	agentAddon, err := addonfactory.NewAgentAddonFactory(SearchAddonName, ChartFS, ChartDir).
 		WithConfigGVRs(
-			addonfactory.AddOnDeploymentConfigGVR,
+			utils.AddOnDeploymentConfigGVR,
 		).WithGetValuesFuncs(
 		getValue,
 		addonfactory.GetValuesFromAddonAnnotation,
