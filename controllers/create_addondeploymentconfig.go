@@ -34,6 +34,8 @@ func (r *SearchReconciler) createAddOnDeploymentConfig(ctx context.Context,
 		return &reconcile.Result{}, err
 	}
 	if !AddonDeploymentConfigEquals(found, adc) {
+		//get the current resource version to update
+		adc.ResourceVersion = found.ResourceVersion
 		if err := r.Update(ctx, adc); err != nil {
 			log.Error(err, "Could not update AddOnDeploymentConfig")
 			return nil, nil
