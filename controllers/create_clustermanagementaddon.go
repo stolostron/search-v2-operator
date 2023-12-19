@@ -61,6 +61,9 @@ func (r *SearchReconciler) newClusterManagementAddOn(instance *searchv1alpha1.Se
 					},
 				},
 			},
+			InstallStrategy: addonv1alpha1.InstallStrategy{
+				Type: addonv1alpha1.AddonInstallStrategyManual,
+			},
 		},
 	}
 	err := controllerutil.SetControllerReference(instance, cma, r.Scheme)
