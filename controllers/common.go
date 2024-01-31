@@ -235,10 +235,12 @@ func getResourceRequirements(deploymentName string, instance *searchv1alpha1.Sea
 			Limits:   getLimits(indexerDeploymentName, instance),
 		}
 	case postgresDeploymentName:
-		return corev1.ResourceRequirements{
+		pg := corev1.ResourceRequirements{
 			Requests: getRequests(postgresDeploymentName, instance),
 			Limits:   getLimits(postgresDeploymentName, instance),
 		}
+		log.Info("Postgres Resource Requirements", "pg", pg)
+		return pg
 	}
 	log.V(2).Info("Unknown deployment ", "name", deploymentName)
 	return corev1.ResourceRequirements{}
@@ -315,6 +317,7 @@ func limitRequestPopulatedCheck(cpu, memory, hugepages resource.Quantity, resour
 		}
 	}
 
+	log.Info("Hugepages ->", "deployment", deployment, "hugepages", hugepages)
 	return corev1.ResourceList{
 		corev1.ResourceCPU:    cpu,
 		corev1.ResourceMemory: memory,
