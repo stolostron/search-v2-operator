@@ -263,11 +263,11 @@ func getRequests(deployment string, instance *searchv1alpha1.Search) corev1.Reso
 	if deploymentConfig.Resources.Requests.Memory() != nil {
 		memory = *deploymentConfig.Resources.Requests.Memory()
 	}
-	if deploymentConfig.Resources.Limits.Name(ResourceHugePages2Mi, resource.BinarySI) != nil {
-		hugepages2Mi = *deploymentConfig.Resources.Limits.Name(ResourceHugePages2Mi, resource.BinarySI)
+	if deploymentConfig.Resources.Requests.Name(ResourceHugePages2Mi, resource.BinarySI) != nil {
+		hugepages2Mi = *deploymentConfig.Resources.Requests.Name(ResourceHugePages2Mi, resource.BinarySI)
 	}
-	if deploymentConfig.Resources.Limits.Name(ResourceHugePages1Gi, resource.BinarySI) != nil {
-		hugepages1Gi = *deploymentConfig.Resources.Limits.Name(ResourceHugePages1Gi, resource.BinarySI)
+	if deploymentConfig.Resources.Requests.Name(ResourceHugePages1Gi, resource.BinarySI) != nil {
+		hugepages1Gi = *deploymentConfig.Resources.Requests.Name(ResourceHugePages1Gi, resource.BinarySI)
 	}
 
 	return limitRequestPopulatedCheck(cpu, memory, hugepages2Mi, hugepages1Gi, "request", deployment)
