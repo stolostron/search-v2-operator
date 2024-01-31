@@ -303,7 +303,7 @@ func limitRequestPopulatedCheck(cpu, memory, hugepages2Mi, hugepages1Gi resource
 	resource, deployment string) corev1.ResourceList {
 	resourceList := corev1.ResourceList{}
 
-	if cpu.String() != "<hil>" && cpu.CmpInt64(0) != 0 {
+	if cpu.String() != "<nil>" && cpu.CmpInt64(0) != 0 {
 		resourceList[corev1.ResourceCPU] = cpu
 	}
 	if memory.String() != "<nil>" && memory.CmpInt64(0) != 0 {
