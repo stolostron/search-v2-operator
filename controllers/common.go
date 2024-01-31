@@ -299,7 +299,8 @@ func getLimits(deployment string, instance *searchv1alpha1.Search) corev1.Resour
 	return limitRequestPopulatedCheck(cpu, memory, hugepages2Mi, hugepages1Gi, "limit", deployment)
 }
 
-func limitRequestPopulatedCheck(cpu, memory, hugepages2Mi, hugepages1Gi resource.Quantity, resource, deployment string) corev1.ResourceList {
+func limitRequestPopulatedCheck(cpu, memory, hugepages2Mi, hugepages1Gi resource.Quantity,
+	resource, deployment string) corev1.ResourceList {
 	resourceList := corev1.ResourceList{}
 
 	if cpu.String() != "<hil>" && cpu.CmpInt64(0) != 0 {
