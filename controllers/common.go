@@ -244,8 +244,10 @@ func getResourceRequirements(deploymentName string, instance *searchv1alpha1.Sea
 	return corev1.ResourceRequirements{}
 }
 
+const ResourceHugePages2Mi corev1.ResourceName = "hugepages-2Mi"
+
 func getRequests(deployment string, instance *searchv1alpha1.Search) corev1.ResourceList {
-	var cpu, memory resource.Quantity
+	var cpu, memory, hugepages resource.Quantity
 	cpu = resource.MustParse(defaultResoureMap[deployment]["CPURequest"])
 	memory = resource.MustParse(defaultResoureMap[deployment]["MemoryRequest"])
 	if !isResourcesCustomized(deployment, instance) {
@@ -261,12 +263,16 @@ func getRequests(deployment string, instance *searchv1alpha1.Search) corev1.Reso
 	if deploymentConfig.Resources.Requests.Memory() != nil {
 		memory = *deploymentConfig.Resources.Requests.Memory()
 	}
+	if deploymentConfig.Resources.Limits.Name(ResourceHugePages2Mi, resource.BinarySI) != nil {
+		hugepages = *deploymentConfig.Resources.Limits.Name(ResourceHugePages2Mi, resource.BinarySI)
+	}
 
-	return limitRequestPopulatedCheck(cpu, memory, "request", deployment)
+	return limitRequestPopulatedCheck(cpu, memory, hugepages, "request", deployment)
 }
 
 func getLimits(deployment string, instance *searchv1alpha1.Search) corev1.ResourceList {
-	var cpu, memory resource.Quantity
+
+	var cpu, memory, hugepages resource.Quantity
 	memory = resource.MustParse(defaultResoureMap[deployment]["MemoryLimit"])
 	if !isResourcesCustomized(deployment, instance) {
 		return corev1.ResourceList{
@@ -281,11 +287,14 @@ func getLimits(deployment string, instance *searchv1alpha1.Search) corev1.Resour
 	if deploymentConfig.Resources.Limits.Memory() != nil {
 		memory = *deploymentConfig.Resources.Limits.Memory()
 	}
+	if deploymentConfig.Resources.Limits.Name(ResourceHugePages2Mi, resource.BinarySI) != nil {
+		hugepages = *deploymentConfig.Resources.Limits.Name(ResourceHugePages2Mi, resource.BinarySI)
+	}
 
-	return limitRequestPopulatedCheck(cpu, memory, "limit", deployment)
+	return limitRequestPopulatedCheck(cpu, memory, hugepages, "limit", deployment)
 }
 
-func limitRequestPopulatedCheck(cpu, memory resource.Quantity, resource, deployment string) corev1.ResourceList {
+func limitRequestPopulatedCheck(cpu, memory, hugepages resource.Quantity, resource, deployment string) corev1.ResourceList {
 	if cpu.CmpInt64(0) == 0 && memory.CmpInt64(0) == 0 {
 		log.V(2).Info(fmt.Sprintf("%s not set for memory and cpu on deployment", resource), "deployment", deployment)
 		return corev1.ResourceList{}
@@ -308,6 +317,7 @@ func limitRequestPopulatedCheck(cpu, memory resource.Quantity, resource, deploym
 	return corev1.ResourceList{
 		corev1.ResourceCPU:    cpu,
 		corev1.ResourceMemory: memory,
+		ResourceHugePages2Mi:  hugepages,
 	}
 }
 
