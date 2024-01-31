@@ -36,17 +36,20 @@ const (
 	apiSecretName      = "search-api-certs"
 	indexerSecretName  = "search-indexer-certs"
 	postgresSecretName = "search-postgres-certs"
+
+	ResourceHugePages2Mi corev1.ResourceName = "hugepages-2Mi"
+	ResourceHugePages1Gi corev1.ResourceName = "hugepages-1Gi"
 )
 
 var (
 	certDefaultMode       = int32(416)
 	AnnotationSearchPause = "search-pause"
+	dbDefaultMap          = map[string]string{
+		"POSTGRESQL_EFFECTIVE_CACHE_SIZE": default_POSTGRESQL_EFFECTIVE_CACHE_SIZE,
+		"POSTGRESQL_SHARED_BUFFERS":       default_POSTGRESQL_SHARED_BUFFERS,
+		"WORK_MEM":                        default_WORK_MEM,
+	}
 )
-var dbDefaultMap = map[string]string{
-	"POSTGRESQL_EFFECTIVE_CACHE_SIZE": default_POSTGRESQL_EFFECTIVE_CACHE_SIZE,
-	"POSTGRESQL_SHARED_BUFFERS":       default_POSTGRESQL_SHARED_BUFFERS,
-	"WORK_MEM":                        default_WORK_MEM,
-}
 
 func generateLabels(key, val string) map[string]string {
 	allLabels := map[string]string{
@@ -234,19 +237,14 @@ func getResourceRequirements(deploymentName string, instance *searchv1alpha1.Sea
 			Limits:   getLimits(indexerDeploymentName, instance),
 		}
 	case postgresDeploymentName:
-		pg := corev1.ResourceRequirements{
+		return corev1.ResourceRequirements{
 			Requests: getRequests(postgresDeploymentName, instance),
 			Limits:   getLimits(postgresDeploymentName, instance),
 		}
-		log.Info("Postgres Resource Requirements", "pg", pg)
-		return pg
 	}
 	log.V(2).Info("Unknown deployment ", "name", deploymentName)
 	return corev1.ResourceRequirements{}
 }
-
-const ResourceHugePages2Mi corev1.ResourceName = "hugepages-2Mi"
-const ResourceHugePages1Gi corev1.ResourceName = "hugepages-1Gi"
 
 func getRequests(deployment string, instance *searchv1alpha1.Search) corev1.ResourceList {
 	var cpu, memory, hugepages2Mi, hugepages1Gi resource.Quantity
@@ -265,7 +263,6 @@ func getRequests(deployment string, instance *searchv1alpha1.Search) corev1.Reso
 	if deploymentConfig.Resources.Requests.Memory() != nil {
 		memory = *deploymentConfig.Resources.Requests.Memory()
 	}
-	log.Info("Requests", "deployment", deployment, "Resources", deploymentConfig.Resources)
 	if deploymentConfig.Resources.Limits.Name(ResourceHugePages2Mi, resource.BinarySI) != nil {
 		hugepages2Mi = *deploymentConfig.Resources.Limits.Name(ResourceHugePages2Mi, resource.BinarySI)
 	}
@@ -292,7 +289,6 @@ func getLimits(deployment string, instance *searchv1alpha1.Search) corev1.Resour
 	if deploymentConfig.Resources.Limits.Memory() != nil {
 		memory = *deploymentConfig.Resources.Limits.Memory()
 	}
-	log.Info("Limits: ", "deployment", deployment, "Resources", deploymentConfig.Resources)
 	if deploymentConfig.Resources.Limits.Name(ResourceHugePages2Mi, resource.BinarySI) != nil {
 		hugepages2Mi = *deploymentConfig.Resources.Limits.Name(ResourceHugePages2Mi, resource.BinarySI)
 	}
@@ -304,9 +300,8 @@ func getLimits(deployment string, instance *searchv1alpha1.Search) corev1.Resour
 }
 
 func limitRequestPopulatedCheck(cpu, memory, hugepages2Mi, hugepages1Gi resource.Quantity, resource, deployment string) corev1.ResourceList {
-	log.Info("Hugepages ->", "deployment", deployment, "hugepages2Mi", hugepages2Mi, "hugepages1Gi", hugepages1Gi)
-
 	resourceList := corev1.ResourceList{}
+
 	if cpu.String() != "<hil>" && cpu.CmpInt64(0) != 0 {
 		resourceList[corev1.ResourceCPU] = cpu
 	}
@@ -320,31 +315,6 @@ func limitRequestPopulatedCheck(cpu, memory, hugepages2Mi, hugepages1Gi resource
 		resourceList[ResourceHugePages1Gi] = hugepages1Gi
 	}
 	return resourceList
-
-	// if cpu.CmpInt64(0) == 0 && memory.CmpInt64(0) == 0 {
-	// 	log.V(2).Info(fmt.Sprintf("%s not set for memory and cpu on deployment", resource), "deployment", deployment)
-	// 	return corev1.ResourceList{}
-	// }
-
-	// if cpu.String() == "<nil>" || cpu.CmpInt64(0) == 0 {
-	// 	log.V(2).Info(fmt.Sprintf("%s not set for cpu on deployment", resource), "deployment", deployment)
-	// 	return corev1.ResourceList{
-	// 		corev1.ResourceMemory: memory,
-	// 	}
-	// }
-
-	// if memory.CmpInt64(0) == 0 {
-	// 	log.V(2).Info(fmt.Sprintf("%s not set for memory on deployment", resource), "deployment", deployment)
-	// 	return corev1.ResourceList{
-	// 		corev1.ResourceCPU: cpu,
-	// 	}
-	// }
-
-	// return corev1.ResourceList{
-	// 	corev1.ResourceCPU:    cpu,
-	// 	corev1.ResourceMemory: memory,
-	// 	ResourceHugePages2Mi:  hugepages,
-	// }
 }
 
 func getReplicaCount(deploymentName string, instance *searchv1alpha1.Search) *int32 {

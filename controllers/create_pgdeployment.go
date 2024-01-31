@@ -99,7 +99,6 @@ func (r *SearchReconciler) PGDeployment(instance *searchv1alpha1.Search) *appsv1
 	}
 	postgresContainer.Env = append(postgresContainer.Env, env...)
 	postgresContainer.Resources = getResourceRequirements(deploymentName, instance)
-	log.Info("postgresContainer.Resources ->", "Resources:", postgresContainer.Resources)
 	shmSizeLimit := resource.MustParse(default_Postgres_SharedMemory)
 	volumes := []corev1.Volume{
 		{
