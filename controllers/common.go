@@ -3,7 +3,6 @@ package controllers
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"strings"
 
@@ -298,31 +297,44 @@ func getLimits(deployment string, instance *searchv1alpha1.Search) corev1.Resour
 }
 
 func limitRequestPopulatedCheck(cpu, memory, hugepages resource.Quantity, resource, deployment string) corev1.ResourceList {
-	if cpu.CmpInt64(0) == 0 && memory.CmpInt64(0) == 0 {
-		log.V(2).Info(fmt.Sprintf("%s not set for memory and cpu on deployment", resource), "deployment", deployment)
-		return corev1.ResourceList{}
-	}
-
-	if cpu.String() == "<nil>" || cpu.CmpInt64(0) == 0 {
-		log.V(2).Info(fmt.Sprintf("%s not set for cpu on deployment", resource), "deployment", deployment)
-		return corev1.ResourceList{
-			corev1.ResourceMemory: memory,
-		}
-	}
-
-	if memory.CmpInt64(0) == 0 {
-		log.V(2).Info(fmt.Sprintf("%s not set for memory on deployment", resource), "deployment", deployment)
-		return corev1.ResourceList{
-			corev1.ResourceCPU: cpu,
-		}
-	}
-
 	log.Info("Hugepages ->", "deployment", deployment, "hugepages", hugepages)
-	return corev1.ResourceList{
-		corev1.ResourceCPU:    cpu,
-		corev1.ResourceMemory: memory,
-		ResourceHugePages2Mi:  hugepages,
+
+	resourceList := corev1.ResourceList{}
+	if cpu.String() != "<hil>" && cpu.CmpInt64(0) != 0 {
+		resourceList[corev1.ResourceCPU] = cpu
 	}
+	if memory.String() != "<nil>" && memory.CmpInt64(0) != 0 {
+		resourceList[corev1.ResourceMemory] = memory
+	}
+	if hugepages.String() != "<nil>" && hugepages.CmpInt64(0) != 0 {
+		resourceList[ResourceHugePages2Mi] = hugepages
+	}
+	return resourceList
+
+	// if cpu.CmpInt64(0) == 0 && memory.CmpInt64(0) == 0 {
+	// 	log.V(2).Info(fmt.Sprintf("%s not set for memory and cpu on deployment", resource), "deployment", deployment)
+	// 	return corev1.ResourceList{}
+	// }
+
+	// if cpu.String() == "<nil>" || cpu.CmpInt64(0) == 0 {
+	// 	log.V(2).Info(fmt.Sprintf("%s not set for cpu on deployment", resource), "deployment", deployment)
+	// 	return corev1.ResourceList{
+	// 		corev1.ResourceMemory: memory,
+	// 	}
+	// }
+
+	// if memory.CmpInt64(0) == 0 {
+	// 	log.V(2).Info(fmt.Sprintf("%s not set for memory on deployment", resource), "deployment", deployment)
+	// 	return corev1.ResourceList{
+	// 		corev1.ResourceCPU: cpu,
+	// 	}
+	// }
+
+	// return corev1.ResourceList{
+	// 	corev1.ResourceCPU:    cpu,
+	// 	corev1.ResourceMemory: memory,
+	// 	ResourceHugePages2Mi:  hugepages,
+	// }
 }
 
 func getReplicaCount(deploymentName string, instance *searchv1alpha1.Search) *int32 {
