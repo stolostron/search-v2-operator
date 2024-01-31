@@ -246,9 +246,10 @@ func getResourceRequirements(deploymentName string, instance *searchv1alpha1.Sea
 }
 
 const ResourceHugePages2Mi corev1.ResourceName = "hugepages-2Mi"
+const ResourceHugePages1Gi corev1.ResourceName = "hugepages-1Gi"
 
 func getRequests(deployment string, instance *searchv1alpha1.Search) corev1.ResourceList {
-	var cpu, memory, hugepages resource.Quantity
+	var cpu, memory, hugepages2Mi, hugepages1Gi resource.Quantity
 	cpu = resource.MustParse(defaultResoureMap[deployment]["CPURequest"])
 	memory = resource.MustParse(defaultResoureMap[deployment]["MemoryRequest"])
 	if !isResourcesCustomized(deployment, instance) {
@@ -266,14 +267,17 @@ func getRequests(deployment string, instance *searchv1alpha1.Search) corev1.Reso
 	}
 	log.Info("Requests", "deployment", deployment, "Resources", deploymentConfig.Resources)
 	if deploymentConfig.Resources.Limits.Name(ResourceHugePages2Mi, resource.BinarySI) != nil {
-		hugepages = *deploymentConfig.Resources.Limits.Name(ResourceHugePages2Mi, resource.BinarySI)
+		hugepages2Mi = *deploymentConfig.Resources.Limits.Name(ResourceHugePages2Mi, resource.BinarySI)
+	}
+	if deploymentConfig.Resources.Limits.Name(ResourceHugePages1Gi, resource.BinarySI) != nil {
+		hugepages1Gi = *deploymentConfig.Resources.Limits.Name(ResourceHugePages1Gi, resource.BinarySI)
 	}
 
-	return limitRequestPopulatedCheck(cpu, memory, hugepages, "request", deployment)
+	return limitRequestPopulatedCheck(cpu, memory, hugepages2Mi, hugepages1Gi, "request", deployment)
 }
 
 func getLimits(deployment string, instance *searchv1alpha1.Search) corev1.ResourceList {
-	var cpu, memory, hugepages resource.Quantity
+	var cpu, memory, hugepages2Mi, hugepages1Gi resource.Quantity
 	memory = resource.MustParse(defaultResoureMap[deployment]["MemoryLimit"])
 	if !isResourcesCustomized(deployment, instance) {
 		return corev1.ResourceList{
@@ -290,14 +294,17 @@ func getLimits(deployment string, instance *searchv1alpha1.Search) corev1.Resour
 	}
 	log.Info("Limits: ", "deployment", deployment, "Resources", deploymentConfig.Resources)
 	if deploymentConfig.Resources.Limits.Name(ResourceHugePages2Mi, resource.BinarySI) != nil {
-		hugepages = *deploymentConfig.Resources.Limits.Name(ResourceHugePages2Mi, resource.BinarySI)
+		hugepages2Mi = *deploymentConfig.Resources.Limits.Name(ResourceHugePages2Mi, resource.BinarySI)
+	}
+	if deploymentConfig.Resources.Limits.Name(ResourceHugePages1Gi, resource.BinarySI) != nil {
+		hugepages1Gi = *deploymentConfig.Resources.Limits.Name(ResourceHugePages1Gi, resource.BinarySI)
 	}
 
-	return limitRequestPopulatedCheck(cpu, memory, hugepages, "limit", deployment)
+	return limitRequestPopulatedCheck(cpu, memory, hugepages2Mi, hugepages1Gi, "limit", deployment)
 }
 
-func limitRequestPopulatedCheck(cpu, memory, hugepages resource.Quantity, resource, deployment string) corev1.ResourceList {
-	log.Info("Hugepages ->", "deployment", deployment, "hugepages", hugepages)
+func limitRequestPopulatedCheck(cpu, memory, hugepages2Mi, hugepages1Gi resource.Quantity, resource, deployment string) corev1.ResourceList {
+	log.Info("Hugepages ->", "deployment", deployment, "hugepages2Mi", hugepages2Mi, "hugepages1Gi", hugepages1Gi)
 
 	resourceList := corev1.ResourceList{}
 	if cpu.String() != "<hil>" && cpu.CmpInt64(0) != 0 {
@@ -306,8 +313,11 @@ func limitRequestPopulatedCheck(cpu, memory, hugepages resource.Quantity, resour
 	if memory.String() != "<nil>" && memory.CmpInt64(0) != 0 {
 		resourceList[corev1.ResourceMemory] = memory
 	}
-	if hugepages.String() != "<nil>" && hugepages.CmpInt64(0) != 0 {
-		resourceList[ResourceHugePages2Mi] = hugepages
+	if hugepages2Mi.String() != "<nil>" && hugepages2Mi.CmpInt64(0) != 0 {
+		resourceList[ResourceHugePages2Mi] = hugepages2Mi
+	}
+	if hugepages1Gi.String() != "<nil>" && hugepages1Gi.CmpInt64(0) != 0 {
+		resourceList[ResourceHugePages1Gi] = hugepages1Gi
 	}
 	return resourceList
 
