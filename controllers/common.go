@@ -263,6 +263,7 @@ func getRequests(deployment string, instance *searchv1alpha1.Search) corev1.Reso
 	if deploymentConfig.Resources.Requests.Memory() != nil {
 		memory = *deploymentConfig.Resources.Requests.Memory()
 	}
+	log.Info("Requests", "deployment", deployment, "Resources", deploymentConfig.Resources)
 	if deploymentConfig.Resources.Limits.Name(ResourceHugePages2Mi, resource.BinarySI) != nil {
 		hugepages = *deploymentConfig.Resources.Limits.Name(ResourceHugePages2Mi, resource.BinarySI)
 	}
@@ -271,7 +272,6 @@ func getRequests(deployment string, instance *searchv1alpha1.Search) corev1.Reso
 }
 
 func getLimits(deployment string, instance *searchv1alpha1.Search) corev1.ResourceList {
-
 	var cpu, memory, hugepages resource.Quantity
 	memory = resource.MustParse(defaultResoureMap[deployment]["MemoryLimit"])
 	if !isResourcesCustomized(deployment, instance) {
@@ -287,6 +287,7 @@ func getLimits(deployment string, instance *searchv1alpha1.Search) corev1.Resour
 	if deploymentConfig.Resources.Limits.Memory() != nil {
 		memory = *deploymentConfig.Resources.Limits.Memory()
 	}
+	log.Info("Limits: ", "deployment", deployment, "Resources", deploymentConfig.Resources)
 	if deploymentConfig.Resources.Limits.Name(ResourceHugePages2Mi, resource.BinarySI) != nil {
 		hugepages = *deploymentConfig.Resources.Limits.Name(ResourceHugePages2Mi, resource.BinarySI)
 	}
