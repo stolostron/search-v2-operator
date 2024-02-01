@@ -22,6 +22,8 @@ spec:
       containers:
       {{- if not (or (.Capabilities.APIVersions.Has "operator.open-cluster-management.io/v1/MultiClusterHub") (.Capabilities.APIVersions.Has "operator.open-cluster-management.io/v1beta1/MultiClusterHub")) }}
       - name: collector
+        image: "{{ .Values.global.imageOverrides.search_collector }}"
+        imagePullPolicy: {{ .Values.global.imagePullPolicy }}
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:
@@ -30,8 +32,6 @@ spec:
           privileged: false
           readOnlyRootFilesystem: true
           runAsNonRoot: true
-        image: "{{ .Values.global.imageOverrides.search_collector }}"
-        imagePullPolicy: {{ .Values.global.imagePullPolicy }}
         {{- if .Values.userargs.containerArgs }}
         args:
           - '{{ .Values.userargs.containerArgs }}'
