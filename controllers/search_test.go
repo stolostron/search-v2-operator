@@ -243,22 +243,12 @@ func TestSearch_controller(t *testing.T) {
 	if !errors.IsNotFound(err) {
 		t.Errorf("Emptydir expected but PVC found %v", err)
 	}
-	//Test Finalizer
-	// cmatest := &addonv1alpha1.ClusterManagementAddOn{
-	// 	TypeMeta: metav1.TypeMeta{
-	// 		Kind:       "ClusterManagementAddon",
-	// 		APIVersion: "addon.open-cluster-management.io",
-	// 	},
-	// 	ObjectMeta: metav1.ObjectMeta{
-	// 		Name: "search-collector",
-	// 	},
-	// }
 
-	// objsEmpty = []runtime.Object{search, cmatest}
 	// Create a fake client to mock API calls.
 	cl = fake.NewClientBuilder().WithRuntimeObjects(objsEmpty...).Build()
 
 	r = &SearchReconciler{Client: cl, Scheme: s}
+
 	//Reconcile to check if the Finilizer is set
 	_, err = r.Reconcile(context.TODO(), req)
 	if err != nil {
@@ -288,15 +278,6 @@ func TestSearch_controller(t *testing.T) {
 	if err != nil {
 		t.Logf("Error during reconcile: (%v)", err)
 	}
-
-	// We should expect ClusterManagementaddon deleted by Finalizer
-	// err = cl.Get(context.TODO(), types.NamespacedName{
-	// 	Name: getClusterManagementAddonName(),
-	// }, cma)
-
-	// if !errors.IsNotFound(err) {
-	// 	t.Errorf("Failed to delete ClusterManagementAddOn %s", getClusterManagementAddonName())
-	// }
 
 	// We should expect Addon ClusterRole deleted by Finalizer
 	err = cl.Get(context.TODO(), types.NamespacedName{
