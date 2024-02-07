@@ -135,11 +135,6 @@ func (r *SearchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		log.Error(err, "GlobalSearchUserClusterRole setup failed")
 		return *result, err
 	}
-	result, err = r.createClusterManagementAddOn(ctx, instance)
-	if result != nil {
-		log.Error(err, "ClusterManagementAddOn  setup failed")
-		return *result, err
-	}
 	result, err = r.createAddOnDeploymentConfig(ctx, r.NewAddOnDeploymentConfig(instance))
 	if result != nil {
 		log.Error(err, "AddOnDeploymentConfig  setup failed")
@@ -221,12 +216,20 @@ func (r *SearchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	once.Do(func() {
 		addon.CreateAddonOnce(ctx, instance)
 	})
-	// Starting with ACM 2.9, ServiceMonitors are created in the open-cluster-management namespace.
-	// This function removes the service monitors that were previously created in the openshift-monitoring namespace.
-	// We can remove this migration step after ACM 2.8 End of Life.
+
 	cleanOnce.Do(func() {
 		// delete legacy servicemonitor setup
+		// Starting with ACM 2.9, ServiceMonitors are created in the open-cluster-management namespace.
+		// This function removes the service monitors that were previously created in the openshift-monitoring namespace.
+		// We can remove this migration step after ACM 2.8 End of Life.
 		r.deleteLegacyServiceMonitorSetup(instance)
+
+		// delete ClusterManagementAddon
+		// Starting with ACM 2.10, the ClusterManagementAddon is owned by the mch operator.
+		err := r.deleteClusterManagementAddon(instance)
+		if err != nil {
+			log.Error(err, "Failed to delete ClusterManagementAddon")
+		}
 	})
 
 	return ctrl.Result{}, nil
