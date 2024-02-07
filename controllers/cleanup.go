@@ -14,7 +14,7 @@ import (
 // Starting with ACM 2.10, the ClusterManagementAddon is owned by the mch operator.
 // We should delete this function once 2.9 is no longer supported.
 func (r *SearchReconciler) deleteClusterManagementAddon(instance *searchv1alpha1.Search) error {
-	log.V(2).Info("Deleting ClusterManagementAddon search-collector")
+	log.Info("Deleting ClusterManagementAddon search-collector")
 	cma := &addonapiv1alpha1.ClusterManagementAddOn{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "ClusterManagementAddon",
@@ -38,7 +38,7 @@ func (r *SearchReconciler) deleteClusterManagementAddon(instance *searchv1alpha1
 		log.Error(err, "Failed to delete ClusterManagementAddon", "name", cma)
 		return err
 	}
-	log.V(2).Info("ClusterManagementAddon search-collector deleted", "name", cma)
+	log.Info("ClusterManagementAddon search-collector deleted", "name", cma)
 	return nil
 }
 
