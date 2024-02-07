@@ -11,6 +11,8 @@ import (
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 )
 
+// Starting with ACM 2.10, the ClusterManagementAddon is owned by the mch operator.
+// We should delete this function once 2.9 is no longer supported.
 func (r *SearchReconciler) deleteClusterManagementAddon(instance *searchv1alpha1.Search) error {
 	log.V(2).Info("Deleting ClusterManagementAddon search-collector")
 	cma := &addonapiv1alpha1.ClusterManagementAddOn{
@@ -21,6 +23,14 @@ func (r *SearchReconciler) deleteClusterManagementAddon(instance *searchv1alpha1
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "search-collector",
 			Namespace: instance.GetNamespace(),
+			// Only delete the ClusterManagementAddon if it's owned by the Search operator.
+			OwnerReferences: []metav1.OwnerReference{
+				metav1.OwnerReference{
+					APIVersion: "search.open-cluster-management.io/v1alpha1",
+					Kind:       "Search",
+					Name:       "search-v2-operator",
+				},
+			},
 		},
 	}
 	err := r.Delete(context.TODO(), cma)

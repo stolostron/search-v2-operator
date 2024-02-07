@@ -226,7 +226,6 @@ func (r *SearchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 
 		// delete ClusterManagementAddon
 		// Starting with ACM 2.10, the ClusterManagementAddon is owned by the mch operator.
-		// TODO: How to delete only if owned by search-v2-operator?
 		err := r.deleteClusterManagementAddon(instance)
 		if err != nil {
 			log.Error(err, "Failed to delete ClusterManagementAddon")
