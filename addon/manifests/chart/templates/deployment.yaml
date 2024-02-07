@@ -24,6 +24,14 @@ spec:
       - name: collector
         image: "{{ .Values.global.imageOverrides.search_collector }}"
         imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          privileged: false
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
         {{- if .Values.userargs.containerArgs }}
         args:
           - '{{ .Values.userargs.containerArgs }}'
