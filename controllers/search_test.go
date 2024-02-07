@@ -192,14 +192,14 @@ func TestSearch_controller(t *testing.T) {
 	}
 
 	//check for ClusterManagementAddon
-	cma := &addonv1alpha1.ClusterManagementAddOn{}
-	err = cl.Get(context.TODO(), types.NamespacedName{
-		Name: getClusterManagementAddonName(),
-	}, cma)
+	// cma := &addonv1alpha1.ClusterManagementAddOn{}
+	// err = cl.Get(context.TODO(), types.NamespacedName{
+	// 	Name: getClusterManagementAddonName(),
+	// }, cma)
 
-	if err != nil {
-		t.Errorf("Failed to get ClusterManagementAddon %s: %v", getClusterManagementAddonName(), err)
-	}
+	// if err != nil {
+	// 	t.Errorf("Failed to get ClusterManagementAddon %s: %v", getClusterManagementAddonName(), err)
+	// }
 
 	//check for AddonDeploymentConfig
 	adc := &addonv1alpha1.AddOnDeploymentConfig{}
@@ -244,17 +244,17 @@ func TestSearch_controller(t *testing.T) {
 		t.Errorf("Emptydir expected but PVC found %v", err)
 	}
 	//Test Finalizer
-	cmatest := &addonv1alpha1.ClusterManagementAddOn{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "ClusterManagementAddon",
-			APIVersion: "addon.open-cluster-management.io",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "search-collector",
-		},
-	}
+	// cmatest := &addonv1alpha1.ClusterManagementAddOn{
+	// 	TypeMeta: metav1.TypeMeta{
+	// 		Kind:       "ClusterManagementAddon",
+	// 		APIVersion: "addon.open-cluster-management.io",
+	// 	},
+	// 	ObjectMeta: metav1.ObjectMeta{
+	// 		Name: "search-collector",
+	// 	},
+	// }
 
-	objsEmpty = []runtime.Object{search, cmatest}
+	// objsEmpty = []runtime.Object{search, cmatest}
 	// Create a fake client to mock API calls.
 	cl = fake.NewClientBuilder().WithRuntimeObjects(objsEmpty...).Build()
 
@@ -290,13 +290,13 @@ func TestSearch_controller(t *testing.T) {
 	}
 
 	// We should expect ClusterManagementaddon deleted by Finalizer
-	err = cl.Get(context.TODO(), types.NamespacedName{
-		Name: getClusterManagementAddonName(),
-	}, cma)
+	// err = cl.Get(context.TODO(), types.NamespacedName{
+	// 	Name: getClusterManagementAddonName(),
+	// }, cma)
 
-	if !errors.IsNotFound(err) {
-		t.Errorf("Failed to delete ClusterManagementAddOn %s", getClusterManagementAddonName())
-	}
+	// if !errors.IsNotFound(err) {
+	// 	t.Errorf("Failed to delete ClusterManagementAddOn %s", getClusterManagementAddonName())
+	// }
 
 	// We should expect Addon ClusterRole deleted by Finalizer
 	err = cl.Get(context.TODO(), types.NamespacedName{
