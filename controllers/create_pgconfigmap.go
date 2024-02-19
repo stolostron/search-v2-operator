@@ -25,6 +25,7 @@ func (r *SearchReconciler) PostgresConfigmap(instance *searchv1alpha1.Search) *c
 	data["postgresql.conf"] = `ssl = 'on'
 ssl_cert_file = '/sslcert/tls.crt'
 ssl_key_file = '/sslcert/tls.key'
+ssl_ciphers = 'HIGH:!aNULL'
 max_parallel_workers_per_gather = '8'`
 
 	data[startScript] = `psql -d search -U searchuser -c "CREATE SCHEMA IF NOT EXISTS search"
