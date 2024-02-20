@@ -931,6 +931,7 @@ func TestSearch_controller_DBConfigAndEnvOverlap(t *testing.T) {
 		t.Fatalf("Failed to get configmap %s: %v", "search-postgres", err)
 	}
 	verifyConfigmapDataContent(t, configmap, "postgresql.conf", "ssl = 'on'")
+	verifyConfigmapDataContent(t, configmap, "postgresql.conf", "ssl_ciphers = 'HIGH:!aNULL'")
 	verifyConfigmapDataContent(t, configmap, "postgresql-start.sh", "ALTER ROLE searchuser set work_mem='33MB'")
 
 	//check for created search-postgres deployment
