@@ -195,6 +195,7 @@ spec:
                       - --upstream=http://127.0.0.1:8080/
                       - --logtostderr=true
                       - --v=10
+                      - "--tls-min-version=VersionTLS13"
                     image: gcr.io/kubebuilder/kube-rbac-proxy:v0.8.0
                     name: kube-rbac-proxy
                     ports:
@@ -212,6 +213,7 @@ spec:
                       - --health-probe-bind-address=:8081
                       - --metrics-bind-address=127.0.0.1:8080
                       - --leader-elect
+                      - "--tls-min-version=VersionTLS13"
                     command:
                       - /manager
                     image: quay.io/stolostron/search-v2-operator:2.7.0-dc0fc8c59239b6a0a3f440b7752101523d87f597
