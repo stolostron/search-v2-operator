@@ -75,7 +75,7 @@ func TestSearch_controller(t *testing.T) {
 	}
 	objs := []runtime.Object{search}
 	// Create a fake client to mock API calls.
-	cl := fake.NewClientBuilder().WithRuntimeObjects(objs...).Build()
+	cl := fake.NewClientBuilder().WithStatusSubresource(search).WithRuntimeObjects(objs...).Build()
 
 	r := &SearchReconciler{Client: cl, Scheme: s}
 
@@ -221,7 +221,7 @@ func TestSearch_controller(t *testing.T) {
 
 	objsEmpty := []runtime.Object{search}
 	// Create a fake client to mock API calls.
-	cl = fake.NewClientBuilder().WithRuntimeObjects(objsEmpty...).Build()
+	cl = fake.NewClientBuilder().WithStatusSubresource(search).WithRuntimeObjects(objsEmpty...).Build()
 
 	r = &SearchReconciler{Client: cl, Scheme: s}
 
@@ -235,7 +235,7 @@ func TestSearch_controller(t *testing.T) {
 	}
 
 	// Create a fake client to mock API calls.
-	cl = fake.NewClientBuilder().WithRuntimeObjects(objsEmpty...).Build()
+	cl = fake.NewClientBuilder().WithStatusSubresource(search).WithRuntimeObjects(objsEmpty...).Build()
 
 	r = &SearchReconciler{Client: cl, Scheme: s}
 
@@ -257,9 +257,8 @@ func TestSearch_controller(t *testing.T) {
 		t.Errorf("Finalizer not set in search-v2-operator")
 	}
 
-	//Now delete the search CR by setting the deletion time
-	search.ObjectMeta.DeletionTimestamp = &metav1.Time{Time: time.Now()}
-	err = cl.Update(context.TODO(), search)
+	// Now delete the search CR
+	err = cl.Delete(context.TODO(), search)
 	if err != nil {
 		t.Fatalf("Failed to update Search: (%v)", err)
 	}
@@ -355,7 +354,7 @@ func TestSearch_controller_Status(t *testing.T) {
 
 	objs := []runtime.Object{search, collectorPod, apiPod, indexerPod, postGresPod}
 	// Create a fake client to mock API calls.
-	cl := fake.NewClientBuilder().WithRuntimeObjects(objs...).Build()
+	cl := fake.NewClientBuilder().WithStatusSubresource(search).WithRuntimeObjects(objs...).Build()
 
 	r := &SearchReconciler{Client: cl, Scheme: s}
 
@@ -430,7 +429,7 @@ func TestSearch_controller_Status_Replicas3(t *testing.T) {
 
 	objs := []runtime.Object{search, collectorPod1, collectorPod2, collectorPod3, apiPod, indexerPod, postGresPod}
 	// Create a fake client to mock API calls.
-	cl := fake.NewClientBuilder().WithRuntimeObjects(objs...).Build()
+	cl := fake.NewClientBuilder().WithStatusSubresource(search).WithRuntimeObjects(objs...).Build()
 
 	r := &SearchReconciler{Client: cl, Scheme: s}
 
@@ -495,7 +494,7 @@ func TestSearch_controller_Status_Replicas0(t *testing.T) {
 
 	objs := []runtime.Object{search, apiPod, indexerPod, postGresPod}
 	// Create a fake client to mock API calls.
-	cl := fake.NewClientBuilder().WithRuntimeObjects(objs...).Build()
+	cl := fake.NewClientBuilder().WithStatusSubresource(search).WithRuntimeObjects(objs...).Build()
 
 	r := &SearchReconciler{Client: cl, Scheme: s}
 
@@ -567,7 +566,7 @@ func TestSearch_controller_Status_Update(t *testing.T) {
 
 	objs := []runtime.Object{search, apiPod, indexerPod, postGresPod}
 	// Create a fake client to mock API calls.
-	cl := fake.NewClientBuilder().WithRuntimeObjects(objs...).Build()
+	cl := fake.NewClientBuilder().WithStatusSubresource(search).WithRuntimeObjects(objs...).Build()
 
 	r := &SearchReconciler{Client: cl, Scheme: s}
 
@@ -665,7 +664,7 @@ func TestSearch_controller_DBConfig(t *testing.T) {
 
 	objs := []runtime.Object{search, customConfigMap}
 	// Create a fake client to mock API calls.
-	cl := fake.NewClientBuilder().WithRuntimeObjects(objs...).Build()
+	cl := fake.NewClientBuilder().WithStatusSubresource(search).WithRuntimeObjects(objs...).Build()
 
 	r := &SearchReconciler{Client: cl, Scheme: s}
 	// Mock request to simulate Reconcile() being called on an event for a watched resource .
@@ -750,7 +749,7 @@ func TestSearch_controller_Metrics(t *testing.T) {
 	// searchApiMonitor := r.ServiceMonitor(search, "search-api", "openshift-monitoring")
 	objs := []runtime.Object{search, collectorPod, apiPod, indexerPod, postGresPod} //, searchApiMonitor}
 	// Create a fake client to mock API calls.
-	cl := fake.NewClientBuilder().WithRuntimeObjects(objs...).Build()
+	cl := fake.NewClientBuilder().WithStatusSubresource(search).WithRuntimeObjects(objs...).Build()
 	r.Client = cl
 
 	// Mock request to simulate Reconcile() being called on an event for a watched resource.
@@ -878,7 +877,7 @@ func TestSearch_controller_DBConfigAndEnvOverlap(t *testing.T) {
 
 	objs := []runtime.Object{search, customConfigMap}
 	// Create a fake client to mock API calls.
-	cl := fake.NewClientBuilder().WithRuntimeObjects(objs...).Build()
+	cl := fake.NewClientBuilder().WithStatusSubresource(search).WithRuntimeObjects(objs...).Build()
 
 	r := &SearchReconciler{Client: cl, Scheme: s}
 	// Mock request to simulate Reconcile() being called on an event for a watched resource .

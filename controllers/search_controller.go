@@ -27,7 +27,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	"github.com/stolostron/search-v2-operator/addon"
 	searchv1alpha1 "github.com/stolostron/search-v2-operator/api/v1alpha1"
@@ -247,16 +246,12 @@ func (r *SearchReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	}
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&searchv1alpha1.Search{}).
-		Watches(&source.Kind{Type: &appsv1.Deployment{}}, &handler.EnqueueRequestForOwner{
-			IsController: true,
-			OwnerType:    &searchv1alpha1.Search{},
-		}, builder.WithPredicates(pred)).
-		Watches(&source.Kind{Type: &corev1.Secret{}}, &handler.EnqueueRequestForOwner{
-			IsController: true,
-			OwnerType:    &searchv1alpha1.Search{},
-		}, builder.WithPredicates(pred)).
-		Watches(&source.Kind{Type: &corev1.Pod{}}, handler.EnqueueRequestsFromMapFunc(
-			func(a client.Object) []reconcile.Request {
+		Watches(&appsv1.Deployment{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(),
+			&searchv1alpha1.Search{}, handler.OnlyControllerOwner()), builder.WithPredicates(pred)).
+		Watches(&corev1.Secret{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(),
+			&searchv1alpha1.Search{}, handler.OnlyControllerOwner()), builder.WithPredicates(pred)).
+		Watches(&corev1.Pod{}, handler.EnqueueRequestsFromMapFunc(
+			func(ctx context.Context, a client.Object) []reconcile.Request {
 				// Trigger reconcile if search pod
 				if searchLabels(a.GetLabels()) {
 					return []reconcile.Request{

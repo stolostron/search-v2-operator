@@ -25,7 +25,7 @@ func (r *SearchReconciler) deleteClusterManagementAddon(instance *searchv1alpha1
 			Namespace: instance.GetNamespace(),
 			// Only delete the ClusterManagementAddon if it's owned by the Search operator.
 			OwnerReferences: []metav1.OwnerReference{
-				metav1.OwnerReference{
+				{
 					APIVersion: "search.open-cluster-management.io/v1alpha1",
 					Kind:       "Search",
 					Name:       "search-v2-operator",
