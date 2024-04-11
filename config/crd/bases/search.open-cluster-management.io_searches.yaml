@@ -804,6 +804,11 @@ spec:
                   parameters [db_host, db_port, db_user, db_password, db_name, ca_cert]
                   Not supported for development preview.'
                 type: string
+              globalSearch:
+                default: false
+                description: '[Tech Preview] Enables the federated global search feature.
+                  Default is false.'
+                type: boolean
               imagePullPolicy:
                 description: ImagePullPolicy
                 type: string
