@@ -37,6 +37,10 @@ type SearchSpec struct {
 	// Important: Run "make" to regenerate code after modifying this file
 
 	// +optional
+	// [PLACEHOLDER, NOT IMPLEMENTED] Specifies deployment replication for improved availability. Options are: Basic and High (default)
+	AvailabilityConfig AvailabilityType `json:"availabilityConfig,omitempty"`
+
+	// +optional
 	// Storage configuration for the database.
 	DBStorage StorageSpec `json:"dbStorage,omitempty"`
 
@@ -49,14 +53,15 @@ type SearchSpec struct {
 	Deployments SearchDeployments `json:"deployments,omitempty"`
 
 	// +optional
-	// [PLACEHOLDER, NOT IMPLEMENTED] Specifies deployment replication for improved availability. Options are: Basic and High (default)
-	AvailabilityConfig AvailabilityType `json:"availabilityConfig,omitempty"`
-
-	// +optional
 	// [PLACEHOLDER, NOT IMPLEMENTED] Kubernetes secret name containing user provided db secret
 	// Secret should contain connection parameters [db_host, db_port, db_user, db_password, db_name, ca_cert]
 	// Not supported for development preview.
 	ExternalDBInstance string `json:"externalDBInstance,omitempty"`
+
+	// +optional
+	// +kubebuilder:default=false
+	// [Tech Preview] Enables the federated global search feature. Default is false.
+	GlobalSearch bool `json:"globalSearch,omitempty"`
 
 	// +optional
 	// ImagePullSecret
