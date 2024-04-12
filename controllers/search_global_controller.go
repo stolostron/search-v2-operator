@@ -4,6 +4,7 @@ package controllers
 
 import (
 	"context"
+	"fmt"
 
 	searchv1alpha1 "github.com/stolostron/search-v2-operator/api/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
@@ -12,16 +13,56 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
+var (
+	multiclusterGlobalHubGvr = schema.GroupVersionResource{
+		Group:    "operator.open-cluster-management.io",
+		Version:  "v1alpha4",
+		Resource: "multiclusterglobalhubs",
+	}
+	multiclusterengineResourceGvr = schema.GroupVersionResource{
+		Group:    "multicluster.openshift.io",
+		Version:  "v1",
+		Resource: "multiclusterengines",
+	}
+	managedClusterResourceGvr = schema.GroupVersionResource{
+		Group:    "cluster.open-cluster-management.io",
+		Version:  "v1",
+		Resource: "managedclusters",
+	}
+	managedClusterAddonResourceGvr = schema.GroupVersionResource{
+		Group:    "addon.open-cluster-management.io",
+		Version:  "v1alpha1",
+		Resource: "managedclusteraddons",
+	}
+	managedServiceAccountGvr = schema.GroupVersionResource{
+		Group:    "addon.open-cluster-management.io",
+		Version:  "v1alpha1",
+		Resource: "managedserviceaccounts",
+	}
+	manifestWorkGvr = schema.GroupVersionResource{
+		Group:    "work.open-cluster-management.io",
+		Version:  "v1",
+		Resource: "manifestworks",
+	}
+)
+
 // Logic to enable Global Search.
 func (r *SearchReconciler) enableGlobalSearch(ctx context.Context, instance *searchv1alpha1.Search) error {
-	log.Info("Enabling Global Search.")
+	log.Info("Reconcile Global Search resources.")
 
-	// TODO: Check that MulticlusterGlobalHub operator is installed.
+	// Verify that MulticlusterGlobalHub operator is installed.
+	// oc get multiclusterglobalhub -A
+	multiclusterGlobalHub, err := r.DynamicClient.Resource(multiclusterGlobalHubGvr).List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return fmt.Errorf("MulticlusterGlobalHub operator is not installed.")
+	} else {
+		log.Info("Found MulticlusterGlobalHubs.", "globalHubs", multiclusterGlobalHub)
+	}
 
 	// Enable global search feature in the console.
 	// oc patch configmap console-mce-config -n multicluster-engine -p '{"data": {"globalSearchFeatureFlag": "enabled"}}'
 	consoleMceConfig := &corev1.ConfigMap{}
-	err := r.Client.Get(ctx, types.NamespacedName{Name: "console-mce-config", Namespace: "multicluster-engine"}, consoleMceConfig)
+	err = r.Client.Get(ctx, types.NamespacedName{Name: "console-mce-config", Namespace: "multicluster-engine"}, consoleMceConfig)
 	if err != nil {
 		log.Error(err, "Failed to get ConfigMap console-mce-config.")
 	} else {
@@ -57,26 +98,29 @@ func (r *SearchReconciler) enableGlobalSearch(ctx context.Context, instance *sea
 
 	// Enable the Managed Service Account add-on in the MultiClusterEngine CR.
 	// oc patch multiclusterengine multiclusterengine --type='json' -p='[{"op": "add", "path": "/spec/overrides/components", "value": [{"name": "managedserviceaccount", "enabled": true}]}]'
-	var multiclusterengineResourceGvr = schema.GroupVersionResource{
-		Group:    "operator.open-cluster-management.io",
-		Version:  "v1",
-		Resource: "multiclusterengines",
-	}
-
-	mce, err := r.DynamicClient.Resource(multiclusterengineResourceGvr).Namespace("multicluster-engine").Get(ctx, "multicluster-engine", metav1.GetOptions{})
+	mce, err := r.DynamicClient.Resource(multiclusterengineResourceGvr).Get(ctx, "multiclusterengine", metav1.GetOptions{})
 	if err != nil {
 		log.Error(err, "Failed to get MulticlusterEngine CR.")
 	} else {
-		log.Info("Got MCE cr.", "mce", mce)
+		log.Info("Found MulticlusterEngine. Checking that ManagedServiceAccount is enabled.")
+		managedServiceAccountEnabled := false
+
+		// Check if the Managed Service Account add-on is enabled.
+		components := mce.Object["spec"].(map[string]interface{})["overrides"].(map[string]interface{})["components"].([]interface{})
+		for _, component := range components {
+			if component.(map[string]interface{})["name"] == "managedserviceaccount" {
+				log.Info("Managed Service Account add-on is enabled.")
+				managedServiceAccountEnabled = true
+				break
+			}
+		}
+		if !managedServiceAccountEnabled {
+			log.Info("Error: Managed Service Account add-on is not enabled.")
+		}
 	}
 
 	// # Create configuration resources for each Managed Hub.
 	// MANAGED_HUBS=($(oc get managedcluster -o json | jq -r '.items[] | select(.status.clusterClaims[] | .name == "hub.open-cluster-management.io" and .value != "NotInstalled") | .metadata.name'))
-	var managedClusterResourceGvr = schema.GroupVersionResource{
-		Group:    "cluster.open-cluster-management.io",
-		Version:  "v1",
-		Resource: "managedclusters",
-	}
 	clusterList, err := r.DynamicClient.Resource(managedClusterResourceGvr).List(ctx, metav1.ListOptions{})
 	if err != nil {
 		log.Error(err, "Failed to list ManagedClusters.")
@@ -100,26 +144,15 @@ func (r *SearchReconciler) enableGlobalSearch(ctx context.Context, instance *sea
 			log.Info("> Cluster is a Managed Hub. Configuring...", "name", cluster.GetName())
 			// 0. FUTURE: Validate that the Managed Hub is running ACM 2.9.0 or later.
 
-			// 1. Create a ManagedClusterAddon
-			// Get the ManagedClusterAddon CRD
-			managedClusterAddonResourceGvr := schema.GroupVersionResource{
-				Group:    "addon.open-cluster-management.io",
-				Version:  "v1alpha1",
-				Resource: "managedclusteraddons",
-			}
+			// 1. Verify the ManagedClusterAddon managed-serviceaccount exists.
 			_, err := r.DynamicClient.Resource(managedClusterAddonResourceGvr).Namespace(cluster.GetName()).Get(ctx, "managed-serviceaccount", metav1.GetOptions{})
 			if err != nil {
-				log.Info("ManagedClusterAddon managed-serviceaccount doesn't exist. Creating...")
+				log.Info("Error: ManagedClusterAddon managed-serviceaccount doesn't exist.")
 			} else {
 				log.Info("Found ManagedClusterAddon managed-serviceaccount.")
 			}
 
 			// 2. Create a ManagedServiceAccount
-			managedServiceAccountGvr := schema.GroupVersionResource{
-				Group:    "addon.open-cluster-management.io",
-				Version:  "v1alpha1",
-				Resource: "managedserviceaccounts",
-			}
 			_, err = r.DynamicClient.Resource(managedServiceAccountGvr).Namespace(cluster.GetName()).Get(ctx, "search-global", metav1.GetOptions{})
 			if err != nil {
 				log.Info("ManagedServiceAccount search-global doesn't exist. Creating...")
@@ -128,11 +161,6 @@ func (r *SearchReconciler) enableGlobalSearch(ctx context.Context, instance *sea
 			}
 
 			// 3. Create a ManifestWork
-			manifestWorkGvr := schema.GroupVersionResource{
-				Group:    "work.open-cluster-management.io",
-				Version:  "v1",
-				Resource: "manifestworks",
-			}
 			_, err = r.DynamicClient.Resource(manifestWorkGvr).Namespace(cluster.GetName()).Get(ctx, "search-global-config", metav1.GetOptions{})
 			if err != nil {
 				log.Info("ManifestWork search-global-config doesn't exist. Creating...")
@@ -142,5 +170,6 @@ func (r *SearchReconciler) enableGlobalSearch(ctx context.Context, instance *sea
 		}
 	}
 
+	log.Info("Done reconciling Global Search resources.")
 	return nil
 }

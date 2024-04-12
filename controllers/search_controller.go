@@ -60,10 +60,9 @@ var cleanOnce sync.Once
 //+kubebuilder:rbac:groups=search.open-cluster-management.io,resources=searches,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=search.open-cluster-management.io,resources=searches/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=search.open-cluster-management.io,resources=searches/finalizers,verbs=update
-//+kubebuilder:rbac:groups=open-cluster-management.io,resources=multiclusterengines,verbs=get;list;watch;patch
 //+kubebuilder:rbac:groups=cluster.open-cluster-management.io,resources=managedclusters,verbs=get;list
-//+kubebuilder:rbac:groups="",resources=configmaps,verbs=get;list;patch
-//+kubebuilder:rbac:groups="",namespace=multicluster-engine,resources=configmaps,verbs=get;list;patch
+//+kubebuilder:rbac:groups=multicluster.openshift.io,resources=multiclusterengines,verbs=get;list;watch;patch
+//+kubebuilder:rbac:groups="",resources=configmaps,verbs=get;list;patch;watch
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -76,7 +75,6 @@ var cleanOnce sync.Once
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.10.0/pkg/reconcile
 func (r *SearchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log.V(2).Info("Reconciling from search-v2-operator for ", req.Name, req.Namespace)
-	r.Status()
 	r.context = ctx
 	instance := &searchv1alpha1.Search{}
 	err := r.Client.Get(ctx, types.NamespacedName{Name: "search-v2-operator", Namespace: req.Namespace}, instance)
@@ -219,12 +217,14 @@ func (r *SearchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return *result, err
 	}
 
-	log.Info("Reconcile global search setup", "globalSearch", instance.Spec.GlobalSearch)
+	log.Info("Reconcile Global Search setup", "globalSearch", instance.Spec.GlobalSearch)
 	if instance.Spec.GlobalSearch {
 		log.Info("Global search is enabled. Setting up global search...")
 		err := r.enableGlobalSearch(ctx, instance)
 		if err != nil {
 			log.Error(err, "Failed to enable global search.")
+
+			// TODO: Set status on CR to indicate that global search setup failed.
 		}
 	} else {
 		log.Info("Global search is disabled. Skipping global search setup...")
