@@ -62,15 +62,15 @@ func (r *SearchReconciler) enableGlobalSearch(ctx context.Context, instance *sea
 
 	// Enable global search feature in the console.
 	// oc patch configmap console-mce-config -n multicluster-engine -p '{"data": {"globalSearchFeatureFlag": "enabled"}}'
-	consoleMceConfig := &corev1.ConfigMap{}
-	err = r.Client.Get(ctx, types.NamespacedName{Name: "console-mce-config", Namespace: "multicluster-engine"}, consoleMceConfig)
+	consoleMceConfig, err := r.DynamicClient.Resource(corev1.SchemeGroupVersion.WithResource("configmaps")).Namespace("multicluster-engine").Get(ctx, "console-mce-config", metav1.GetOptions{})
 	if err != nil {
-		log.Error(err, "Failed to get ConfigMap console-mce-config.")
+		log.Error(err, "Failed to get ConfigMap console-mce-config in multicluster-engine.")
 	} else {
-		consoleMceConfig.Data["globalSearchFeatureFlag"] = "enabled"
-		err = r.Client.Update(ctx, consoleMceConfig)
+		log.Info("Patching ConfigMap console-mce-config in multicluster-engine.")
+		consoleMceConfig.Object["data"].(map[string]interface{})["globalSearchFeatureFlag"] = "enabled"
+		_, err = r.DynamicClient.Resource(corev1.SchemeGroupVersion.WithResource("configmaps")).Namespace("multicluster-engine").Update(ctx, consoleMceConfig, metav1.UpdateOptions{})
 		if err != nil {
-			log.Error(err, "Failed to update ConfigMap console-mce-config.")
+			log.Error(err, "Failed to update ConfigMap console-mce-config in multicluster-engine.")
 		}
 	}
 
@@ -87,7 +87,7 @@ func (r *SearchReconciler) enableGlobalSearch(ctx context.Context, instance *sea
 		}
 	}
 
-	// # Enable federated search feature in the search-api.
+	// Enable federated search feature in the search-api.
 	// oc patch search search-v2-operator -n open-cluster-management --type='merge' -p '{"spec":{"deployments":{"queryapi":{"envVar":[{"name":"FEATURE_FEDERATED_SEARCH", "value":"true"}]}}}}'
 	if instance.Spec.Deployments.QueryAPI.Env == nil { // TODO: OR if FEATURE_FEDERATED_SEARCH is not already set to true
 		instance.Spec.Deployments.QueryAPI.Env = append(instance.Spec.Deployments.QueryAPI.Env, corev1.EnvVar{Name: "FEATURE_FEDERATED_SEARCH", Value: "true"})
@@ -120,7 +120,7 @@ func (r *SearchReconciler) enableGlobalSearch(ctx context.Context, instance *sea
 		}
 	}
 
-	// # Create configuration resources for each Managed Hub.
+	// Create configuration resources for each Managed Hub.
 	// MANAGED_HUBS=($(oc get managedcluster -o json | jq -r '.items[] | select(.status.clusterClaims[] | .name == "hub.open-cluster-management.io" and .value != "NotInstalled") | .metadata.name'))
 	clusterList, err := r.DynamicClient.Resource(managedClusterResourceGvr).List(ctx, metav1.ListOptions{})
 	if err != nil {
@@ -129,6 +129,11 @@ func (r *SearchReconciler) enableGlobalSearch(ctx context.Context, instance *sea
 
 	for _, cluster := range clusterList.Items {
 		isManagedHub := false
+		if cluster.Object["status"] == nil || cluster.Object["status"].(map[string]interface{})["clusterClaims"] == nil {
+			log.Info("Cluster doesn't have status or clusterClaims.", "cluster", cluster.GetName())
+			continue
+		}
+
 		clusterClaims := cluster.Object["status"].(map[string]interface{})["clusterClaims"].([]interface{})
 		for _, claim := range clusterClaims {
 			claimMap := claim.(map[string]interface{})
@@ -222,22 +227,30 @@ func (r *SearchReconciler) enableGlobalSearch(ctx context.Context, instance *sea
 										},
 									},
 								},
-								// - apiVersion: route.openshift.io/v1
-								//   kind: Route
-								//   metadata:
-								// 	labels:
-								// 	  app: ocm-search
-								// 	name: search-global-hub
-								// 	namespace: open-cluster-management
-								//   spec:
-								// 	port:
-								// 	  targetPort: search-api
-								// 	tls:
-								// 	  termination: passthrough
-								// 	to:
-								// 	  kind: Service
-								// 	  name: search-search-api
-								// 	  weight: 100
+								{
+									"apiVersion": "route.openshift.io/v1",
+									"kind":       "Route",
+									"metadata": map[string]interface{}{
+										"name":      "search-global-hub",
+										"namespace": "open-cluster-management",
+										"labels": map[string]interface{}{
+											"app": "search",
+										},
+									},
+									"spec": map[string]interface{}{
+										"port": map[string]interface{}{
+											"targetPort": "search-api",
+										},
+										"tls": map[string]interface{}{
+											"termination": "passthrough",
+										},
+										"to": map[string]interface{}{
+											"kind":   "Service",
+											"name":   "search-search-api",
+											"weight": 100,
+										},
+									},
+								},
 							},
 						},
 					},
@@ -256,3 +269,24 @@ func (r *SearchReconciler) enableGlobalSearch(ctx context.Context, instance *sea
 	log.Info("Done reconciling Global Search resources.")
 	return nil
 }
+
+// Logic to disable Global Search.
+// func (r *SearchReconciler) disableGlobalSearch(ctx context.Context, instance *searchv1alpha1.Search) error {
+// 	log.Info("Reconcile Global Search resources.")
+
+// 	// Disable global search feature in the console.
+// 	// oc patch configmap console-mce-config -n multicluster-engine -p '{"data": {"globalSearchFeatureFlag": "disabled"}}'
+// 	consoleMceConfig, err := r.DynamicClient.Resource(corev1.SchemeGroupVersion.WithResource("configmaps")).Namespace("multicluster-engine").Get(ctx, "console-mce-config", metav1.GetOptions{})
+// 	if err != nil {
+// 		log.Error(err, "Failed to get ConfigMap console-mce-config in multicluster-engine.")
+// 	} else {
+// 		if exist := consoleMceConfig.Object["data"].(map[string]interface{})["globalSearchFeatureFlagxxx"]; exist == nil {
+// 			log.Info("globalSearchFeatureFlagxxx doesn't exists.")
+// 		}
+// 		delete(consoleMceConfig.Object["data"].(map[string]interface{}), "globalSearchFeatureFlag")
+// 		_, err = r.DynamicClient.Resource(corev1.SchemeGroupVersion.WithResource("configmaps")).Namespace("multicluster-engine").Update(ctx, consoleMceConfig, metav1.UpdateOptions{})
+// 		if err != nil {
+// 			log.Error(err, "Failed to update ConfigMap console-mce-config in multicluster-engine.")
+// 		}
+// 	}
+// }
