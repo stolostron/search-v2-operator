@@ -209,3 +209,10 @@ setup:
 	export COLLECTOR_IMAGE=$$(kubectl get deploy/search-collector -o jsonpath="{..image}")	
 	export API_IMAGE=$$(kubectl get deploy/search-api -o jsonpath="{..image}")
 	export INDEXER_IMAGE=$$(kubectl get deploy/search-indexer -o jsonpath="{..image}")
+
+.PHONY: lint
+lint:
+	GOPATH=$(go env GOPATH)
+	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b "${GOPATH}/bin" v1.51.2
+	CGO_ENABLED=1 GOGC=25 golangci-lint run --timeout=3m
+	gosec ./...
