@@ -228,7 +228,11 @@ func (r *SearchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 			// TODO: Set status on CR to indicate that global search setup failed.
 		}
 	} else {
-		log.Info("Global search is disabled. Skipping global search setup...")
+		log.Info("Global search is disabled. Deleting configuration.")
+		err := r.disableGlobalSearch(ctx, instance)
+		if err != nil {
+			log.Error(err, "Failed to disable global search.")
+		}
 	}
 
 	once.Do(func() {
