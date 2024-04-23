@@ -18,11 +18,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
-/*
-	#nosec G101
-
-gosec will flag the "secrets" as security violations. This flag will allow us to ignore it as a false positive.
-*/
 const (
 	apiDeploymentName       = "search-api"
 	collectorDeploymentName = "search-collector"
@@ -33,9 +28,9 @@ const (
 	postgresConfigmapName = "search-postgres"
 	caCertConfigmapName   = "search-ca-crt"
 
-	apiSecretName      = "search-api-certs"      // #nosec G101
-	indexerSecretName  = "search-indexer-certs"  // #nosec G101
-	postgresSecretName = "search-postgres-certs" // #nosec G101
+	apiSecretName      = "search-api-certs"      // #nosec G101 - False positive, this is a secret name, not a password
+	indexerSecretName  = "search-indexer-certs"  // #nosec G101 - False positive, this is a secret name, not a password
+	postgresSecretName = "search-postgres-certs" // #nosec G101 - False positive, this is a secret name, not a password
 
 	ResourceHugePages2Mi corev1.ResourceName = "hugepages-2Mi"
 	ResourceHugePages1Gi corev1.ResourceName = "hugepages-1Gi"
