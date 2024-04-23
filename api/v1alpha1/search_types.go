@@ -8,6 +8,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// Important: Run the "make manifests" command to regenerate the manifests after you modify this file.
+
 // AvailabilityType
 type AvailabilityType string
 
@@ -33,9 +35,6 @@ type Search struct {
 
 // SearchSpec defines the desired state of Search.
 type SearchSpec struct {
-	// You can insert additional specification fields.
-	// Important: To regenerate code after you modify the file, run the "make" command.
-
 	// +optional
 	// Storage configuration for the database.
 	DBStorage StorageSpec `json:"dbStorage,omitempty"`
