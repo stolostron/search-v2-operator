@@ -66,7 +66,7 @@ type SearchSpec struct {
 	ImagePullPolicy corev1.PullPolicy `json:"imagePullPolicy,omitempty"`
 
 	// +optional
-	// Define the nodes that you want to achedule with matching labels.
+	// Define the nodes that you want to schedule with matching labels.
 	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
 
 	// +optional
@@ -126,7 +126,7 @@ type StorageSpec struct {
 // SearchStatus defines the observed state of Search.
 type SearchStatus struct {
 
-	// Database used by search.
+	// Database used by Search.
 	DB string `json:"db"`
 
 	// Storage used by database

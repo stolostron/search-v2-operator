@@ -931,7 +931,7 @@ spec:
                   type: object
                 type: array
               db:
-                description: Database used by search.
+                description: Database used by Search.
                 type: string
               storage:
                 description: Storage used by database
