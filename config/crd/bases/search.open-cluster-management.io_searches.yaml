@@ -18,7 +18,7 @@ spec:
   - name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: Search is the Schema for the searches API
+        description: Search is the schema for the searches API.
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation
@@ -33,7 +33,7 @@ spec:
           metadata:
             type: object
           spec:
-            description: SearchSpec defines the desired state of Search
+            description: SearchSpec defines the desired state of Search.
             properties:
               availabilityConfig:
                 description: '[PLACEHOLDER, NOT IMPLEMENTED] Specifies deployment
@@ -41,8 +41,8 @@ spec:
                   (default)'
                 type: string
               dbConfig:
-                description: Configmap name contains parameters to override default
-                  db parameters
+                description: The config map name contains parameters to override default
+                  database parameters.
                 type: string
               dbStorage:
                 description: Storage configuration for the database.
@@ -59,10 +59,10 @@ spec:
                     type: string
                 type: object
               deployments:
-                description: Customization for search deployments
+                description: Customization for search deployments.
                 properties:
                   collector:
-                    description: Configuration for collector Deployment
+                    description: Configuration for the collector.
                     properties:
                       arguments:
                         description: Container Arguments
@@ -191,12 +191,12 @@ spec:
                         description: Image_override
                         type: string
                       replicaCount:
-                        description: Number of pod instances for deployment
+                        description: Number of pod instances for the deployment.
                         format: int32
                         minimum: 1
                         type: integer
                       resources:
-                        description: Compute Resources required by deployment
+                        description: Compute resources required by deployment.
                         properties:
                           claims:
                             description: "Claims lists the names of resources, defined
@@ -246,7 +246,7 @@ spec:
                         type: object
                     type: object
                   database:
-                    description: Configuration for DB Deployment
+                    description: Configuration for the database.
                     properties:
                       arguments:
                         description: Container Arguments
@@ -375,12 +375,12 @@ spec:
                         description: Image_override
                         type: string
                       replicaCount:
-                        description: Number of pod instances for deployment
+                        description: Number of pod instances for the deployment.
                         format: int32
                         minimum: 1
                         type: integer
                       resources:
-                        description: Compute Resources required by deployment
+                        description: Compute resources required by deployment.
                         properties:
                           claims:
                             description: "Claims lists the names of resources, defined
@@ -430,7 +430,7 @@ spec:
                         type: object
                     type: object
                   indexer:
-                    description: Configuration for indexer Deployment
+                    description: Configuration for the indexer.
                     properties:
                       arguments:
                         description: Container Arguments
@@ -559,12 +559,12 @@ spec:
                         description: Image_override
                         type: string
                       replicaCount:
-                        description: Number of pod instances for deployment
+                        description: Number of pod instances for the deployment.
                         format: int32
                         minimum: 1
                         type: integer
                       resources:
-                        description: Compute Resources required by deployment
+                        description: Compute resources required by deployment.
                         properties:
                           claims:
                             description: "Claims lists the names of resources, defined
@@ -614,7 +614,7 @@ spec:
                         type: object
                     type: object
                   queryapi:
-                    description: Configuration for api Deployment
+                    description: Configuration for Query API.
                     properties:
                       arguments:
                         description: Container Arguments
@@ -743,12 +743,12 @@ spec:
                         description: Image_override
                         type: string
                       replicaCount:
-                        description: Number of pod instances for deployment
+                        description: Number of pod instances for the deployment.
                         format: int32
                         minimum: 1
                         type: integer
                       resources:
-                        description: Compute Resources required by deployment
+                        description: Compute resources required by deployment.
                         properties:
                           claims:
                             description: "Claims lists the names of resources, defined
@@ -813,10 +813,12 @@ spec:
               nodeSelector:
                 additionalProperties:
                   type: string
-                description: NodeSelector to schedule on nodes with matching labels
+                description: Define the nodes that you want to schedule with matching
+                  labels.
                 type: object
               tolerations:
-                description: Tolerations to schedule pods on nodes with matching taints
+                description: Define tolerations to schedule pods on nodes with matching
+                  taints.
                 items:
                   description: The pod this Toleration is attached to tolerates any
                     taint that matches the triple <key,value,effect> using the matching
@@ -857,7 +859,7 @@ spec:
                 type: array
             type: object
           status:
-            description: SearchStatus defines the observed state of Search
+            description: SearchStatus defines the observed state of Search.
             properties:
               conditions:
                 description: Conditions
@@ -929,7 +931,7 @@ spec:
                   type: object
                 type: array
               db:
-                description: Database used by search
+                description: Database used by Search.
                 type: string
               storage:
                 description: Storage used by database
