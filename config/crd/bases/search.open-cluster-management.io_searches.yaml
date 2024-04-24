@@ -813,7 +813,7 @@ spec:
               nodeSelector:
                 additionalProperties:
                   type: string
-                description: Define the nodes that you want to achedule with matching
+                description: Define the nodes that you want to schedule with matching
                   labels.
                 type: object
               tolerations:
