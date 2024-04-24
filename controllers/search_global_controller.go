@@ -60,7 +60,14 @@ func (r *SearchReconciler) enableGlobalSearch(ctx context.Context, instance *sea
 	}
 
 	// Enable global search feature in the console.
-	err = r.configureGlobalSearchConsole(ctx, true, instance)
+	// Adds the globalSearchFeatureFlag key to ConfigMap console-mce-config in multicluster-engine namespace.
+	err = r.updateConsoleConfig(ctx, true, "console-mce-config", "multicluster-engine")
+	if err != nil {
+		log.Error(err, "Failed to enable the Global Search feature in the console. multicluster-engine.")
+	}
+
+	// Adds the globalSearchFeatureFlag key to ConfigMap console-config in open-cluster-management namespace.
+	err = r.updateConsoleConfig(ctx, true, "console-config", instance.GetNamespace())
 	if err != nil {
 		log.Error(err, "Failed to enable the Global Search feature in the console.")
 	}
@@ -249,9 +256,22 @@ func (r *SearchReconciler) disableGlobalSearch(ctx context.Context, instance *se
 	log.Info("Reconcile Global Search resources.")
 
 	// Disable global search feature in the console.
-	err := r.configureGlobalSearchConsole(ctx, false, instance)
+	// err := r.configureGlobalSearchConsole(ctx, false, instance)
+	// if err != nil {
+	// 	log.Error(err, "Failed to disable Global Search feature in the console.")
+	// }
+
+	// Disable global search feature in the console.
+	// Remove the globalSearchFeatureFlag key to ConfigMap console-mce-config in multicluster-engine namespace.
+	err := r.updateConsoleConfig(ctx, false, "console-mce-config", "multicluster-engine")
 	if err != nil {
-		log.Error(err, "Failed to disable Global Search feature in the console.")
+		log.Error(err, "Failed to enable the Global Search feature in the console. multicluster-engine.")
+	}
+
+	// Remove the globalSearchFeatureFlag key to ConfigMap console-config in open-cluster-management namespace.
+	err = r.updateConsoleConfig(ctx, false, "console-config", instance.GetNamespace())
+	if err != nil {
+		log.Error(err, "Failed to enable the Global Search feature in the console.")
 	}
 
 	// Disable federated search feature in the search-api.
@@ -260,7 +280,6 @@ func (r *SearchReconciler) disableGlobalSearch(ctx context.Context, instance *se
 	if err != nil {
 		log.Error(err, "Failed to disable the federated global search feature.")
 	}
-
 
 	// Delete configuration resources for each Managed Hub.
 	// MANAGED_HUBS=($(oc get managedcluster -o json | jq -r '.items[] | select(.status.clusterClaims[] | .name == "hub.open-cluster-management.io" and .value != "NotInstalled") | .metadata.name'))
@@ -296,52 +315,26 @@ func (r *SearchReconciler) disableGlobalSearch(ctx context.Context, instance *se
 	return err
 }
 
-// Configure the global search feature flag in the console.
-// Adds the globalSearchFeatureFlag key to both console ConfigMaps.
-//  1. ConfigMap console-mce-config in multicluster-engine namespace.
-//  2. ConfigMap console-config in open-cluster-management namespace.
-func (r *SearchReconciler) configureGlobalSearchConsole(ctx context.Context, enabled bool, instance *searchv1alpha1.Search) error {
-
-	// Update ConfigMap console-mce-config in multicluster-engine namespace.
-	// oc patch configmap console-mce-config -n multicluster-engine -p '{"data": {"globalSearchFeatureFlag": "enabled"}}'
-	consoleMceConfig, err := r.DynamicClient.Resource(corev1.SchemeGroupVersion.WithResource("configmaps")).Namespace("multicluster-engine").Get(ctx, "console-mce-config", metav1.GetOptions{})
+// Update flag globalSearchFeatureFlag in console config.
+func (r *SearchReconciler) updateConsoleConfig(ctx context.Context, enabled bool, name, namespace string) error {
+	// oc patch configmap {name} -n {namespace} -p '{"data": {"globalSearchFeatureFlag": "enabled"}}'
+	consoleConfig, err := r.DynamicClient.Resource(corev1.SchemeGroupVersion.WithResource("configmaps")).Namespace(namespace).Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
-		log.Error(err, "Failed to get ConfigMap console-mce-config in multicluster-engine.")
+		log.Error(err, "Failed to get ConfigMap console-config in ", "namespace", namespace)
 	} else {
 		if enabled {
-			log.Info("Adding globalSearchFeatureFlag to configmap console-mce-config in multicluster-engine.")
-			consoleMceConfig.Object["data"].(map[string]interface{})["globalSearchFeatureFlag"] = "enabled"
-		} else {
-			log.Info("Removing globalSearchFeatureFlag from configmap console-mce-config in multicluster-engine.")
-			delete(consoleMceConfig.Object["data"].(map[string]interface{}), "globalSearchFeatureFlag")
-		}
-
-		_, err = r.DynamicClient.Resource(corev1.SchemeGroupVersion.WithResource("configmaps")).Namespace("multicluster-engine").Update(ctx, consoleMceConfig, metav1.UpdateOptions{})
-		if err != nil {
-			log.Error(err, "Failed to update configmap console-mce-config in multicluster-engine.")
-		}
-	}
-
-	// Update ConfigMap console-config in open-cluster-management namespace.
-	// oc patch configmap console-config -n open-cluster-management -p '{"data": {"globalSearchFeatureFlag": "enabled"}}'
-	consoleConfig, err := r.DynamicClient.Resource(corev1.SchemeGroupVersion.WithResource("configmaps")).Namespace(instance.GetNamespace()).Get(ctx, "console-config", metav1.GetOptions{})
-	if err != nil {
-		log.Error(err, "Failed to get ConfigMap console-config in ", "namespace", instance.GetNamespace())
-	} else {
-		if enabled {
-			log.Info("Adding globalSearchFeatureFlag to configmap console-config in ", "namespace", instance.GetNamespace())
+			log.Info("Adding globalSearchFeatureFlag to configmap ", "namespace", namespace, "name", name)
 			consoleConfig.Object["data"].(map[string]interface{})["globalSearchFeatureFlag"] = "enabled"
 		} else {
-			log.Info("Removing globalSearchFeatureFlag from configmap console-config in ", "namespace", instance.GetNamespace())
+			log.Info("Removing globalSearchFeatureFlag from configmap", "namespace", namespace, "name", name)
 			delete(consoleConfig.Object["data"].(map[string]interface{}), "globalSearchFeatureFlag")
 		}
 
-		_, err = r.DynamicClient.Resource(corev1.SchemeGroupVersion.WithResource("configmaps")).Namespace(instance.GetNamespace()).Update(ctx, consoleMceConfig, metav1.UpdateOptions{})
+		_, err = r.DynamicClient.Resource(corev1.SchemeGroupVersion.WithResource("configmaps")).Namespace(namespace).Update(ctx, consoleConfig, metav1.UpdateOptions{})
 		if err != nil {
 			log.Error(err, "Failed to update configmap console-mce-config in multicluster-engine.")
 		}
 	}
-
 	return err
 }
 

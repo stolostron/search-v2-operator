@@ -218,9 +218,12 @@ func (r *SearchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return *result, err
 	}
 
-	log.Info("Reconcile Global Search setup", "globalSearch", instance.Spec.GlobalSearch)
-	if instance.Spec.GlobalSearch {
-		log.Info("Global search is enabled. Setting up global search...")
+	// log.Info("Reconcile Global Search setup", "globalSearch", instance.Spec.GlobalSearch)
+	if instance.ObjectMeta.Annotations["search.open-cluster-management.io/globalSearchPreview"] == "true" ||
+		instance.ObjectMeta.Annotations["globalSearchPreview"] == "true" {
+
+		// if instance.Spec.GlobalSearch {
+		log.Info("Global search preview is enabled. Setting up global search...")
 		err := r.enableGlobalSearch(ctx, instance)
 		if err != nil {
 			log.Error(err, "Failed to enable global search.")
