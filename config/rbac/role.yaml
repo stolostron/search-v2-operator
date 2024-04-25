@@ -6,6 +6,39 @@ metadata:
   name: manager-role
 rules:
 - apiGroups:
+  - ""
+  resources:
+  - configmaps
+  verbs:
+  - get
+  - list
+  - patch
+  - watch
+- apiGroups:
+  - authentication.open-cluster-management.io
+  resources:
+  - managedserviceaccounts
+  verbs:
+  - create
+  - get
+  - list
+- apiGroups:
+  - cluster.open-cluster-management.io
+  resources:
+  - managedclusters
+  verbs:
+  - get
+  - list
+- apiGroups:
+  - multicluster.openshift.io
+  resources:
+  - multiclusterengines
+  verbs:
+  - get
+  - list
+  - patch
+  - watch
+- apiGroups:
   - search.open-cluster-management.io
   resources:
   - searches

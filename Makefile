@@ -206,3 +206,14 @@ lint:
 	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b "${GOPATH}/bin" v1.51.2
 	CGO_ENABLED=1 GOGC=25 golangci-lint run --timeout=3m
 	gosec ./...
+
+# Setup local development environment.
+setup:
+	@echo "[MANUAL STEP] Setup shell environment variables:"
+	@echo 
+	@echo "export WATCH_NAMESPACE=open-cluster-management"
+	@echo "oc project $$WATCH_NAMESPACE"
+	export POSTGRES_IMAGE=$(shell kubectl get deploy/search-postgres -o jsonpath="{..image}")
+	export COLLECTOR_IMAGE=$(shell kubectl get deploy/search-collector -o jsonpath="{..image}")	
+	export API_IMAGE=$(shell kubectl get deploy/search-api -o jsonpath="{..image}")
+	export INDEXER_IMAGE=$(shell kubectl get deploy/search-indexer -o jsonpath="{..image}")

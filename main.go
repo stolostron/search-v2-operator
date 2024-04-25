@@ -22,6 +22,7 @@ import (
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
+	"k8s.io/client-go/dynamic"
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
 	"github.com/cloudflare/cfssl/log"
@@ -82,13 +83,20 @@ func main() {
 		setupLog.Error(err, "unable to start manager")
 		os.Exit(1)
 	}
+
+	dynClient, err := dynamic.NewForConfig(mgr.GetConfig())
+	if err != nil {
+		setupLog.Error(err, "Unable to create kubernetes dynamic client.")
+	}
+
 	if err := addonv1alpha1.AddToScheme(mgr.GetScheme()); err != nil {
 		log.Error(err, "unable to add to scheme, search addon will be unavailable")
 	}
 
 	if err = (&controllers.SearchReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
+		Client:        mgr.GetClient(),
+		DynamicClient: dynClient,
+		Scheme:        mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Search")
 		os.Exit(1)

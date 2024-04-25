@@ -36,6 +36,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/dynamic"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -45,8 +46,9 @@ import (
 // SearchReconciler reconciles a Search object
 type SearchReconciler struct {
 	client.Client
-	Scheme  *runtime.Scheme
-	context context.Context
+	Scheme        *runtime.Scheme
+	context       context.Context
+	DynamicClient dynamic.Interface
 }
 
 const searchFinalizer = "search.open-cluster-management.io/finalizer"
@@ -58,6 +60,10 @@ var cleanOnce sync.Once
 //+kubebuilder:rbac:groups=search.open-cluster-management.io,resources=searches,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=search.open-cluster-management.io,resources=searches/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=search.open-cluster-management.io,resources=searches/finalizers,verbs=update
+//+kubebuilder:rbac:groups=cluster.open-cluster-management.io,resources=managedclusters,verbs=get;list
+//+kubebuilder:rbac:groups=authentication.open-cluster-management.io,resources=managedserviceaccounts,verbs=get;list;create
+//+kubebuilder:rbac:groups=multicluster.openshift.io,resources=multiclusterengines,verbs=get;list;watch;patch
+//+kubebuilder:rbac:groups="",resources=configmaps,verbs=get;list;patch;watch
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -210,6 +216,25 @@ func (r *SearchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	if result != nil {
 		log.Error(err, "Search CACert setup failed")
 		return *result, err
+	}
+
+	if instance.ObjectMeta.Annotations["search.open-cluster-management.io/globalSearchPreview"] == "true" ||
+		instance.ObjectMeta.Annotations["globalSearchPreview"] == "true" {
+
+		// if instance.Spec.GlobalSearch {
+		log.Info("Global search preview is enabled. Setting up global search...")
+		err := r.enableGlobalSearch(ctx, instance)
+		if err != nil {
+			log.Error(err, "Failed to enable global search.")
+
+			// TODO: Set status on CR to indicate that global search setup failed.
+		}
+	} else {
+		log.Info("Global search is disabled. Deleting configuration.")
+		err := r.disableGlobalSearch(ctx, instance)
+		if err != nil {
+			log.Error(err, "Failed to disable global search.")
+		}
 	}
 
 	once.Do(func() {
