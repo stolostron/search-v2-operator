@@ -211,9 +211,8 @@ lint:
 setup:
 	@echo "[MANUAL STEP] Setup shell environment variables:"
 	@echo 
-	@echo "export WATCH_NAMESPACE=open-cluster-management"
-	@echo "oc project $$WATCH_NAMESPACE"
-	export POSTGRES_IMAGE=$(shell kubectl get deploy/search-postgres -o jsonpath="{..image}")
-	export COLLECTOR_IMAGE=$(shell kubectl get deploy/search-collector -o jsonpath="{..image}")	
-	export API_IMAGE=$(shell kubectl get deploy/search-api -o jsonpath="{..image}")
-	export INDEXER_IMAGE=$(shell kubectl get deploy/search-indexer -o jsonpath="{..image}")
+	export WATCH_NAMESPACE=open-cluster-management
+	export POSTGRES_IMAGE=$(shell kubectl get deploy/search-postgres -n open-cluster-management -o jsonpath="{..image}")
+	export COLLECTOR_IMAGE=$(shell kubectl get deploy/search-collector -n open-cluster-management -o jsonpath="{..image}")	
+	export API_IMAGE=$(shell kubectl get deploy/search-api -n open-cluster-management -o jsonpath="{..image}")
+	export INDEXER_IMAGE=$(shell kubectl get deploy/search-indexer -n open-cluster-management -o jsonpath="{..image}")

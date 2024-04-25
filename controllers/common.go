@@ -547,7 +547,7 @@ func AddonDeploymentConfigEquals(current, new *addonv1alpha1.AddOnDeploymentConf
 }
 
 // update status condition in search instance
-func updateStatusCondition(instance *searchv1alpha1.Search, podList *corev1.PodList) *searchv1alpha1.Search {
+func updateStatusCondition(instance *searchv1alpha1.Search, podList *corev1.PodList) {
 	var podCondition metav1.Condition
 	var readyType string
 
@@ -600,8 +600,6 @@ func updateStatusCondition(instance *searchv1alpha1.Search, podList *corev1.PodL
 		instance.Status.Conditions = append(instance.Status.Conditions,
 			podCondition)
 	}
-
-	return instance
 }
 
 // check if labels has 'component: search-operator'

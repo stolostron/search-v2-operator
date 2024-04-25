@@ -8,6 +8,7 @@ import (
 
 	searchv1alpha1 "github.com/stolostron/search-v2-operator/api/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -369,4 +370,36 @@ func (r *SearchReconciler) configureFederatedGlobalSearchFeature(ctx context.Con
 	}
 
 	return nil // TODO: Return error if any
+}
+
+func (r *SearchReconciler) updateGlobalSearchStatus(ctx context.Context, instance *searchv1alpha1.Search, status metav1.Condition) error {
+	// Find existing status condition.
+	existingConditionIndex := -1
+	for i, condition := range instance.Status.Conditions {
+		if condition.Type == "GlobalSearchReady" {
+			existingConditionIndex = i
+			break
+		}
+	}
+	if existingConditionIndex == -1 {
+		// Add new condition.
+		instance.Status.Conditions = append(instance.Status.Conditions, status)
+	} else {
+		// Update existing condition.
+		instance.Status.Conditions[existingConditionIndex] = status
+	}
+
+	// write instance with the new status values.
+	// FIXME: combine with other status update to avoid multiple writes.
+	err := r.Client.Status().Update(ctx, instance)
+	if err != nil {
+		if errors.IsConflict(err) {
+			log.Error(err, "Failed to update status for Search CR instance: Object has been modified")
+		}
+		log.Error(err, "Failed to update status for Search CR instance")
+		return err
+	}
+	log.Info("Updated Search CR status successfully")
+
+	return nil
 }
