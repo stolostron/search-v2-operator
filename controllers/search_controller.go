@@ -209,7 +209,7 @@ func (r *SearchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	}
 	result, err = r.createConfigMap(ctx, r.PostgresConfigmap(instance))
 	if result != nil {
-		log.Error(err, "Postgres configmap  setup failed")
+		log.Error(err, "Postgres configmap setup failed")
 		return *result, err
 	}
 	result, err = r.createConfigMap(ctx, r.SearchCACert(instance))
@@ -230,7 +230,7 @@ func (r *SearchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 				Type:               "GlobalSearchReady",
 				Status:             metav1.ConditionFalse,
 				Reason:             "GlobalSearchSetupFailed",
-				Message:            "Failed to enable global search.",
+				Message:            "Failed to enable global search. " + err.Error(),
 				LastTransitionTime: metav1.Now(),
 			})
 			if updateErr != nil {
@@ -246,7 +246,7 @@ func (r *SearchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 				LastTransitionTime: metav1.Now(),
 			})
 			if updateErr != nil {
-				log.Error(updateErr, "Failed to update Global Search status condition on Search CR instance.")
+				log.Error(updateErr, "Failed to update the global search status condition on Search CR instance.")
 			}
 		}
 	} else {
@@ -264,7 +264,7 @@ func (r *SearchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 			LastTransitionTime: metav1.Now(),
 		})
 		if updateErr != nil {
-			log.Error(updateErr, "Failed to update Global Search status condition on Search CR instance.")
+			log.Error(updateErr, "Failed to update global search status condition on Search CR instance.")
 		}
 	}
 
