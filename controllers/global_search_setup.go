@@ -12,7 +12,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
 var (
@@ -31,11 +30,6 @@ var (
 		Version:  "v1",
 		Resource: "managedclusters",
 	}
-	managedClusterAddonResourceGvr = schema.GroupVersionResource{
-		Group:    "addon.open-cluster-management.io",
-		Version:  "v1alpha1",
-		Resource: "managedclusteraddons",
-	}
 	managedServiceAccountGvr = schema.GroupVersionResource{
 		Group:    "authentication.open-cluster-management.io",
 		Version:  "v1beta1",
@@ -48,8 +42,8 @@ var (
 	}
 )
 
-// Logic to enable Global Search.
-//  1. Verify pre-requisites.
+// Enable Global Search.
+//  1. Check pre-requisites.
 //     a. MulticlusterGlobalHub operator is installed in the cluster.
 //     b. The ManagedServiceAccount add-on is enabled in the MultiClusterEngine CR.
 //     c. The ClusterProxy addon is enabled in the MultiClusterEngine CR.
@@ -58,63 +52,32 @@ var (
 //  4. Create a ManagedServiceAccount recource for each Managed Hub.
 //  5. Create a ManifestWork resource for each Managed Hub.
 func (r *SearchReconciler) enableGlobalSearch(ctx context.Context, instance *searchv1alpha1.Search) error {
-	log.V(5).Info("Checking global search pre-requisites.")
-
-	// Verify that MulticlusterGlobalHub operator is installed.
-	// oc get multiclusterglobalhub -A
-	multiclusterGlobalHub, err := r.DynamicClient.Resource(multiclusterGlobalHubGvr).List(ctx, metav1.ListOptions{})
+	// 1. Check global search pre-requisites.
+	err := r.verifyGlobalSearchPrerequisites(ctx)
 	if err != nil {
-		return fmt.Errorf("MulticlusterGlobalHub operator is not installed.")
-	} else if len(multiclusterGlobalHub.Items) > 0 {
-		log.V(5).Info("Found MulticlusterGlobalHub intance.")
+		log.Error(err, "Failed to verify global search pre-requisites.")
+		return err
 	}
 
-	// Verify that the ManagedServiceAccount add-on is enabled in the MultiClusterEngine CR.
-	mce, err := r.DynamicClient.Resource(multiclusterengineResourceGvr).Get(ctx, "multiclusterengine", metav1.GetOptions{})
-	if err != nil {
-		log.Error(err, "Failed to get MulticlusterEngine CR.")
-	} else {
-		log.V(5).Info("Found MulticlusterEngine. Checking that ManagedServiceAccount and cluster-proxy-addon are enabled.")
-		managedServiceAccountEnabled := false
-		clusterProxyEnabled := false
-		for _, component := range mce.Object["spec"].(map[string]interface{})["overrides"].(map[string]interface{})["components"].([]interface{}) {
-			if component.(map[string]interface{})["name"] == "managedserviceaccount" && component.(map[string]interface{})["enabled"] == true {
-				log.V(5).Info("Managed Service Account add-on is enabled.")
-				managedServiceAccountEnabled = true
-			}
-			if component.(map[string]interface{})["name"] == "cluster-proxy-addon" && component.(map[string]interface{})["enabled"] == true {
-				log.V(5).Info("Cluster Proxy add-on is enabled.")
-				clusterProxyEnabled = true
-			}
-		}
-		if !managedServiceAccountEnabled {
-			// log.Info("Error: Managed Service Account add-on is not enabled in MulticlusterEngine.")
-			return fmt.Errorf("Managed Service Account add-on is not enabled in MulticlusterEngine.")
-		}
-		if !clusterProxyEnabled {
-			// log.Info("Error: Cluster Proxy add-on is not enabled in MulticlusterEngine.")
-			return fmt.Errorf("Cluster Proxy add-on is not enabled in MulticlusterEngine.")
-		}
-	}
-	log.V(2).Info("Verified global search pre-requisites.")
-
-	// Enable global search feature in the console.
-	// Adds the globalSearchFeatureFlag key to ConfigMap console-mce-config in multicluster-engine namespace.
+	// 2. Enable global search feature in the console.
+	// 2a.Add globalSearchFeatureFlag=true to configmap console-mce-config in multicluster-engine namespace.
 	err = r.updateConsoleConfig(ctx, true, "console-mce-config", "multicluster-engine")
 	if err != nil {
-		log.Error(err, "Failed to enable the Global Search feature in the console. multicluster-engine.")
+		log.Error(err, "Failed to enable the global search feature in console-mce-config.")
+		// TODO: This error is never returned.
 	}
-
-	// Adds the globalSearchFeatureFlag key to ConfigMap console-config in open-cluster-management namespace.
+	// 2b. Add globalSearchFeatureFlag=true to configmap console-config in open-cluster-management namespace.
 	err = r.updateConsoleConfig(ctx, true, "console-config", instance.GetNamespace())
 	if err != nil {
-		log.Error(err, "Failed to enable the Global Search feature in the console.")
+		log.Error(err, "Failed to enable the global search feature in console-config.")
+		// TODO: This error is never returned.
 	}
 
-	// Enable federated search feature in the search-api.
-	err = r.configureFederatedGlobalSearchFeature(ctx, true, instance)
+	// 3. Enable federated search feature in the search-api deployment.
+	err = r.updateSearchApiDeployment(ctx, true, instance)
 	if err != nil {
 		log.Error(err, "Failed to enable the federated global search feature.")
+		// TODO: This error is never returned.
 	}
 
 	// Create configuration resources for each Managed Hub.
@@ -122,6 +85,7 @@ func (r *SearchReconciler) enableGlobalSearch(ctx context.Context, instance *sea
 	clusterList, err := r.DynamicClient.Resource(managedClusterResourceGvr).List(ctx, metav1.ListOptions{})
 	if err != nil {
 		log.Error(err, "Failed to list of ManagedClusters to configure global search.")
+		return err
 	}
 
 	for _, cluster := range clusterList.Items {
@@ -144,13 +108,11 @@ func (r *SearchReconciler) enableGlobalSearch(ctx context.Context, instance *sea
 		}
 
 		log.V(2).Info("Cluster is a Managed Hub. Configuring global search resources.", "name", cluster.GetName())
-		// 0. FUTURE: Validate that the Managed Hub is running ACM 2.9.0 or later.
 
-		// 1. Create a ManagedServiceAccount search-global.
+		// 4. Create a ManagedServiceAccount search-global.
 		_, err := r.DynamicClient.Resource(managedServiceAccountGvr).Namespace(cluster.GetName()).Get(ctx, "search-global", metav1.GetOptions{})
-
 		if err != nil && errors.IsNotFound(err) {
-			log.Info("Creating ManagedServiceAccount search-global for managed hub", "name", cluster.GetName())
+			log.V(1).Info("Creating ManagedServiceAccount search-global for managed hub", "name", cluster.GetName())
 			managedSA := &unstructured.Unstructured{
 				Object: map[string]interface{}{
 					"apiVersion": "authentication.open-cluster-management.io/v1beta1",
@@ -166,26 +128,19 @@ func (r *SearchReconciler) enableGlobalSearch(ctx context.Context, instance *sea
 					},
 				},
 			}
-			msaObj, err := r.DynamicClient.Resource(managedServiceAccountGvr).Namespace(cluster.GetName()).Create(ctx, managedSA, metav1.CreateOptions{})
+			_, err := r.DynamicClient.Resource(managedServiceAccountGvr).Namespace(cluster.GetName()).Create(ctx, managedSA, metav1.CreateOptions{})
 			if err != nil {
 				log.Error(err, "Failed to create ManagedServiceAccount search-global.")
-				// TODO: This error is not returned.
-			}
-
-			err = controllerutil.SetControllerReference(instance, msaObj, r.Scheme)
-			if err != nil {
-				log.Error(err, "Could not set owner reference for managed service account.")
 			}
 		} else {
 			log.V(5).Info("Found existing ManagedServiceAccount search-global for Managed Hub.", "name", cluster.GetName())
 		}
 
-		// 3. Create a ManifestWork search-global-config if it doesn't exist.
+		// 5. Create a ManifestWork search-global-config if it doesn't exist.
 		_, err = r.DynamicClient.Resource(manifestWorkGvr).Namespace(cluster.GetName()).Get(ctx, "search-global-config", metav1.GetOptions{})
 		if err != nil && errors.IsNotFound(err) {
-			log.Info("CreatingManifestWork search-global-config for Managed Hub", "name", cluster.GetName())
+			log.V(1).Info("CreatingManifestWork search-global-config for Managed Hub", "name", cluster.GetName())
 
-			// Create the ManifestWork search-global-config.
 			manifestWork := &unstructured.Unstructured{
 				Object: map[string]interface{}{
 					"apiVersion": "work.open-cluster-management.io/v1",
@@ -250,76 +205,112 @@ func (r *SearchReconciler) enableGlobalSearch(ctx context.Context, instance *sea
 					},
 				},
 			}
-			manifestworkObj, err := r.DynamicClient.Resource(manifestWorkGvr).Namespace(cluster.GetName()).Create(ctx, manifestWork, metav1.CreateOptions{})
+			_, err := r.DynamicClient.Resource(manifestWorkGvr).Namespace(cluster.GetName()).Create(ctx, manifestWork, metav1.CreateOptions{})
 			if err != nil {
 				log.Error(err, "Failed to create ManifestWork search-global-config.")
-				// TODO: This error is not returned.
-			}
-
-			err = controllerutil.SetControllerReference(instance, manifestworkObj, r.Scheme)
-			if err != nil {
-				log.Error(err, "Could not set owner reference for manifestwork.")
 			}
 		} else {
 			log.V(5).Info("Found existing ManifestWork search-global-config.")
 		}
 	}
 	log.Info("Global search resources are configured.")
+	return err
+}
+
+// Verify pre-requisites.
+//
+//	a. MulticlusterGlobalHub operator is installed in the cluster.
+//	b. The ManagedServiceAccount add-on is enabled in the MultiClusterEngine CR.
+//	c. The ClusterProxy addon is enabled in the MultiClusterEngine CR.
+func (r *SearchReconciler) verifyGlobalSearchPrerequisites(ctx context.Context) error {
+	log.V(5).Info("Checking global search pre-requisites.")
+	// Verify that MulticlusterGlobalHub operator is installed.
+	// oc get multiclusterglobalhub -A
+	multiclusterGlobalHub, err := r.DynamicClient.Resource(multiclusterGlobalHubGvr).List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return fmt.Errorf("MulticlusterGlobalHub operator is not installed.")
+	} else if len(multiclusterGlobalHub.Items) > 0 {
+		log.V(5).Info("Found MulticlusterGlobalHub intance.")
+	}
+
+	// Verify that the ManagedServiceAccount and ClusterProxy add-ons are enabled in the MultiClusterEngine CR.
+	mce, err := r.DynamicClient.Resource(multiclusterengineResourceGvr).Get(ctx, "multiclusterengine", metav1.GetOptions{})
+	if err != nil {
+		log.Error(err, "Failed to get MulticlusterEngine CR.")
+	} else {
+		log.V(5).Info("Found MulticlusterEngine CR. Checking that ManagedServiceAccount and cluster-proxy-addon are enabled.")
+		managedServiceAccountEnabled := false
+		clusterProxyEnabled := false
+		for _, component := range mce.Object["spec"].(map[string]interface{})["overrides"].(map[string]interface{})["components"].([]interface{}) {
+			if component.(map[string]interface{})["name"] == "managedserviceaccount" && component.(map[string]interface{})["enabled"] == true {
+				log.V(5).Info("Managed Service Account add-on is enabled.")
+				managedServiceAccountEnabled = true
+			}
+			if component.(map[string]interface{})["name"] == "cluster-proxy-addon" && component.(map[string]interface{})["enabled"] == true {
+				log.V(5).Info("Cluster Proxy add-on is enabled.")
+				clusterProxyEnabled = true
+			}
+		}
+		if !managedServiceAccountEnabled {
+			return fmt.Errorf("Managed Service Account add-on is not enabled in MulticlusterEngine.")
+		}
+		if !clusterProxyEnabled {
+			return fmt.Errorf("Cluster Proxy add-on is not enabled in MulticlusterEngine.")
+		}
+	}
 	return nil
 }
 
 // Logic to disable Global Search.
+//  1. Disable global search feature in the console.
+//  2. Disable federated search feature in the search-api deployment.
+//  3. Delete configuration resources for each Managed Hub.
 func (r *SearchReconciler) disableGlobalSearch(ctx context.Context, instance *searchv1alpha1.Search) error {
-	log.Info("Reconcile Global Search resources.")
-
-	// Disable global search feature in the console.
-	// Remove the globalSearchFeatureFlag key to ConfigMap console-mce-config in multicluster-engine namespace.
+	// 1. Disable global search feature in the console.
+	// 1a. Remove the globalSearchFeatureFlag key to configmap console-mce-config in multicluster-engine namespace.
 	err := r.updateConsoleConfig(ctx, false, "console-mce-config", "multicluster-engine")
 	if err != nil {
-		log.Error(err, "Failed to enable the Global Search feature in the console. multicluster-engine.")
+		log.Error(err, "Failed to remove the globalSearchFeatureFlag in configmap console-mce-config.")
 	}
 
-	// Remove the globalSearchFeatureFlag key to ConfigMap console-config in open-cluster-management namespace.
+	// 1b. Remove the globalSearchFeatureFlag key to configmap console-config in open-cluster-management namespace.
 	err = r.updateConsoleConfig(ctx, false, "console-config", instance.GetNamespace())
 	if err != nil {
-		log.Error(err, "Failed to enable the Global Search feature in the console.")
+		log.Error(err, "Failed to remove the globalSearchFeatureFlag in configmap console-config.")
 	}
 
-	// Disable federated search feature in the search-api.
+	// 2. Disable federated search feature in the search-api.
 	// oc patch search search-v2-operator -n open-cluster-management --type='merge' -p '{"spec":{"deployments":{"queryapi":{"envVar":[{"name":"FEATURE_FEDERATED_SEARCH", "value":"false"}]}}}}'
-	err = r.configureFederatedGlobalSearchFeature(ctx, false, instance)
+	err = r.updateSearchApiDeployment(ctx, false, instance)
 	if err != nil {
-		log.Error(err, "Failed to disable the federated global search feature.")
+		log.Error(err, "Failed to remove the federated global search feature flag from search-api deployment.")
 	}
 
-	// Delete configuration resources for each Managed Hub.
+	// 3. Delete configuration resources for each Managed Hub.
 	// MANAGED_HUBS=($(oc get managedcluster -o json | jq -r '.items[] | select(.status.clusterClaims[] | .name == "hub.open-cluster-management.io" and .value != "NotInstalled") | .metadata.name'))
 	clusterList, err := r.DynamicClient.Resource(managedClusterResourceGvr).List(ctx, metav1.ListOptions{})
 	if err != nil {
 		log.Error(err, "Failed to list ManagedClusters.")
 	}
 	for _, cluster := range clusterList.Items {
-		// Delete the ManagedServiceAccount search-global.
+		// 3a. Delete the ManagedServiceAccount search-global.
 		managedServiceAccount, err := r.DynamicClient.Resource(managedServiceAccountGvr).Namespace(cluster.GetName()).Get(ctx, "search-global", metav1.GetOptions{})
 		if err == nil && managedServiceAccount != nil {
-			log.Info(("Deleting ManagedServiceAccount search-global for Managed Hub"), "name", cluster.GetName())
 			err = r.DynamicClient.Resource(managedServiceAccountGvr).Namespace(cluster.GetName()).Delete(ctx, "search-global", metav1.DeleteOptions{})
 			if err != nil {
-				log.Error(err, "Failed to delete ManagedServiceAccount search-global.")
+				log.Error(err, "Failed to delete ManagedServiceAccount search-global for Managed Hub.", "name", cluster.GetName())
 			}
 		}
-
-		// Delete the ManifestWork search-global-config.
+		// 3b. Delete the ManifestWork search-global-config.
 		manifestWork, err := r.DynamicClient.Resource(manifestWorkGvr).Namespace(cluster.GetName()).Get(ctx, "search-global-config", metav1.GetOptions{})
 		if err == nil && manifestWork != nil {
-			log.Info("Deleting ManifestWork search-global-config for Managed Hub", "name", cluster.GetName())
 			err = r.DynamicClient.Resource(manifestWorkGvr).Namespace(cluster.GetName()).Delete(ctx, "search-global-config", metav1.DeleteOptions{})
 			if err != nil {
-				log.Error(err, "Failed to delete ManifestWork search-global-config.")
+				log.Error(err, "Failed to delete ManifestWork search-global-config for Managed Hub.", "name", cluster.GetName())
 			}
 		}
 	}
-	log.Info("Done deleting global search configuration resources.")
+	log.V(1).Info("Done deleting global search configuration resources.")
 	return err
 }
 
@@ -347,41 +338,34 @@ func (r *SearchReconciler) updateConsoleConfig(ctx context.Context, enabled bool
 
 	// Write the updated configmap.
 	_, err = r.DynamicClient.Resource(corev1.SchemeGroupVersion.WithResource("configmaps")).Namespace(namespace).Update(ctx, consoleConfig, metav1.UpdateOptions{})
-
 	return err
 }
 
 // Configure the federated global search feature in the search-api.
-func (r *SearchReconciler) configureFederatedGlobalSearchFeature(ctx context.Context, enabled bool, instance *searchv1alpha1.Search) error {
+func (r *SearchReconciler) updateSearchApiDeployment(ctx context.Context, enabled bool, instance *searchv1alpha1.Search) error {
 	if enabled {
-		// Enable federated search feature in the search-api.
 		// oc patch search search-v2-operator -n open-cluster-management --type='merge' -p '{"spec":{"deployments":{"queryapi":{"envVar":[{"name":"FEATURE_FEDERATED_SEARCH", "value":"true"}]}}}}'
-		if instance.Spec.Deployments.QueryAPI.Env == nil { // TODO: OR if FEATURE_FEDERATED_SEARCH is not already set to true
+		if instance.Spec.Deployments.QueryAPI.Env == nil {
 			instance.Spec.Deployments.QueryAPI.Env = append(instance.Spec.Deployments.QueryAPI.Env, corev1.EnvVar{Name: "FEATURE_FEDERATED_SEARCH", Value: "true"})
-			err := r.Client.Update(ctx, instance)
-			if err != nil {
-				log.Error(err, "Failed to update Search instance.")
-			}
 		}
+		// TODO: Case whee FEATURE_FEDERATED_SEARCH is set to false.
 	} else {
-		// Disable federated search feature in the search-api.
 		// oc patch search search-v2-operator -n open-cluster-management --type='merge' -p '{"spec":{"deployments":{"queryapi":{"envVar":[{"name":"FEATURE_FEDERATED_SEARCH", "value":"false"}]}}}}'
 		if instance.Spec.Deployments.QueryAPI.Env != nil {
 			for i, env := range instance.Spec.Deployments.QueryAPI.Env {
 				if env.Name == "FEATURE_FEDERATED_SEARCH" {
-					log.Info("Removing FEATURE_FEDERATED_SEARCH.")
 					instance.Spec.Deployments.QueryAPI.Env = append(instance.Spec.Deployments.QueryAPI.Env[:i], instance.Spec.Deployments.QueryAPI.Env[i+1:]...)
-					err := r.Client.Update(ctx, instance)
-					if err != nil {
-						log.Error(err, "Failed to update Search instance.")
-					}
 					break
 				}
 			}
 		}
 	}
-
-	return nil // TODO: Return error if any
+	// TODO: Update only if the value has changed.
+	err := r.Client.Update(ctx, instance)
+	if err != nil {
+		log.Error(err, "Failed to update Search API env in the Search instance.")
+	}
+	return err
 }
 
 func (r *SearchReconciler) updateGlobalSearchStatus(ctx context.Context, instance *searchv1alpha1.Search, status metav1.Condition) error {
@@ -406,12 +390,12 @@ func (r *SearchReconciler) updateGlobalSearchStatus(ctx context.Context, instanc
 	err := r.Client.Status().Update(ctx, instance)
 	if err != nil {
 		if errors.IsConflict(err) {
-			log.Error(err, "Failed to update status for Search CR instance: Object has been modified")
+			log.Error(err, "Failed to update status for Search CR instance: Object has been modified.")
 		}
-		log.Error(err, "Failed to update status for Search CR instance")
+		log.Error(err, "Failed to update status for Search CR instance.")
 		return err
 	}
-	log.Info("Updated Search CR status successfully")
 
-	return nil
+	log.Info("Updated global search status in search CR successfully.")
+	return err
 }
