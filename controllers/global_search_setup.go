@@ -14,6 +14,11 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
+const (
+	searchGlobal       = "search-global"
+	searchGlobalConfig = "search-global-config"
+)
+
 var (
 	multiclusterGlobalHubGvr = schema.GroupVersionResource{
 		Group:    "operator.open-cluster-management.io",
@@ -81,7 +86,8 @@ func (r *SearchReconciler) enableGlobalSearch(ctx context.Context, instance *sea
 	}
 
 	// Create configuration resources for each Managed Hub.
-	// MANAGED_HUBS=($(oc get managedcluster -o json | jq -r '.items[] | select(.status.clusterClaims[] | .name == "hub.open-cluster-management.io" and .value != "NotInstalled") | .metadata.name'))
+	// MANAGED_HUBS=($(oc get managedcluster -o json | jq -r '.items[] | select(.status.clusterClaims[] |
+	//     .name == "hub.open-cluster-management.io" and .value != "NotInstalled") | .metadata.name'))
 	clusterList, err := r.DynamicClient.Resource(managedClusterResourceGvr).List(ctx, metav1.ListOptions{})
 	if err != nil {
 		log.Error(err, "Failed to list of ManagedClusters to configure global search.")
@@ -110,7 +116,8 @@ func (r *SearchReconciler) enableGlobalSearch(ctx context.Context, instance *sea
 		log.V(2).Info("Cluster is a Managed Hub. Configuring global search resources.", "name", cluster.GetName())
 
 		// 4. Create a ManagedServiceAccount search-global.
-		_, err := r.DynamicClient.Resource(managedServiceAccountGvr).Namespace(cluster.GetName()).Get(ctx, "search-global", metav1.GetOptions{})
+		_, err := r.DynamicClient.Resource(managedServiceAccountGvr).Namespace(cluster.GetName()).
+			Get(ctx, searchGlobal, metav1.GetOptions{})
 		if err != nil && errors.IsNotFound(err) {
 			log.V(1).Info("Creating ManagedServiceAccount search-global for managed hub", "name", cluster.GetName())
 			managedSA := &unstructured.Unstructured{
@@ -118,7 +125,7 @@ func (r *SearchReconciler) enableGlobalSearch(ctx context.Context, instance *sea
 					"apiVersion": "authentication.open-cluster-management.io/v1beta1",
 					"kind":       "ManagedServiceAccount",
 					"metadata": map[string]interface{}{
-						"name": "search-global",
+						"name": searchGlobal,
 						"labels": map[string]interface{}{
 							"app": "search",
 						},
@@ -128,7 +135,8 @@ func (r *SearchReconciler) enableGlobalSearch(ctx context.Context, instance *sea
 					},
 				},
 			}
-			_, err := r.DynamicClient.Resource(managedServiceAccountGvr).Namespace(cluster.GetName()).Create(ctx, managedSA, metav1.CreateOptions{})
+			_, err := r.DynamicClient.Resource(managedServiceAccountGvr).Namespace(cluster.GetName()).
+				Create(ctx, managedSA, metav1.CreateOptions{})
 			if err != nil {
 				log.Error(err, "Failed to create ManagedServiceAccount search-global.")
 			}
@@ -137,7 +145,8 @@ func (r *SearchReconciler) enableGlobalSearch(ctx context.Context, instance *sea
 		}
 
 		// 5. Create a ManifestWork search-global-config if it doesn't exist.
-		_, err = r.DynamicClient.Resource(manifestWorkGvr).Namespace(cluster.GetName()).Get(ctx, "search-global-config", metav1.GetOptions{})
+		_, err = r.DynamicClient.Resource(manifestWorkGvr).Namespace(cluster.GetName()).
+			Get(ctx, searchGlobalConfig, metav1.GetOptions{})
 		if err != nil && errors.IsNotFound(err) {
 			log.V(1).Info("CreatingManifestWork search-global-config for Managed Hub", "name", cluster.GetName())
 
@@ -146,7 +155,7 @@ func (r *SearchReconciler) enableGlobalSearch(ctx context.Context, instance *sea
 					"apiVersion": "work.open-cluster-management.io/v1",
 					"kind":       "ManifestWork",
 					"metadata": map[string]interface{}{
-						"name": "search-global-config",
+						"name": searchGlobalConfig,
 						"labels": map[string]interface{}{
 							"app": "search",
 						},
@@ -171,7 +180,7 @@ func (r *SearchReconciler) enableGlobalSearch(ctx context.Context, instance *sea
 									"subjects": []map[string]interface{}{
 										{
 											"kind":      "ServiceAccount",
-											"name":      "search-global",
+											"name":      searchGlobal,
 											"namespace": "open-cluster-management-agent-addon",
 										},
 									},
@@ -281,33 +290,41 @@ func (r *SearchReconciler) disableGlobalSearch(ctx context.Context, instance *se
 	}
 
 	// 2. Disable federated search feature in the search-api.
-	// oc patch search search-v2-operator -n open-cluster-management --type='merge' -p '{"spec":{"deployments":{"queryapi":{"envVar":[{"name":"FEATURE_FEDERATED_SEARCH", "value":"false"}]}}}}'
+	// oc patch search search-v2-operator -n open-cluster-management --type='merge'
+	//    -p '{"spec":{"deployments":{"queryapi":{"envVar":[{"name":"FEATURE_FEDERATED_SEARCH", "value":"false"}]}}}}'
 	err = r.updateSearchApiDeployment(ctx, false, instance)
 	if err != nil {
 		log.Error(err, "Failed to remove the federated global search feature flag from search-api deployment.")
 	}
 
 	// 3. Delete configuration resources for each Managed Hub.
-	// MANAGED_HUBS=($(oc get managedcluster -o json | jq -r '.items[] | select(.status.clusterClaims[] | .name == "hub.open-cluster-management.io" and .value != "NotInstalled") | .metadata.name'))
+	// MANAGED_HUBS=($(oc get managedcluster -o json | jq -r '.items[] | select(.status.clusterClaims[] |
+	//    .name == "hub.open-cluster-management.io" and .value != "NotInstalled") | .metadata.name'))
 	clusterList, err := r.DynamicClient.Resource(managedClusterResourceGvr).List(ctx, metav1.ListOptions{})
 	if err != nil {
 		log.Error(err, "Failed to list ManagedClusters.")
 	}
 	for _, cluster := range clusterList.Items {
 		// 3a. Delete the ManagedServiceAccount search-global.
-		managedServiceAccount, err := r.DynamicClient.Resource(managedServiceAccountGvr).Namespace(cluster.GetName()).Get(ctx, "search-global", metav1.GetOptions{})
+		managedServiceAccount, err := r.DynamicClient.Resource(managedServiceAccountGvr).Namespace(cluster.GetName()).
+			Get(ctx, searchGlobal, metav1.GetOptions{})
 		if err == nil && managedServiceAccount != nil {
-			err = r.DynamicClient.Resource(managedServiceAccountGvr).Namespace(cluster.GetName()).Delete(ctx, "search-global", metav1.DeleteOptions{})
+			err = r.DynamicClient.Resource(managedServiceAccountGvr).Namespace(cluster.GetName()).
+				Delete(ctx, searchGlobal, metav1.DeleteOptions{})
 			if err != nil {
-				log.Error(err, "Failed to delete ManagedServiceAccount search-global for Managed Hub.", "name", cluster.GetName())
+				log.Error(err, "Failed to delete ManagedServiceAccount search-global on Managed Hub.",
+					"name", cluster.GetName())
 			}
 		}
 		// 3b. Delete the ManifestWork search-global-config.
-		manifestWork, err := r.DynamicClient.Resource(manifestWorkGvr).Namespace(cluster.GetName()).Get(ctx, "search-global-config", metav1.GetOptions{})
+		manifestWork, err := r.DynamicClient.Resource(manifestWorkGvr).Namespace(cluster.GetName()).
+			Get(ctx, searchGlobalConfig, metav1.GetOptions{})
 		if err == nil && manifestWork != nil {
-			err = r.DynamicClient.Resource(manifestWorkGvr).Namespace(cluster.GetName()).Delete(ctx, "search-global-config", metav1.DeleteOptions{})
+			err = r.DynamicClient.Resource(manifestWorkGvr).Namespace(cluster.GetName()).
+				Delete(ctx, searchGlobalConfig, metav1.DeleteOptions{})
 			if err != nil {
-				log.Error(err, "Failed to delete ManifestWork search-global-config for Managed Hub.", "name", cluster.GetName())
+				log.Error(err, "Failed to delete ManifestWork search-global-config on Managed Hub.",
+					"name", cluster.GetName())
 			}
 		}
 	}
@@ -318,7 +335,8 @@ func (r *SearchReconciler) disableGlobalSearch(ctx context.Context, instance *se
 // Update flag globalSearchFeatureFlag in console config.
 // oc patch configmap {name} -n {namespace} -p '{"data": {"globalSearchFeatureFlag": "enabled"}}'
 func (r *SearchReconciler) updateConsoleConfig(ctx context.Context, enabled bool, namespace, name string) error {
-	consoleConfig, err := r.DynamicClient.Resource(corev1.SchemeGroupVersion.WithResource("configmaps")).Namespace(namespace).Get(ctx, name, metav1.GetOptions{})
+	consoleConfig, err := r.DynamicClient.Resource(corev1.SchemeGroupVersion.WithResource("configmaps")).
+		Namespace(namespace).Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
 		log.Error(err, "Error getting console configmap", "name", name, "namespace", namespace)
 		return fmt.Errorf("Error getting configmap %s in namespace %s", name, namespace)
@@ -338,24 +356,29 @@ func (r *SearchReconciler) updateConsoleConfig(ctx context.Context, enabled bool
 	}
 
 	// Write the updated configmap.
-	_, err = r.DynamicClient.Resource(corev1.SchemeGroupVersion.WithResource("configmaps")).Namespace(namespace).Update(ctx, consoleConfig, metav1.UpdateOptions{})
+	_, err = r.DynamicClient.Resource(corev1.SchemeGroupVersion.WithResource("configmaps")).Namespace(namespace).
+		Update(ctx, consoleConfig, metav1.UpdateOptions{})
 	return err
 }
 
 // Configure the federated global search feature in the search-api.
 func (r *SearchReconciler) updateSearchApiDeployment(ctx context.Context, enabled bool, instance *searchv1alpha1.Search) error {
 	if enabled {
-		// oc patch search search-v2-operator -n open-cluster-management --type='merge' -p '{"spec":{"deployments":{"queryapi":{"envVar":[{"name":"FEATURE_FEDERATED_SEARCH", "value":"true"}]}}}}'
+		// oc patch search search-v2-operator -n open-cluster-management --type='merge'
+		// -p '{"spec":{"deployments":{"queryapi":{"envVar":[{"name":"FEATURE_FEDERATED_SEARCH", "value":"true"}]}}}}'
 		if instance.Spec.Deployments.QueryAPI.Env == nil {
-			instance.Spec.Deployments.QueryAPI.Env = append(instance.Spec.Deployments.QueryAPI.Env, corev1.EnvVar{Name: "FEATURE_FEDERATED_SEARCH", Value: "true"})
+			instance.Spec.Deployments.QueryAPI.Env = append(instance.Spec.Deployments.QueryAPI.Env,
+				corev1.EnvVar{Name: "FEATURE_FEDERATED_SEARCH", Value: "true"})
 		}
 		// TODO: Case whee FEATURE_FEDERATED_SEARCH is set to false.
 	} else {
-		// oc patch search search-v2-operator -n open-cluster-management --type='merge' -p '{"spec":{"deployments":{"queryapi":{"envVar":[{"name":"FEATURE_FEDERATED_SEARCH", "value":"false"}]}}}}'
+		// oc patch search search-v2-operator -n open-cluster-management --type='merge'
+		//   -p '{"spec":{"deployments":{"queryapi":{"envVar":[{"name":"FEATURE_FEDERATED_SEARCH", "value":"false"}]}}}}'
 		if instance.Spec.Deployments.QueryAPI.Env != nil {
 			for i, env := range instance.Spec.Deployments.QueryAPI.Env {
 				if env.Name == "FEATURE_FEDERATED_SEARCH" {
-					instance.Spec.Deployments.QueryAPI.Env = append(instance.Spec.Deployments.QueryAPI.Env[:i], instance.Spec.Deployments.QueryAPI.Env[i+1:]...)
+					instance.Spec.Deployments.QueryAPI.Env = append(instance.Spec.Deployments.QueryAPI.Env[:i],
+						instance.Spec.Deployments.QueryAPI.Env[i+1:]...)
 					break
 				}
 			}
@@ -369,7 +392,8 @@ func (r *SearchReconciler) updateSearchApiDeployment(ctx context.Context, enable
 	return err
 }
 
-func (r *SearchReconciler) updateGlobalSearchStatus(ctx context.Context, instance *searchv1alpha1.Search, status metav1.Condition) error {
+func (r *SearchReconciler) updateGlobalSearchStatus(ctx context.Context, instance *searchv1alpha1.Search,
+	status metav1.Condition) error {
 	// Find existing status condition.
 	existingConditionIndex := -1
 	for i, condition := range instance.Status.Conditions {
