@@ -59,6 +59,7 @@ func fakeDynClient() *fakeDyn.FakeDynamicClient {
 			{Group: "operator.open-cluster-management.io", Version: "v1alpha4", Resource: "multiclusterglobalhubs"}: "MulticlusterGlobalHubList",
 			{Group: "", Version: "v1", Resource: "configmaps"}:                                                      "ConfigMapList",
 			{Group: "cluster.open-cluster-management.io", Version: "v1", Resource: "managedclusters"}:               "ManagedClusterList",
+			{Group: "multicluster.openshift.io", Version: "v1", Resource: "multiclusterengines"}:                    "MultiClusterEngineList",
 		},
 		&unstructured.UnstructuredList{
 			Object: map[string]interface{}{
@@ -77,6 +78,37 @@ func fakeDynClient() *fakeDyn.FakeDynamicClient {
 			Items: []unstructured.Unstructured{
 				*newUnstructured("cluster.open-cluster-management.io/v1", "ManagedCluster", "cluster-1", "cluster-1"),
 				*newUnstructured("cluster.open-cluster-management.io/v1", "ManagedCluster", "cluster-2", "cluster-2"),
+			},
+		},
+		&unstructured.UnstructuredList{
+			Object: map[string]interface{}{
+				"apiVersion": "multicluster.openshift.io/v1",
+				"kind":       "MultiClusterEngine",
+			},
+			Items: []unstructured.Unstructured{
+				{
+					Object: map[string]interface{}{
+						"apiVersion": "multicluster.openshift.io/v1",
+						"kind":       "MultiClusterEngine",
+						"metadata": map[string]interface{}{
+							"name": "multiclusterengine",
+						},
+						"spec": map[string]interface{}{
+							"overrides": map[string]interface{}{
+								"components": []interface{}{
+									map[string]interface{}{
+										"name":    "managedserviceaccount",
+										"enabled": true,
+									},
+									map[string]interface{}{
+										"name":    "cluster-proxy-addon",
+										"enabled": true,
+									},
+								},
+							},
+						},
+					},
+				},
 			},
 		},
 		fakeCM1, fakeCM2,

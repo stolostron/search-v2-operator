@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	fake "k8s.io/client-go/dynamic/fake"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -29,23 +28,9 @@ func newUnstructured(apiVersion, kind, namespace, name string) *unstructured.Uns
 func Test_checkPrerequisites(t *testing.T) {
 	// Create a fake client to mock API calls.
 	s := scheme.Scheme
-	fakeDynClient := fake.NewSimpleDynamicClientWithCustomListKinds(s,
-		map[schema.GroupVersionResource]string{
-			{Group: "operator.open-cluster-management.io", Version: "v1alpha4", Resource: "multiclusterglobalhubs"}: "MulticlusterGlobalHubList",
-		},
-		&unstructured.UnstructuredList{
-			Object: map[string]interface{}{
-				"apiVersion": "operator.open-cluster-management.io",
-				"kind":       "v1alpha4",
-			},
-			Items: []unstructured.Unstructured{
-				*newUnstructured("operator.open-cluster-management.io/v1alpha4", "MulticlusterGlobalHub", "ns-foo", "name-foo"),
-			},
-		},
-	)
 	r := &SearchReconciler{
 		Scheme:        s,
-		DynamicClient: fakeDynClient,
+		DynamicClient: fakeDynClient(),
 	}
 
 	ctx := context.Background()
