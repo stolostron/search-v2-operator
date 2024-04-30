@@ -16,8 +16,11 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	fakeDyn "k8s.io/client-go/dynamic/fake"
 	"k8s.io/client-go/kubernetes/scheme"
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -45,13 +48,53 @@ func verifyConfigmapDataContent(t *testing.T, cm *corev1.ConfigMap, expectedKey 
 	t.Errorf("Failed to find the expected data key: %s within the configmap: %s", expectedKey, cm.Name)
 }
 
+func fakeDynClient() *fakeDyn.FakeDynamicClient {
+	s := scheme.Scheme
+	fakeCM1 := newUnstructured("v1", "ConfigMap", "multicluster-engine", "console-mce-config")
+	fakeCM1.Object["data"] = map[string]interface{}{"globalSearchFeatureFlag": "true"}
+	fakeCM2 := newUnstructured("v1", "ConfigMap", "open-cluster-management", "console-config")
+	fakeCM2.Object["data"] = map[string]interface{}{}
+	fakeDynClient := fakeDyn.NewSimpleDynamicClientWithCustomListKinds(s,
+		map[schema.GroupVersionResource]string{
+			{Group: "operator.open-cluster-management.io", Version: "v1alpha4", Resource: "multiclusterglobalhubs"}: "MulticlusterGlobalHubList",
+			{Group: "", Version: "v1", Resource: "configmaps"}:                                                      "ConfigMapList",
+			{Group: "cluster.open-cluster-management.io", Version: "v1", Resource: "managedclusters"}:               "ManagedClusterList",
+		},
+		&unstructured.UnstructuredList{
+			Object: map[string]interface{}{
+				"apiVersion": "operator.open-cluster-management.io",
+				"kind":       "v1alpha4",
+			},
+			Items: []unstructured.Unstructured{
+				*newUnstructured("operator.open-cluster-management.io/v1alpha4", "MulticlusterGlobalHub", "ns-foo", "name-foo"),
+			},
+		},
+		&unstructured.UnstructuredList{
+			Object: map[string]interface{}{
+				"apiVersion": "cluster.open-cluster-management.io/v1",
+				"kind":       "ManagedCluster",
+			},
+			Items: []unstructured.Unstructured{
+				*newUnstructured("cluster.open-cluster-management.io/v1", "ManagedCluster", "cluster-1", "cluster-1"),
+				*newUnstructured("cluster.open-cluster-management.io/v1", "ManagedCluster", "cluster-2", "cluster-2"),
+			},
+		},
+		fakeCM1, fakeCM2,
+	)
+	return fakeDynClient
+}
+
 func TestSearch_controller(t *testing.T) {
 	var (
-		name = "search-v2-operator"
+		name      = "search-v2-operator"
+		namespace = "test-ns"
 	)
 	search := &searchv1alpha1.Search{
-		TypeMeta:   metav1.TypeMeta{Kind: "Search"},
-		ObjectMeta: metav1.ObjectMeta{Name: name},
+		TypeMeta: metav1.TypeMeta{Kind: "Search"},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
 		Spec: searchv1alpha1.SearchSpec{
 			DBStorage: searchv1alpha1.StorageSpec{
 				StorageClassName: "test",
@@ -77,12 +120,13 @@ func TestSearch_controller(t *testing.T) {
 	// Create a fake client to mock API calls.
 	cl := fake.NewClientBuilder().WithStatusSubresource(search).WithRuntimeObjects(objs...).Build()
 
-	r := &SearchReconciler{Client: cl, Scheme: s}
+	r := &SearchReconciler{Client: cl, DynamicClient: fakeDynClient(), Scheme: s}
 
 	// Mock request to simulate Reconcile() being called on an event for a watched resource .
 	req := ctrl.Request{
 		NamespacedName: types.NamespacedName{
-			Name: name,
+			Name:      name,
+			Namespace: namespace,
 		},
 	}
 
@@ -98,7 +142,8 @@ func TestSearch_controller(t *testing.T) {
 	//check for deployment
 	deploy := &appsv1.Deployment{}
 	err = cl.Get(context.TODO(), types.NamespacedName{
-		Name: "search-postgres",
+		Name:      "search-postgres",
+		Namespace: namespace,
 	}, deploy)
 
 	if err != nil {
@@ -113,7 +158,8 @@ func TestSearch_controller(t *testing.T) {
 	//check for service
 	service := &corev1.Secret{}
 	err = cl.Get(context.TODO(), types.NamespacedName{
-		Name: "search-postgres",
+		Name:      "search-postgres",
+		Namespace: namespace,
 	}, service)
 
 	if err != nil {
@@ -123,7 +169,8 @@ func TestSearch_controller(t *testing.T) {
 	//check for secret
 	secret := &corev1.Secret{}
 	err = cl.Get(context.TODO(), types.NamespacedName{
-		Name: "search-postgres",
+		Name:      "search-postgres",
+		Namespace: namespace,
 	}, secret)
 
 	if err != nil {
@@ -133,7 +180,8 @@ func TestSearch_controller(t *testing.T) {
 	//check for configmap
 	configmap1 := &corev1.ConfigMap{}
 	err = cl.Get(context.TODO(), types.NamespacedName{
-		Name: "search-ca-crt",
+		Name:      "search-ca-crt",
+		Namespace: namespace,
 	}, configmap1)
 
 	if err != nil {
@@ -143,7 +191,8 @@ func TestSearch_controller(t *testing.T) {
 	//check for configmap
 	configmap2 := &corev1.ConfigMap{}
 	err = cl.Get(context.TODO(), types.NamespacedName{
-		Name: "search-indexer",
+		Name:      "search-indexer",
+		Namespace: namespace,
 	}, configmap2)
 
 	if err != nil {
@@ -153,7 +202,8 @@ func TestSearch_controller(t *testing.T) {
 	//check for configmap
 	configmap3 := &corev1.ConfigMap{}
 	err = cl.Get(context.TODO(), types.NamespacedName{
-		Name: "search-postgres",
+		Name:      "search-postgres",
+		Namespace: namespace,
 	}, configmap3)
 
 	if err != nil {
@@ -166,7 +216,8 @@ func TestSearch_controller(t *testing.T) {
 	//check for Service Account
 	serviceaccount := &corev1.ServiceAccount{}
 	err = cl.Get(context.TODO(), types.NamespacedName{
-		Name: getServiceAccountName(),
+		Name:      getServiceAccountName(),
+		Namespace: namespace,
 	}, serviceaccount)
 	if err != nil {
 		t.Errorf("Failed to get serviceaccount %s: %v", getServiceAccountName(), err)
@@ -175,7 +226,8 @@ func TestSearch_controller(t *testing.T) {
 	//check for Role
 	role := &rbacv1.ClusterRole{}
 	err = cl.Get(context.TODO(), types.NamespacedName{
-		Name: getRoleName(),
+		Name:      getRoleName(),
+		Namespace: namespace,
 	}, role)
 	if err != nil {
 		t.Errorf("Failed to get role %s: %v", getRoleName(), err)
@@ -184,7 +236,8 @@ func TestSearch_controller(t *testing.T) {
 	//check for RoleBinding
 	rolebinding := &rbacv1.ClusterRoleBinding{}
 	err = cl.Get(context.TODO(), types.NamespacedName{
-		Name: getRoleBindingName(),
+		Name:      getRoleBindingName(),
+		Namespace: namespace,
 	}, rolebinding)
 
 	if err != nil {
@@ -194,7 +247,8 @@ func TestSearch_controller(t *testing.T) {
 	//check for AddonDeploymentConfig
 	adc := &addonv1alpha1.AddOnDeploymentConfig{}
 	err = cl.Get(context.TODO(), types.NamespacedName{
-		Name: getClusterManagementAddonName(),
+		Name:      getClusterManagementAddonName(),
+		Namespace: namespace,
 	}, adc)
 
 	if err != nil {
@@ -205,7 +259,8 @@ func TestSearch_controller(t *testing.T) {
 	pvc := &corev1.PersistentVolumeClaim{}
 	storageClassName := search.Spec.DBStorage.StorageClassName
 	err = cl.Get(context.TODO(), types.NamespacedName{
-		Name: getPVCName(storageClassName),
+		Name:      getPVCName(storageClassName),
+		Namespace: namespace,
 	}, pvc)
 
 	if err != nil {
@@ -215,7 +270,7 @@ func TestSearch_controller(t *testing.T) {
 	//Test EmptyDir
 	search = &searchv1alpha1.Search{
 		TypeMeta:   metav1.TypeMeta{Kind: "Search"},
-		ObjectMeta: metav1.ObjectMeta{Name: name},
+		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespace},
 		Spec:       searchv1alpha1.SearchSpec{},
 	}
 
@@ -223,11 +278,12 @@ func TestSearch_controller(t *testing.T) {
 	// Create a fake client to mock API calls.
 	cl = fake.NewClientBuilder().WithStatusSubresource(search).WithRuntimeObjects(objsEmpty...).Build()
 
-	r = &SearchReconciler{Client: cl, Scheme: s}
+	r.Client = cl
 
 	//check for PVC
 	err = cl.Get(context.TODO(), types.NamespacedName{
-		Name: getPVCName(storageClassName),
+		Name:      getPVCName(storageClassName),
+		Namespace: namespace,
 	}, pvc)
 
 	if !errors.IsNotFound(err) {
@@ -237,7 +293,7 @@ func TestSearch_controller(t *testing.T) {
 	// Create a fake client to mock API calls.
 	cl = fake.NewClientBuilder().WithStatusSubresource(search).WithRuntimeObjects(objsEmpty...).Build()
 
-	r = &SearchReconciler{Client: cl, Scheme: s}
+	r.Client = cl
 
 	//Reconcile to check if the Finilizer is set
 	_, err = r.Reconcile(context.TODO(), req)
@@ -245,7 +301,8 @@ func TestSearch_controller(t *testing.T) {
 		t.Logf("Error during reconcile: (%v)", err)
 	}
 	err = cl.Get(context.TODO(), types.NamespacedName{
-		Name: "search-v2-operator",
+		Name:      "search-v2-operator",
+		Namespace: namespace,
 	}, search)
 
 	if err != nil {
@@ -270,7 +327,8 @@ func TestSearch_controller(t *testing.T) {
 
 	// We should expect Addon ClusterRole deleted by Finalizer
 	err = cl.Get(context.TODO(), types.NamespacedName{
-		Name: getAddonRoleName(),
+		Name:      getAddonRoleName(),
+		Namespace: namespace,
 	}, role)
 
 	if !errors.IsNotFound(err) {
@@ -279,7 +337,8 @@ func TestSearch_controller(t *testing.T) {
 
 	// We should expect Addon ClusterRolebinding deleted by Finalizer
 	err = cl.Get(context.TODO(), types.NamespacedName{
-		Name: getAddonRoleName(),
+		Name:      getAddonRoleName(),
+		Namespace: namespace,
 	}, rolebinding)
 
 	if !errors.IsNotFound(err) {
@@ -288,7 +347,8 @@ func TestSearch_controller(t *testing.T) {
 
 	// We should expect Search ClusterRole deleted by Finalizer
 	err = cl.Get(context.TODO(), types.NamespacedName{
-		Name: getRoleName(),
+		Name:      getRoleName(),
+		Namespace: namespace,
 	}, role)
 
 	if !errors.IsNotFound(err) {
@@ -297,7 +357,8 @@ func TestSearch_controller(t *testing.T) {
 
 	// We should expect Search ClusterRolebinding deleted by Finalizer
 	err = cl.Get(context.TODO(), types.NamespacedName{
-		Name: getRoleBindingName(),
+		Name:      getRoleBindingName(),
+		Namespace: namespace,
 	}, rolebinding)
 
 	if !errors.IsNotFound(err) {
@@ -666,7 +727,7 @@ func TestSearch_controller_DBConfig(t *testing.T) {
 	// Create a fake client to mock API calls.
 	cl := fake.NewClientBuilder().WithStatusSubresource(search).WithRuntimeObjects(objs...).Build()
 
-	r := &SearchReconciler{Client: cl, Scheme: s}
+	r := &SearchReconciler{Client: cl, DynamicClient: fakeDynClient(), Scheme: s}
 	// Mock request to simulate Reconcile() being called on an event for a watched resource .
 	req := ctrl.Request{
 		NamespacedName: types.NamespacedName{
@@ -744,7 +805,7 @@ func TestSearch_controller_Metrics(t *testing.T) {
 	if err != nil {
 		t.Errorf("error adding rbac scheme: (%v)", err)
 	}
-	r := &SearchReconciler{Scheme: s}
+	r := &SearchReconciler{Scheme: s, DynamicClient: fakeDynClient()}
 	// legacy servicemonitor - should get deleted after reconcile
 	// searchApiMonitor := r.ServiceMonitor(search, "search-api", "openshift-monitoring")
 	objs := []runtime.Object{search, collectorPod, apiPod, indexerPod, postGresPod} //, searchApiMonitor}
@@ -879,7 +940,7 @@ func TestSearch_controller_DBConfigAndEnvOverlap(t *testing.T) {
 	// Create a fake client to mock API calls.
 	cl := fake.NewClientBuilder().WithStatusSubresource(search).WithRuntimeObjects(objs...).Build()
 
-	r := &SearchReconciler{Client: cl, Scheme: s}
+	r := &SearchReconciler{Client: cl, DynamicClient: fakeDynClient(), Scheme: s}
 	// Mock request to simulate Reconcile() being called on an event for a watched resource .
 	req := ctrl.Request{
 		NamespacedName: types.NamespacedName{
