@@ -54,12 +54,21 @@ func fakeDynClient() *fakeDyn.FakeDynamicClient {
 	fakeCM1.Object["data"] = map[string]interface{}{"globalSearchFeatureFlag": "true"}
 	fakeCM2 := newUnstructured("v1", "ConfigMap", "open-cluster-management", "console-config")
 	fakeCM2.Object["data"] = map[string]interface{}{}
+
+	fakeCluster1 := newUnstructured("cluster.open-cluster-management.io/v1", "ManagedCluster", "cluster-1", "cluster-1")
+	fakeCluster1.Object["status"] = map[string]interface{}{"clusterClaims": []interface{}{
+		map[string]interface{}{"name": "hub.open-cluster-management.io", "value": "Installed"},
+	}}
+	fakeCluster2 := newUnstructured("cluster.open-cluster-management.io/v1", "ManagedCluster", "cluster-2", "cluster-2")
+
 	fakeDynClient := fakeDyn.NewSimpleDynamicClientWithCustomListKinds(s,
 		map[schema.GroupVersionResource]string{
-			{Group: "operator.open-cluster-management.io", Version: "v1alpha4", Resource: "multiclusterglobalhubs"}: "MulticlusterGlobalHubList",
 			{Group: "", Version: "v1", Resource: "configmaps"}:                                                      "ConfigMapList",
+			{Group: "operator.open-cluster-management.io", Version: "v1alpha4", Resource: "multiclusterglobalhubs"}: "MulticlusterGlobalHubList",
 			{Group: "cluster.open-cluster-management.io", Version: "v1", Resource: "managedclusters"}:               "ManagedClusterList",
 			{Group: "multicluster.openshift.io", Version: "v1", Resource: "multiclusterengines"}:                    "MultiClusterEngineList",
+			{Group: "work.open-cluster-management.io", Version: "v1", Resource: "manifestworks"}:                    "ManifestworkList",
+			{Group: "authentication.open-cluster-management.io", Version: "v1", Resource: "managedserviceacounts"}:  "ManagedServiceAccountList",
 		},
 		&unstructured.UnstructuredList{
 			Object: map[string]interface{}{
@@ -76,8 +85,7 @@ func fakeDynClient() *fakeDyn.FakeDynamicClient {
 				"kind":       "ManagedCluster",
 			},
 			Items: []unstructured.Unstructured{
-				*newUnstructured("cluster.open-cluster-management.io/v1", "ManagedCluster", "cluster-1", "cluster-1"),
-				*newUnstructured("cluster.open-cluster-management.io/v1", "ManagedCluster", "cluster-2", "cluster-2"),
+				*fakeCluster1, *fakeCluster2,
 			},
 		},
 		&unstructured.UnstructuredList{
@@ -111,8 +119,23 @@ func fakeDynClient() *fakeDyn.FakeDynamicClient {
 				},
 			},
 		},
+		&unstructured.UnstructuredList{
+			Object: map[string]interface{}{
+				"apiVersion": "work.open-cluster-management.io/v1",
+				"kind":       "Manifestwork",
+			},
+			Items: []unstructured.Unstructured{},
+		},
+		&unstructured.UnstructuredList{
+			Object: map[string]interface{}{
+				"apiVersion": "authentication.open-cluster-management.io/v1",
+				"kind":       "ManagedServiceAccount",
+			},
+			Items: []unstructured.Unstructured{},
+		},
 		fakeCM1, fakeCM2,
 	)
+
 	return fakeDynClient
 }
 

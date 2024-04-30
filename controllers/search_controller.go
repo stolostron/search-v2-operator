@@ -218,54 +218,10 @@ func (r *SearchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return *result, err
 	}
 
-	if instance.ObjectMeta.Annotations["search.open-cluster-management.io/globalSearchPreview"] == "true" ||
-		instance.ObjectMeta.Annotations["globalSearchPreview"] == "true" {
-
-		log.Info("Global search preview annotation is present. Setting up global search...")
-		err := r.enableGlobalSearch(ctx, instance)
-		if err != nil {
-			log.Info("Failed to enable global search. Updating CR status conditions.", "error", err.Error())
-
-			updateErr := r.updateGlobalSearchStatus(ctx, instance, metav1.Condition{
-				Type:               "GlobalSearchReady",
-				Status:             metav1.ConditionFalse,
-				Reason:             "GlobalSearchSetupFailed",
-				Message:            "Failed to enable global search. " + err.Error(),
-				LastTransitionTime: metav1.Now(),
-			})
-			if updateErr != nil {
-				log.Error(updateErr, "Failed to update Global Search status condition on Search CR instance.")
-			}
-
-		} else {
-			updateErr := r.updateGlobalSearchStatus(ctx, instance, metav1.Condition{
-				Type:               "GlobalSearchReady",
-				Status:             metav1.ConditionTrue,
-				Reason:             "None",
-				Message:            "None",
-				LastTransitionTime: metav1.Now(),
-			})
-			if updateErr != nil {
-				log.Error(updateErr, "Failed to update the global search status condition on Search CR instance.")
-			}
-		}
-	} else {
-		// TODO: Messages in this path could be confusing for users that aren;t aware of the global search tech preview.
-		log.Info("Global search is disabled. Deleting configuration.")
-		err := r.disableGlobalSearch(ctx, instance)
-		if err != nil {
-			log.Error(err, "Failed to disable global search.")
-		}
-		updateErr := r.updateGlobalSearchStatus(ctx, instance, metav1.Condition{
-			Type:               "GlobalSearchReady",
-			Status:             metav1.ConditionFalse,
-			Reason:             "NotEnabled",
-			Message:            "Global search is not enabled.",
-			LastTransitionTime: metav1.Now(),
-		})
-		if updateErr != nil {
-			log.Error(updateErr, "Failed to update global search status condition on Search CR instance.")
-		}
+	result, err = r.reconcileGlobalSearch(ctx, instance)
+	if result != nil {
+		log.Error(err, "Global Search setup failed")
+		return *result, err
 	}
 
 	once.Do(func() {

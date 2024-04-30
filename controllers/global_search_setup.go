@@ -12,6 +12,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
 const (
@@ -47,26 +48,163 @@ var (
 	}
 )
 
-// Enable Global Search.
-//  1. Check pre-requisites.
+// Reconcile Global Search.
+//  1. Check the global-search-preview annotation.
+//  2. Validate pre-requisites.
 //     a. MulticlusterGlobalHub operator is installed in the cluster.
 //     b. The ManagedServiceAccount add-on is enabled in the MultiClusterEngine CR.
 //     c. The ClusterProxy addon is enabled in the MultiClusterEngine CR.
-//  2. Enable global search feature in the console.
-//  3. Enable federated search feature in the search-api deployment.
-//  4. Create a ManagedServiceAccount recource for each Managed Hub.
-//  5. Create a ManifestWork resource for each Managed Hub.
-func (r *SearchReconciler) enableGlobalSearch(ctx context.Context, instance *searchv1alpha1.Search) error {
-	// 1. Check global search pre-requisites.
-	err := r.verifyGlobalSearchPrerequisites(ctx)
-	if err != nil {
-		log.Error(err, "Failed to verify global search pre-requisites.")
-		return err
+//  3. Enable global search feature in the console.
+//  4. Enable federated search feature in the search-api deployment.
+//  5. Create a ManagedServiceAccount recource for each Managed Hub.
+//  6. Create a ManifestWork resource for each Managed Hub.
+func (r *SearchReconciler) reconcileGlobalSearch(ctx context.Context,
+	instance *searchv1alpha1.Search) (*reconcile.Result, error) {
+
+	if instance.ObjectMeta.Annotations["search.open-cluster-management.io/global-search-peview"] == "true" ||
+		instance.ObjectMeta.Annotations["global-search-preview"] == "true" {
+
+		log.Info("The global-search-preview annotation is present. Setting up global search...")
+
+		// Validate global search pre-requisites.
+		err := r.validateGlobalSearchPrerequisites(ctx)
+		if err != nil {
+			log.Error(err, "Failed to verify global search pre-requisites.")
+			return &reconcile.Result{}, err
+		}
+
+		// Enable global search.
+		err = r.enableGlobalSearch(ctx, instance)
+		if err != nil {
+			log.Info("Failed to enable global search. Updating CR status conditions.", "error", err.Error())
+
+			updateErr := r.updateGlobalSearchStatus(ctx, instance, metav1.Condition{
+				Type:               "GlobalSearchReady",
+				Status:             metav1.ConditionFalse,
+				Reason:             "GlobalSearchSetupFailed",
+				Message:            "Failed to enable global search. " + err.Error(),
+				LastTransitionTime: metav1.Now(),
+			})
+			if updateErr != nil {
+				log.Error(updateErr, "Failed to update Global Search status condition on Search CR instance.")
+			}
+
+		} else {
+			updateErr := r.updateGlobalSearchStatus(ctx, instance, metav1.Condition{
+				Type:               "GlobalSearchReady",
+				Status:             metav1.ConditionTrue,
+				Reason:             "None",
+				Message:            "None",
+				LastTransitionTime: metav1.Now(),
+			})
+			if updateErr != nil {
+				log.Error(updateErr, "Failed to update the global search status condition on Search CR instance.")
+			}
+		}
+	} else {
+		log.Info("The global-search-preview annotation is not present. Checking if global search was enabled before.")
+
+		// Use the status conditions to determine if global search was enabled before this reconcile.
+		globalSearchPresent := false
+		globalSearchConditionIndex := -1
+		for condIndex, condition := range instance.Status.Conditions {
+			if condition.Type == "GlobalSearchReady" {
+				globalSearchPresent = true
+				globalSearchConditionIndex = condIndex
+				break
+			}
+		}
+		if globalSearchPresent {
+			err := r.disableGlobalSearch(ctx, instance)
+			if err != nil {
+				log.Error(err, "Failed to disable global search.")
+				updateErr := r.updateGlobalSearchStatus(ctx, instance, metav1.Condition{
+					Type:               "GlobalSearchReady",
+					Status:             metav1.ConditionFalse,
+					Reason:             "GlobalSearchCleanupFailed",
+					Message:            "Failed to disable global search. " + err.Error(),
+					LastTransitionTime: metav1.Now(),
+				})
+				if updateErr != nil {
+					log.Error(updateErr, "Failed to update Search CR instance status.")
+				}
+				return &reconcile.Result{}, err
+			}
+
+			// Remove the status condition.
+			instance.Status.Conditions = append(instance.Status.Conditions[:globalSearchConditionIndex],
+				instance.Status.Conditions[globalSearchConditionIndex+1:]...)
+
+			err = r.commitInstanceState(ctx, instance)
+			if err != nil {
+				log.Error(err, "Failed to update Search CR instance status.")
+				return &reconcile.Result{}, err
+			}
+		}
 	}
+	return &reconcile.Result{}, nil
+}
+
+// Validate pre-requisites.
+//
+//	a. MulticlusterGlobalHub operator is installed in the cluster.
+//	b. The ManagedServiceAccount add-on is enabled in the MultiClusterEngine CR.
+//	c. The ClusterProxy addon is enabled in the MultiClusterEngine CR.
+func (r *SearchReconciler) validateGlobalSearchPrerequisites(ctx context.Context) error {
+	log.V(5).Info("Checking global search pre-requisites.")
+	// Verify that MulticlusterGlobalHub operator is installed.
+	// oc get multiclusterglobalhub -A
+	multiclusterGlobalHub, err := r.DynamicClient.Resource(multiclusterGlobalHubGvr).List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return fmt.Errorf("MulticlusterGlobalHub operator is not installed.")
+	} else if len(multiclusterGlobalHub.Items) > 0 {
+		log.V(5).Info("Found MulticlusterGlobalHub intance.")
+	}
+
+	// Verify that the ManagedServiceAccount and ClusterProxy add-ons are enabled in the MultiClusterEngine CR.
+	mce, err := r.DynamicClient.Resource(multiclusterengineResourceGvr).
+		Get(ctx, "multiclusterengine", metav1.GetOptions{})
+	if err != nil {
+		log.Error(err, "Failed to get MulticlusterEngine CR.")
+		return fmt.Errorf("Failed to get MulticlusterEngine CR.")
+	} else {
+		log.V(5).Info("Checking that managedserviceaccount and cluster-proxy-addon are enabled in MCE.")
+		managedServiceAccountEnabled := false
+		clusterProxyEnabled := false
+		components := mce.Object["spec"].(map[string]interface{})["overrides"].(map[string]interface{})["components"]
+		for _, component := range components.([]interface{}) {
+			if component.(map[string]interface{})["name"] == "managedserviceaccount" &&
+				component.(map[string]interface{})["enabled"] == true {
+				log.V(5).Info("Managed Service Account add-on is enabled.")
+				managedServiceAccountEnabled = true
+			}
+			if component.(map[string]interface{})["name"] == "cluster-proxy-addon" &&
+				component.(map[string]interface{})["enabled"] == true {
+				log.V(5).Info("Cluster Proxy add-on is enabled.")
+				clusterProxyEnabled = true
+			}
+		}
+		if !managedServiceAccountEnabled {
+			return fmt.Errorf("Managed Service Account add-on is not enabled in MulticlusterEngine.")
+		}
+		if !clusterProxyEnabled {
+			return fmt.Errorf("Cluster Proxy add-on is not enabled in MulticlusterEngine.")
+		}
+	}
+	return nil
+}
+
+func (r *SearchReconciler) enableGlobalSearch(ctx context.Context, instance *searchv1alpha1.Search) error {
+	// // 1. Check global search pre-requisites.
+	// err := r.verifyGlobalSearchPrerequisites(ctx)
+	// if err != nil {
+	// 	log.Error(err, "Failed to verify global search pre-requisites.")
+	// 	return err
+	// }
 
 	// 2. Enable global search feature in the console.
 	// 2a.Add globalSearchFeatureFlag=true to configmap console-mce-config in multicluster-engine namespace.
-	err = r.updateConsoleConfig(ctx, true, "multicluster-engine", "console-mce-config")
+	err := r.updateConsoleConfig(ctx, true, "multicluster-engine", "console-mce-config")
 	if err != nil {
 		log.Error(err, "Failed to enable the global search feature in console-mce-config.")
 		// TODO: This error is never returned.
@@ -227,55 +365,6 @@ func (r *SearchReconciler) enableGlobalSearch(ctx context.Context, instance *sea
 	return err
 }
 
-// Verify pre-requisites.
-//
-//	a. MulticlusterGlobalHub operator is installed in the cluster.
-//	b. The ManagedServiceAccount add-on is enabled in the MultiClusterEngine CR.
-//	c. The ClusterProxy addon is enabled in the MultiClusterEngine CR.
-func (r *SearchReconciler) verifyGlobalSearchPrerequisites(ctx context.Context) error {
-	log.V(5).Info("Checking global search pre-requisites.")
-	// Verify that MulticlusterGlobalHub operator is installed.
-	// oc get multiclusterglobalhub -A
-	multiclusterGlobalHub, err := r.DynamicClient.Resource(multiclusterGlobalHubGvr).List(ctx, metav1.ListOptions{})
-	if err != nil {
-		return fmt.Errorf("MulticlusterGlobalHub operator is not installed.")
-	} else if len(multiclusterGlobalHub.Items) > 0 {
-		log.V(5).Info("Found MulticlusterGlobalHub intance.")
-	}
-
-	// Verify that the ManagedServiceAccount and ClusterProxy add-ons are enabled in the MultiClusterEngine CR.
-	mce, err := r.DynamicClient.Resource(multiclusterengineResourceGvr).
-		Get(ctx, "multiclusterengine", metav1.GetOptions{})
-	if err != nil {
-		log.Error(err, "Failed to get MulticlusterEngine CR.")
-		return fmt.Errorf("Failed to get MulticlusterEngine CR.")
-	} else {
-		log.V(5).Info("Checking that managedserviceaccount and cluster-proxy-addon are enabled in MCE.")
-		managedServiceAccountEnabled := false
-		clusterProxyEnabled := false
-		components := mce.Object["spec"].(map[string]interface{})["overrides"].(map[string]interface{})["components"]
-		for _, component := range components.([]interface{}) {
-			if component.(map[string]interface{})["name"] == "managedserviceaccount" &&
-				component.(map[string]interface{})["enabled"] == true {
-				log.V(5).Info("Managed Service Account add-on is enabled.")
-				managedServiceAccountEnabled = true
-			}
-			if component.(map[string]interface{})["name"] == "cluster-proxy-addon" &&
-				component.(map[string]interface{})["enabled"] == true {
-				log.V(5).Info("Cluster Proxy add-on is enabled.")
-				clusterProxyEnabled = true
-			}
-		}
-		if !managedServiceAccountEnabled {
-			return fmt.Errorf("Managed Service Account add-on is not enabled in MulticlusterEngine.")
-		}
-		if !clusterProxyEnabled {
-			return fmt.Errorf("Cluster Proxy add-on is not enabled in MulticlusterEngine.")
-		}
-	}
-	return nil
-}
-
 // Logic to disable Global Search.
 //  1. Disable global search feature in the console.
 //  2. Disable federated search feature in the search-api deployment.
@@ -366,17 +455,27 @@ func (r *SearchReconciler) updateConsoleConfig(ctx context.Context, enabled bool
 	return err
 }
 
-// Configure the federated global search feature in the search-api.
+// Configure the federated global search feature in the search-api deployment.
 func (r *SearchReconciler) updateSearchApiDeployment(ctx context.Context, enabled bool,
 	instance *searchv1alpha1.Search) error {
+	changed := false
+
 	if enabled {
 		// oc patch search search-v2-operator -n open-cluster-management --type='merge'
 		// -p '{"spec":{"deployments":{"queryapi":{"envVar":[{"name":"FEATURE_FEDERATED_SEARCH", "value":"true"}]}}}}'
 		if instance.Spec.Deployments.QueryAPI.Env == nil {
 			instance.Spec.Deployments.QueryAPI.Env = append(instance.Spec.Deployments.QueryAPI.Env,
 				corev1.EnvVar{Name: "FEATURE_FEDERATED_SEARCH", Value: "true"})
+			changed = true
+		} else {
+			for _, env := range instance.Spec.Deployments.QueryAPI.Env {
+				if env.Name == "FEATURE_FEDERATED_SEARCH" && env.Value != "true" {
+					env.Value = "true"
+					changed = true
+					break
+				}
+			}
 		}
-		// TODO: Case whee FEATURE_FEDERATED_SEARCH is set to false.
 	} else {
 		// oc patch search search-v2-operator -n open-cluster-management --type='merge'
 		//   -p '{"spec":{"deployments":{"queryapi":{"envVar":[{"name":"FEATURE_FEDERATED_SEARCH", "value":"false"}]}}}}'
@@ -385,17 +484,20 @@ func (r *SearchReconciler) updateSearchApiDeployment(ctx context.Context, enable
 				if env.Name == "FEATURE_FEDERATED_SEARCH" {
 					instance.Spec.Deployments.QueryAPI.Env = append(instance.Spec.Deployments.QueryAPI.Env[:i],
 						instance.Spec.Deployments.QueryAPI.Env[i+1:]...)
+					changed = true
 					break
 				}
 			}
 		}
 	}
-	// TODO: Update only if the value has changed.
-	err := r.Client.Update(ctx, instance)
-	if err != nil {
-		log.Error(err, "Failed to update Search API env in the Search instance.")
+	if changed {
+		err := r.commitInstanceState(ctx, instance)
+		if err != nil {
+			log.Error(err, "Failed to update Search API env in the Search instance.")
+		}
+		return err
 	}
-	return err
+	return nil
 }
 
 func (r *SearchReconciler) updateGlobalSearchStatus(ctx context.Context, instance *searchv1alpha1.Search,
@@ -408,25 +510,36 @@ func (r *SearchReconciler) updateGlobalSearchStatus(ctx context.Context, instanc
 			break
 		}
 	}
+	existingStatus := instance.Status.Conditions[existingConditionIndex]
 	if existingConditionIndex == -1 {
 		// Add new condition.
 		instance.Status.Conditions = append(instance.Status.Conditions, status)
-	} else {
-		// Update existing condition.
+	} else if existingStatus.Status != status.Status ||
+		existingStatus.Reason != status.Reason ||
+		existingStatus.Message != status.Message {
+		// Update existing condition, only if anything changed.
 		instance.Status.Conditions[existingConditionIndex] = status
+	} else {
+		// Nothing has changed.
+		log.Info("Global search status condition did not change.")
+		return nil
 	}
 
-	// TODO: Only update the status if it has changed.
-	// write instance with the new status values.
+	// write instance with the new status.
+	err := r.commitInstanceState(ctx, instance)
+
+	log.Info("Updated global search status in search CR successfully.")
+	return err
+}
+
+// Write instance with the new state values.
+func (r *SearchReconciler) commitInstanceState(ctx context.Context, instance *searchv1alpha1.Search) error {
 	err := r.Client.Status().Update(ctx, instance)
 	if err != nil {
 		if errors.IsConflict(err) {
 			log.Error(err, "Failed to update status for Search CR instance: Object has been modified.")
 		}
 		log.Error(err, "Failed to update status for Search CR instance.")
-		return err
 	}
-
-	log.Info("Updated global search status in search CR successfully.")
 	return err
 }
