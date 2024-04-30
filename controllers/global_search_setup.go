@@ -141,7 +141,7 @@ func (r *SearchReconciler) enableGlobalSearch(ctx context.Context, instance *sea
 				log.Error(err, "Failed to create ManagedServiceAccount search-global.")
 			}
 		} else {
-			log.V(5).Info("Found existing ManagedServiceAccount search-global for Managed Hub.", "name", cluster.GetName())
+			log.V(5).Info("Found ManagedServiceAccount search-global for Managed Hub.", "name", cluster.GetName())
 		}
 
 		// 5. Create a ManifestWork search-global-config if it doesn't exist.
@@ -214,7 +214,8 @@ func (r *SearchReconciler) enableGlobalSearch(ctx context.Context, instance *sea
 					},
 				},
 			}
-			_, err := r.DynamicClient.Resource(manifestWorkGvr).Namespace(cluster.GetName()).Create(ctx, manifestWork, metav1.CreateOptions{})
+			_, err := r.DynamicClient.Resource(manifestWorkGvr).Namespace(cluster.GetName()).
+				Create(ctx, manifestWork, metav1.CreateOptions{})
 			if err != nil {
 				log.Error(err, "Failed to create ManifestWork search-global-config.")
 			}
@@ -243,20 +244,24 @@ func (r *SearchReconciler) verifyGlobalSearchPrerequisites(ctx context.Context) 
 	}
 
 	// Verify that the ManagedServiceAccount and ClusterProxy add-ons are enabled in the MultiClusterEngine CR.
-	mce, err := r.DynamicClient.Resource(multiclusterengineResourceGvr).Get(ctx, "multiclusterengine", metav1.GetOptions{})
+	mce, err := r.DynamicClient.Resource(multiclusterengineResourceGvr).
+		Get(ctx, "multiclusterengine", metav1.GetOptions{})
 	if err != nil {
 		log.Error(err, "Failed to get MulticlusterEngine CR.")
 		return fmt.Errorf("Failed to get MulticlusterEngine CR.")
 	} else {
-		log.V(5).Info("Found MulticlusterEngine CR. Checking that ManagedServiceAccount and cluster-proxy-addon are enabled.")
+		log.V(5).Info("Checking that managedserviceaccount and cluster-proxy-addon are enabled in MCE.")
 		managedServiceAccountEnabled := false
 		clusterProxyEnabled := false
-		for _, component := range mce.Object["spec"].(map[string]interface{})["overrides"].(map[string]interface{})["components"].([]interface{}) {
-			if component.(map[string]interface{})["name"] == "managedserviceaccount" && component.(map[string]interface{})["enabled"] == true {
+		components := mce.Object["spec"].(map[string]interface{})["overrides"].(map[string]interface{})["components"]
+		for _, component := range components.([]interface{}) {
+			if component.(map[string]interface{})["name"] == "managedserviceaccount" &&
+				component.(map[string]interface{})["enabled"] == true {
 				log.V(5).Info("Managed Service Account add-on is enabled.")
 				managedServiceAccountEnabled = true
 			}
-			if component.(map[string]interface{})["name"] == "cluster-proxy-addon" && component.(map[string]interface{})["enabled"] == true {
+			if component.(map[string]interface{})["name"] == "cluster-proxy-addon" &&
+				component.(map[string]interface{})["enabled"] == true {
 				log.V(5).Info("Cluster Proxy add-on is enabled.")
 				clusterProxyEnabled = true
 			}
@@ -362,7 +367,8 @@ func (r *SearchReconciler) updateConsoleConfig(ctx context.Context, enabled bool
 }
 
 // Configure the federated global search feature in the search-api.
-func (r *SearchReconciler) updateSearchApiDeployment(ctx context.Context, enabled bool, instance *searchv1alpha1.Search) error {
+func (r *SearchReconciler) updateSearchApiDeployment(ctx context.Context, enabled bool,
+	instance *searchv1alpha1.Search) error {
 	if enabled {
 		// oc patch search search-v2-operator -n open-cluster-management --type='merge'
 		// -p '{"spec":{"deployments":{"queryapi":{"envVar":[{"name":"FEATURE_FEDERATED_SEARCH", "value":"true"}]}}}}'
