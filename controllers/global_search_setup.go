@@ -195,32 +195,26 @@ func (r *SearchReconciler) validateGlobalSearchPrerequisites(ctx context.Context
 }
 
 func (r *SearchReconciler) enableGlobalSearch(ctx context.Context, instance *searchv1alpha1.Search) error {
-	// // 1. Check global search pre-requisites.
-	// err := r.verifyGlobalSearchPrerequisites(ctx)
-	// if err != nil {
-	// 	log.Error(err, "Failed to verify global search pre-requisites.")
-	// 	return err
-	// }
 
 	// 2. Enable global search feature in the console.
 	// 2a.Add globalSearchFeatureFlag=true to configmap console-mce-config in multicluster-engine namespace.
 	err := r.updateConsoleConfig(ctx, true, "multicluster-engine", "console-mce-config")
 	if err != nil {
 		log.Error(err, "Failed to enable the global search feature in console-mce-config.")
-		// TODO: This error is never returned.
+		return err // QUESTION: Should we return here or continue? Should we rollback other changes?
 	}
 	// 2b. Add globalSearchFeatureFlag=true to configmap console-config in open-cluster-management namespace.
 	err = r.updateConsoleConfig(ctx, true, instance.GetNamespace(), "console-config")
 	if err != nil {
 		log.Error(err, "Failed to enable the global search feature in console-config.")
-		// TODO: This error is never returned.
+		return err // QUESTION: Should we return here or continue? Should we rollback other changes?
 	}
 
 	// 3. Enable federated search feature in the search-api deployment.
 	err = r.updateSearchApiDeployment(ctx, true, instance)
 	if err != nil {
 		log.Error(err, "Failed to enable the federated global search feature.")
-		// TODO: This error is never returned.
+		return err // QUESTION: Should we return here or continue? Should we rollback other changes?
 	}
 
 	// Create configuration resources for each Managed Hub.
@@ -229,7 +223,7 @@ func (r *SearchReconciler) enableGlobalSearch(ctx context.Context, instance *sea
 	clusterList, err := r.DynamicClient.Resource(managedClusterResourceGvr).List(ctx, metav1.ListOptions{})
 	if err != nil {
 		log.Error(err, "Failed to list of ManagedClusters to configure global search.")
-		return err
+		return err // QUESTION: Should we return here or continue? Should we rollback other changes?
 	}
 
 	for _, cluster := range clusterList.Items {
@@ -277,92 +271,179 @@ func (r *SearchReconciler) enableGlobalSearch(ctx context.Context, instance *sea
 				Create(ctx, managedSA, metav1.CreateOptions{})
 			if err != nil {
 				log.Error(err, "Failed to create ManagedServiceAccount search-global.")
+				// QUESTION: How should we handle partial errors? Should we continue or rollback?
 			}
 		} else {
 			log.V(5).Info("Found ManagedServiceAccount search-global for Managed Hub.", "name", cluster.GetName())
 		}
 
 		// 5. Create a ManifestWork search-global-config if it doesn't exist.
-		_, err = r.DynamicClient.Resource(manifestWorkGvr).Namespace(cluster.GetName()).
-			Get(ctx, searchGlobalConfig, metav1.GetOptions{})
-		if err != nil && errors.IsNotFound(err) {
-			log.V(1).Info("CreatingManifestWork search-global-config for Managed Hub", "name", cluster.GetName())
+		err = r.createManifestWork(ctx, cluster.GetName())
+		if err != nil {
+			log.Error(err, "Failed to create ManifestWork search-global-config.")
+			// QUESTION: How should we handle partial errors? Should we continue or rollback?
+		}
 
-			manifestWork := &unstructured.Unstructured{
-				Object: map[string]interface{}{
-					"apiVersion": "work.open-cluster-management.io/v1",
-					"kind":       "ManifestWork",
-					"metadata": map[string]interface{}{
-						"name": searchGlobalConfig,
-						"labels": map[string]interface{}{
-							"app": "search",
-						},
+		// _, err = r.DynamicClient.Resource(manifestWorkGvr).Namespace(cluster.GetName()).
+		// 	Get(ctx, searchGlobalConfig, metav1.GetOptions{})
+		// if err != nil && errors.IsNotFound(err) {
+		// 	log.V(1).Info("CreatingManifestWork search-global-config for Managed Hub", "name", cluster.GetName())
+
+		// 	manifestWork := &unstructured.Unstructured{
+		// 		Object: map[string]interface{}{
+		// 			"apiVersion": "work.open-cluster-management.io/v1",
+		// 			"kind":       "ManifestWork",
+		// 			"metadata": map[string]interface{}{
+		// 				"name": searchGlobalConfig,
+		// 				"labels": map[string]interface{}{
+		// 					"app": "search",
+		// 				},
+		// 			},
+		// 			"spec": map[string]interface{}{
+		// 				"workload": map[string]interface{}{
+		// 					"manifests": []map[string]interface{}{
+		// 						{
+		// 							"apiVersion": "rbac.authorization.k8s.io/v1",
+		// 							"kind":       "ClusterRoleBinding",
+		// 							"metadata": map[string]interface{}{
+		// 								"name": "search-global-binding",
+		// 								"labels": map[string]interface{}{
+		// 									"app": "search",
+		// 								},
+		// 							},
+		// 							"roleRef": map[string]interface{}{
+		// 								"apiGroup": "rbac.authorization.k8s.io",
+		// 								"kind":     "ClusterRole",
+		// 								"name":     "global-search-user",
+		// 							},
+		// 							"subjects": []map[string]interface{}{
+		// 								{
+		// 									"kind":      "ServiceAccount",
+		// 									"name":      searchGlobal,
+		// 									"namespace": "open-cluster-management-agent-addon",
+		// 								},
+		// 							},
+		// 						},
+		// 						{ // TODO: Remove Route recource and use cluster-proxy-addon instead.
+		// 							"apiVersion": "route.openshift.io/v1",
+		// 							"kind":       "Route",
+		// 							"metadata": map[string]interface{}{
+		// 								"name":      "search-global-hub",
+		// 								"namespace": "open-cluster-management",
+		// 								"labels": map[string]interface{}{
+		// 									"app": "search",
+		// 								},
+		// 							},
+		// 							"spec": map[string]interface{}{
+		// 								"port": map[string]interface{}{
+		// 									"targetPort": "search-api",
+		// 								},
+		// 								"tls": map[string]interface{}{
+		// 									"termination": "passthrough",
+		// 								},
+		// 								"to": map[string]interface{}{
+		// 									"kind":   "Service",
+		// 									"name":   "search-search-api",
+		// 									"weight": 100,
+		// 								},
+		// 							},
+		// 						},
+		// 					},
+		// 				},
+		// 			},
+		// 		},
+		// 	}
+		// 	_, err := r.DynamicClient.Resource(manifestWorkGvr).Namespace(cluster.GetName()).
+		// 		Create(ctx, manifestWork, metav1.CreateOptions{})
+		// 	if err != nil {
+		// 		log.Error(err, "Failed to create ManifestWork search-global-config.")
+		// 		// QUESTION: How should we handle partial errors? Should we continue or rollback?
+		// 	}
+		// } else {
+		// 	log.V(5).Info("Found existing ManifestWork search-global-config.")
+		// }
+	}
+	log.Info("Global search resources configured.")
+	return err
+}
+
+// Create a ManifestWork search-global-config if it doesn't exist.
+func (r *SearchReconciler) createManifestWork(ctx context.Context, cluster string) error {
+	_, err := r.DynamicClient.Resource(manifestWorkGvr).Namespace(cluster).
+		Get(ctx, searchGlobalConfig, metav1.GetOptions{})
+	if err != nil && errors.IsNotFound(err) {
+		log.V(1).Info("CreatingManifestWork search-global-config for Managed Hub", "name", cluster)
+
+		manifestWork := &unstructured.Unstructured{
+			Object: map[string]interface{}{
+				"apiVersion": "work.open-cluster-management.io/v1",
+				"kind":       "ManifestWork",
+				"metadata": map[string]interface{}{
+					"name": searchGlobalConfig,
+					"labels": map[string]interface{}{
+						"app": "search",
 					},
-					"spec": map[string]interface{}{
-						"workload": map[string]interface{}{
-							"manifests": []map[string]interface{}{
-								{
-									"apiVersion": "rbac.authorization.k8s.io/v1",
-									"kind":       "ClusterRoleBinding",
-									"metadata": map[string]interface{}{
-										"name": "search-global-binding",
-										"labels": map[string]interface{}{
-											"app": "search",
-										},
-									},
-									"roleRef": map[string]interface{}{
-										"apiGroup": "rbac.authorization.k8s.io",
-										"kind":     "ClusterRole",
-										"name":     "global-search-user",
-									},
-									"subjects": []map[string]interface{}{
-										{
-											"kind":      "ServiceAccount",
-											"name":      searchGlobal,
-											"namespace": "open-cluster-management-agent-addon",
-										},
+				},
+				"spec": map[string]interface{}{
+					"workload": map[string]interface{}{
+						"manifests": []map[string]interface{}{
+							{
+								"apiVersion": "rbac.authorization.k8s.io/v1",
+								"kind":       "ClusterRoleBinding",
+								"metadata": map[string]interface{}{
+									"name": "search-global-binding",
+									"labels": map[string]interface{}{
+										"app": "search",
 									},
 								},
-								{ // TODO: Remove Route recource and use cluster-proxy-addon instead.
-									"apiVersion": "route.openshift.io/v1",
-									"kind":       "Route",
-									"metadata": map[string]interface{}{
-										"name":      "search-global-hub",
-										"namespace": "open-cluster-management",
-										"labels": map[string]interface{}{
-											"app": "search",
-										},
+								"roleRef": map[string]interface{}{
+									"apiGroup": "rbac.authorization.k8s.io",
+									"kind":     "ClusterRole",
+									"name":     "global-search-user",
+								},
+								"subjects": []map[string]interface{}{
+									{
+										"kind":      "ServiceAccount",
+										"name":      searchGlobal,
+										"namespace": "open-cluster-management-agent-addon",
 									},
-									"spec": map[string]interface{}{
-										"port": map[string]interface{}{
-											"targetPort": "search-api",
-										},
-										"tls": map[string]interface{}{
-											"termination": "passthrough",
-										},
-										"to": map[string]interface{}{
-											"kind":   "Service",
-											"name":   "search-search-api",
-											"weight": 100,
-										},
+								},
+							},
+							{ // TODO: Remove Route recource and use cluster-proxy-addon instead.
+								"apiVersion": "route.openshift.io/v1",
+								"kind":       "Route",
+								"metadata": map[string]interface{}{
+									"name":      "search-global-hub",
+									"namespace": "open-cluster-management",
+									"labels": map[string]interface{}{
+										"app": "search",
+									},
+								},
+								"spec": map[string]interface{}{
+									"port": map[string]interface{}{
+										"targetPort": "search-api",
+									},
+									"tls": map[string]interface{}{
+										"termination": "passthrough",
+									},
+									"to": map[string]interface{}{
+										"kind":   "Service",
+										"name":   "search-search-api",
+										"weight": 100,
 									},
 								},
 							},
 						},
 					},
 				},
-			}
-			_, err := r.DynamicClient.Resource(manifestWorkGvr).Namespace(cluster.GetName()).
-				Create(ctx, manifestWork, metav1.CreateOptions{})
-			if err != nil {
-				log.Error(err, "Failed to create ManifestWork search-global-config.")
-			}
-		} else {
-			log.V(5).Info("Found existing ManifestWork search-global-config.")
+			},
 		}
+		_, err := r.DynamicClient.Resource(manifestWorkGvr).Namespace(cluster).
+			Create(ctx, manifestWork, metav1.CreateOptions{})
+		return err
 	}
-	log.Info("Global search resources are configured.")
-	return err
+	log.V(5).Info("Found existing ManifestWork search-global-config.")
+	return nil
 }
 
 // Logic to disable Global Search.
