@@ -61,8 +61,7 @@ var (
 func (r *SearchReconciler) reconcileGlobalSearch(ctx context.Context,
 	instance *searchv1alpha1.Search) (*reconcile.Result, error) {
 
-	if instance.ObjectMeta.Annotations["search.open-cluster-management.io/global-search-preview"] == "true" ||
-		instance.ObjectMeta.Annotations["global-search-preview"] == "true" {
+	if instance.ObjectMeta.Annotations["global-search-preview"] == "true" {
 
 		log.Info("The global-search-preview annotation is present. Setting up global search...")
 
@@ -135,7 +134,7 @@ func (r *SearchReconciler) reconcileGlobalSearch(ctx context.Context,
 			instance.Status.Conditions = append(instance.Status.Conditions[:globalSearchConditionIndex],
 				instance.Status.Conditions[globalSearchConditionIndex+1:]...)
 
-			err = r.commitInstanceState(ctx, instance)
+			err = r.commitSearchCRInstanceState(ctx, instance)
 			if err != nil {
 				log.Error(err, "Failed to update Search CR instance status.")
 				return &reconcile.Result{}, err
@@ -314,8 +313,8 @@ func (r *SearchReconciler) createManifestWork(ctx context.Context, cluster strin
 				},
 				"spec": map[string]interface{}{
 					"workload": map[string]interface{}{
-						"manifests": []map[string]interface{}{
-							{
+						"manifests": []interface{}{
+							map[string]interface{}{
 								"apiVersion": "rbac.authorization.k8s.io/v1",
 								"kind":       "ClusterRoleBinding",
 								"metadata": map[string]interface{}{
@@ -329,15 +328,15 @@ func (r *SearchReconciler) createManifestWork(ctx context.Context, cluster strin
 									"kind":     "ClusterRole",
 									"name":     "global-search-user",
 								},
-								"subjects": []map[string]interface{}{
-									{
+								"subjects": []interface{}{
+									map[string]interface{}{
 										"kind":      "ServiceAccount",
 										"name":      searchGlobal,
 										"namespace": "open-cluster-management-agent-addon",
 									},
 								},
 							},
-							{ // TODO: Remove Route recource and use cluster-proxy-addon instead.
+							map[string]interface{}{ // TODO: Remove Route recource and use cluster-proxy-addon instead.
 								"apiVersion": "route.openshift.io/v1",
 								"kind":       "Route",
 								"metadata": map[string]interface{}{
@@ -355,9 +354,9 @@ func (r *SearchReconciler) createManifestWork(ctx context.Context, cluster strin
 										"termination": "passthrough",
 									},
 									"to": map[string]interface{}{
-										"kind":   "Service",
-										"name":   "search-search-api",
-										"weight": 100,
+										"kind": "Service",
+										"name": "search-search-api",
+										// "weight": 100,
 									},
 								},
 							},
@@ -500,7 +499,7 @@ func (r *SearchReconciler) updateSearchApiDeployment(ctx context.Context, enable
 		}
 	}
 	if changed {
-		err := r.commitInstanceState(ctx, instance)
+		err := r.commitSearchCRInstanceState(ctx, instance)
 		if err != nil {
 			log.Error(err, "Failed to update Search API env in the Search instance.")
 		}
@@ -530,19 +529,19 @@ func (r *SearchReconciler) updateGlobalSearchStatus(ctx context.Context, instanc
 		instance.Status.Conditions[existingConditionIndex] = status
 	} else {
 		// Nothing has changed.
-		log.Info("Global search status condition did not change.")
+		log.V(3).Info("Global search status condition did not change.")
 		return nil
 	}
 
 	// write instance with the new status.
-	err := r.commitInstanceState(ctx, instance)
+	err := r.commitSearchCRInstanceState(ctx, instance)
 
-	log.Info("Updated global search status in search CR successfully.")
+	log.Info("Successfully updated global search status condition in search CR.")
 	return err
 }
 
-// Write instance with the new state values.
-func (r *SearchReconciler) commitInstanceState(ctx context.Context, instance *searchv1alpha1.Search) error {
+// Write Search CR instance with the new state.
+func (r *SearchReconciler) commitSearchCRInstanceState(ctx context.Context, instance *searchv1alpha1.Search) error {
 	err := r.Client.Status().Update(ctx, instance)
 	if err != nil {
 		if errors.IsConflict(err) {

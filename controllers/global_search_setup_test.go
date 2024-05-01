@@ -177,38 +177,38 @@ func Test_disableConsole(t *testing.T) {
 	}
 }
 
-// func Test_enableGlobalSearch(t *testing.T) {
-// 	// Create a fake client to mock API calls.
-// 	searchInst := &searchv1alpha1.Search{
-// 		ObjectMeta: metav1.ObjectMeta{
-// 			Name:      "search-operator",
-// 			Namespace: "test-namespace",
-// 			Annotations: map[string]string{
-// 				"search.open-cluster-management.io/global-search-preview": "true",
-// 			},
-// 		},
-// 		Spec: searchv1alpha1.SearchSpec{},
-// 	}
-// 	s := scheme.Scheme
-// 	err := searchv1alpha1.SchemeBuilder.AddToScheme(s)
-// 	if err != nil {
-// 		t.Errorf("error adding search scheme: (%v)", err)
-// 	}
+func Test_enableGlobalSearch(t *testing.T) {
+	// Create a fake client to mock API calls.
+	searchInst := &searchv1alpha1.Search{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "search-operator",
+			Namespace: "open-cluster-management",
+			Annotations: map[string]string{
+				"global-search-preview": "true",
+			},
+		},
+		Spec: searchv1alpha1.SearchSpec{},
+	}
+	s := scheme.Scheme
+	err := searchv1alpha1.SchemeBuilder.AddToScheme(s)
+	if err != nil {
+		t.Errorf("error adding search scheme: (%v)", err)
+	}
 
-// 	objs := []runtime.Object{searchInst}
-// 	// Create a fake client to mock API calls.
-// 	cl := fake.NewClientBuilder().WithStatusSubresource(searchInst).WithRuntimeObjects(objs...).Build()
+	objs := []runtime.Object{searchInst}
+	// Create a fake client to mock API calls.
+	cl := fake.NewClientBuilder().WithStatusSubresource(searchInst).WithRuntimeObjects(objs...).Build()
 
-// 	r := &SearchReconciler{Client: cl, DynamicClient: fakeDynClient(), Scheme: s}
+	r := &SearchReconciler{Client: cl, DynamicClient: fakeDynClient(), Scheme: s}
 
-// 	ctx := context.Background()
-// 	err = r.enableGlobalSearch(ctx, searchInst)
-// 	if err != nil {
-// 		t.Fatalf("Failed to enable global search: %v", err)
-// 	}
+	ctx := context.Background()
+	err = r.enableGlobalSearch(ctx, searchInst)
+	if err != nil {
+		t.Fatalf("Failed to enable global search: %v", err)
+	}
 
-// 	//Check state here.
-// }
+	//Check state here.
+}
 
 func Test_disableGlobalSearch(t *testing.T) {
 	// Create a fake client to mock API calls.
