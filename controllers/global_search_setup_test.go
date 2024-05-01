@@ -202,7 +202,7 @@ func Test_enableGlobalSearch(t *testing.T) {
 	r := &SearchReconciler{Client: cl, DynamicClient: fakeDynClient(), Scheme: s}
 
 	ctx := context.Background()
-	err = r.enableGlobalSearch(ctx, searchInst)
+	_, err = r.reconcileGlobalSearch(ctx, searchInst)
 	if err != nil {
 		t.Fatalf("Failed to enable global search: %v", err)
 	}
@@ -254,7 +254,7 @@ func Test_disableGlobalSearch(t *testing.T) {
 	r := &SearchReconciler{Client: cl, DynamicClient: fakeDynClient(), Scheme: s}
 
 	ctx := context.Background()
-	err = r.disableGlobalSearch(ctx, searchInst)
+	_, err = r.reconcileGlobalSearch(ctx, searchInst)
 	if err != nil {
 		t.Fatalf("Failed to disable global search: %v", err)
 	}
