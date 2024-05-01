@@ -61,7 +61,7 @@ var (
 func (r *SearchReconciler) reconcileGlobalSearch(ctx context.Context,
 	instance *searchv1alpha1.Search) (*reconcile.Result, error) {
 
-	if instance.ObjectMeta.Annotations["search.open-cluster-management.io/global-search-peview"] == "true" ||
+	if instance.ObjectMeta.Annotations["search.open-cluster-management.io/global-search-preview"] == "true" ||
 		instance.ObjectMeta.Annotations["global-search-preview"] == "true" {
 
 		log.Info("The global-search-preview annotation is present. Setting up global search...")
@@ -98,7 +98,7 @@ func (r *SearchReconciler) reconcileGlobalSearch(ctx context.Context,
 				LastTransitionTime: metav1.Now(),
 			})
 			if updateErr != nil {
-				log.Error(updateErr, "Failed to update the global search status condition on Search CR instance.")
+				log.Error(updateErr, "Failed to update the Global Search status condition on Search CR instance.")
 			}
 		}
 	} else {

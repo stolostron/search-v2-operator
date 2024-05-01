@@ -6,8 +6,13 @@ import (
 	"context"
 	"testing"
 
+	searchv1alpha1 "github.com/stolostron/search-v2-operator/api/v1alpha1"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	fakeDyn "k8s.io/client-go/dynamic/fake"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -202,5 +207,59 @@ func Test_disableConsole(t *testing.T) {
 // 		t.Fatalf("Failed to enable global search: %v", err)
 // 	}
 
-// 	// TODO: Check state.
+// 	//Check state here.
 // }
+
+func Test_disableGlobalSearch(t *testing.T) {
+	// Create a fake client to mock API calls.
+	searchInst := &searchv1alpha1.Search{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "search-operator",
+			Namespace: "test-namespace",
+			Annotations: map[string]string{
+				"global-search-preview": "false",
+			},
+		},
+		Spec: searchv1alpha1.SearchSpec{
+			Deployments: searchv1alpha1.SearchDeployments{
+				QueryAPI: searchv1alpha1.DeploymentConfig{
+					Env: []corev1.EnvVar{
+						{
+							Name:  "FEATURE_FEDERATED_SEARCH",
+							Value: "true",
+						},
+					},
+				},
+			},
+		},
+		Status: searchv1alpha1.SearchStatus{
+			Conditions: []metav1.Condition{
+				{
+					Type:   "GlobalSearchReady",
+					Status: metav1.ConditionTrue,
+				},
+			},
+		},
+	}
+	s := scheme.Scheme
+	err := searchv1alpha1.SchemeBuilder.AddToScheme(s)
+	if err != nil {
+		t.Errorf("error adding search scheme: (%v)", err)
+	}
+
+	objs := []runtime.Object{searchInst}
+	// Create a fake client to mock API calls.
+	cl := fake.NewClientBuilder().WithStatusSubresource(searchInst).WithRuntimeObjects(objs...).Build()
+
+	r := &SearchReconciler{Client: cl, DynamicClient: fakeDynClient(), Scheme: s}
+
+	ctx := context.Background()
+	err = r.disableGlobalSearch(ctx, searchInst)
+	if err != nil {
+		t.Fatalf("Failed to disable global search: %v", err)
+	}
+
+	// Check state here.
+	t.Log("search instance after: ", searchInst)
+	// t.Fail()
+}
