@@ -519,13 +519,13 @@ func (r *SearchReconciler) updateGlobalSearchStatus(ctx context.Context, instanc
 			break
 		}
 	}
-	existingStatus := instance.Status.Conditions[existingConditionIndex]
+	existingConditions := instance.Status.Conditions
 	if existingConditionIndex == -1 {
 		// Add new condition.
 		instance.Status.Conditions = append(instance.Status.Conditions, status)
-	} else if existingStatus.Status != status.Status ||
-		existingStatus.Reason != status.Reason ||
-		existingStatus.Message != status.Message {
+	} else if existingConditions[existingConditionIndex].Status != status.Status ||
+		existingConditions[existingConditionIndex].Reason != status.Reason ||
+		existingConditions[existingConditionIndex].Message != status.Message {
 		// Update existing condition, only if anything changed.
 		instance.Status.Conditions[existingConditionIndex] = status
 	} else {
