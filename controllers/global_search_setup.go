@@ -279,7 +279,8 @@ func (r *SearchReconciler) createManagedServiceAccount(ctx context.Context, clus
 			"metadata": map[string]interface{}{
 				"name": searchGlobal,
 				"labels": map[string]interface{}{
-					"app": "search",
+					"app":     "search",
+					"feature": "global-search",
 				},
 			},
 			"spec": map[string]interface{}{
@@ -310,7 +311,8 @@ func (r *SearchReconciler) createManifestWork(ctx context.Context, cluster strin
 			"metadata": map[string]interface{}{
 				"name": searchGlobalConfig,
 				"labels": map[string]interface{}{
-					"app": "search",
+					"app":     "search",
+					"feature": "global-search",
 				},
 			},
 			"spec": map[string]interface{}{
@@ -322,7 +324,8 @@ func (r *SearchReconciler) createManifestWork(ctx context.Context, cluster strin
 							"metadata": map[string]interface{}{
 								"name": "search-global-binding",
 								"labels": map[string]interface{}{
-									"app": "search",
+									"app":     "search",
+									"feature": "global-search",
 								},
 							},
 							"roleRef": map[string]interface{}{
@@ -346,7 +349,8 @@ func (r *SearchReconciler) createManifestWork(ctx context.Context, cluster strin
 								"name":      "search-global-hub",
 								"namespace": "open-cluster-management",
 								"labels": map[string]interface{}{
-									"app": "search",
+									"app":     "search",
+									"feature": "global-search",
 								},
 							},
 							"spec": map[string]interface{}{
