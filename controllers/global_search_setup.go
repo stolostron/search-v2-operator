@@ -62,7 +62,6 @@ func (r *SearchReconciler) reconcileGlobalSearch(ctx context.Context,
 	instance *searchv1alpha1.Search) (*reconcile.Result, error) {
 
 	if instance.ObjectMeta.Annotations["global-search-preview"] == "true" {
-
 		log.Info("The global-search-preview annotation is present. Setting up global search...")
 
 		// Validate global search pre-requisites.
@@ -87,7 +86,6 @@ func (r *SearchReconciler) reconcileGlobalSearch(ctx context.Context,
 			if updateErr != nil {
 				log.Error(updateErr, "Failed to update Global Search status condition on Search CR instance.")
 			}
-
 		} else {
 			updateErr := r.updateGlobalSearchStatus(ctx, instance, metav1.Condition{
 				Type:               "GlobalSearchReady",
@@ -219,7 +217,7 @@ func (r *SearchReconciler) enableGlobalSearch(ctx context.Context, instance *sea
 	// 2. Enable federated search feature in the search-api deployment.
 	err = r.updateSearchApiDeployment(ctx, true, instance)
 	if err != nil {
-		log.Error(err, "Failed to enable the federated global search feature.")
+		log.Error(err, "Failed to enable the federated global search feature on search-api deployment.")
 		return err // QUESTION: Should we return here or continue? Should we rollback other changes?
 	}
 
