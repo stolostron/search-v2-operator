@@ -225,7 +225,7 @@ func (r *SearchReconciler) enableGlobalSearch(ctx context.Context, instance *sea
 	// MANAGED_HUBS=($(oc get managedcluster -o json | jq -r '.items[] | select(.status.clusterClaims[] |
 	//     .name == "hub.open-cluster-management.io" and .value != "NotInstalled") | .metadata.name'))
 	clusterList, err := r.DynamicClient.Resource(managedClusterResourceGvr).List(ctx, metav1.ListOptions{})
-	if err != nil {
+	if err != nil || clusterList == nil || clusterList.Items == nil {
 		log.Error(err, "Failed to list the ManagedClusters to configure global search.")
 		return err // QUESTION: Should we return here or continue? Should we rollback other changes?
 	}
@@ -412,31 +412,22 @@ func (r *SearchReconciler) disableGlobalSearch(ctx context.Context, instance *se
 	// MANAGED_HUBS=($(oc get managedcluster -o json | jq -r '.items[] | select(.status.clusterClaims[] |
 	//    .name == "hub.open-cluster-management.io" and .value != "NotInstalled") | .metadata.name'))
 	clusterList, err := r.DynamicClient.Resource(managedClusterResourceGvr).List(ctx, metav1.ListOptions{})
-	if err != nil {
+	if err != nil || clusterList == nil || clusterList.Items == nil {
 		log.Error(err, "Failed to list ManagedClusters.")
 	}
 	for _, cluster := range clusterList.Items {
 		// 3a. Delete the ManagedServiceAccount search-global.
-		managedServiceAccount, err := r.DynamicClient.Resource(managedServiceAccountGvr).Namespace(cluster.GetName()).
-			Get(ctx, searchGlobal, metav1.GetOptions{})
-		if err == nil && managedServiceAccount != nil {
-			err = r.DynamicClient.Resource(managedServiceAccountGvr).Namespace(cluster.GetName()).
-				Delete(ctx, searchGlobal, metav1.DeleteOptions{})
-			if err != nil {
-				log.Error(err, "Failed to delete ManagedServiceAccount search-global on Managed Hub.",
-					"name", cluster.GetName())
-			}
+		err = r.DynamicClient.Resource(managedServiceAccountGvr).Namespace(cluster.GetName()).
+			Delete(ctx, searchGlobal, metav1.DeleteOptions{})
+		if err != nil && !errors.IsNotFound(err) {
+			log.Error(err, "Failed to delete ManagedServiceAccount search-global.", "namespace", cluster.GetName())
 		}
+
 		// 3b. Delete the ManifestWork search-global-config.
-		manifestWork, err := r.DynamicClient.Resource(manifestWorkGvr).Namespace(cluster.GetName()).
-			Get(ctx, searchGlobalConfig, metav1.GetOptions{})
-		if err == nil && manifestWork != nil {
-			err = r.DynamicClient.Resource(manifestWorkGvr).Namespace(cluster.GetName()).
-				Delete(ctx, searchGlobalConfig, metav1.DeleteOptions{})
-			if err != nil {
-				log.Error(err, "Failed to delete ManifestWork search-global-config on Managed Hub.",
-					"name", cluster.GetName())
-			}
+		err = r.DynamicClient.Resource(manifestWorkGvr).Namespace(cluster.GetName()).
+			Delete(ctx, searchGlobalConfig, metav1.DeleteOptions{})
+		if err != nil && !errors.IsNotFound(err) {
+			log.Error(err, "Failed to delete ManifestWork search-global-config.", "namespace", cluster.GetName())
 		}
 	}
 	log.V(1).Info("Done deleting global search configuration resources.")
