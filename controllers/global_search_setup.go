@@ -341,7 +341,7 @@ func (r *SearchReconciler) createManifestWork(ctx context.Context, cluster strin
 								},
 							},
 						},
-						// FUTURE: Will remove this Route recource and use cluster-proxy-addon instead.
+						// FUTURE: Will remove this Route resource and use cluster-proxy-addon instead.
 						map[string]interface{}{
 							"apiVersion": "route.openshift.io/v1",
 							"kind":       "Route",
