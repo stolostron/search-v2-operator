@@ -36,6 +36,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/dynamic"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -45,8 +46,9 @@ import (
 // SearchReconciler reconciles a Search object
 type SearchReconciler struct {
 	client.Client
-	Scheme  *runtime.Scheme
-	context context.Context
+	Scheme        *runtime.Scheme
+	context       context.Context
+	DynamicClient dynamic.Interface
 }
 
 const searchFinalizer = "search.open-cluster-management.io/finalizer"
@@ -55,9 +57,14 @@ var log = logf.Log.WithName("searchoperator")
 var once sync.Once
 var cleanOnce sync.Once
 
+//+kubebuilder:rbac:groups=authentication.open-cluster-management.io,resources=managedserviceaccounts,verbs=create;delete
+//+kubebuilder:rbac:groups=cluster.open-cluster-management.io,resources=managedclusters,verbs=get;list
 //+kubebuilder:rbac:groups=search.open-cluster-management.io,resources=searches,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=search.open-cluster-management.io,resources=searches/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=search.open-cluster-management.io,resources=searches/finalizers,verbs=update
+//+kubebuilder:rbac:groups=work.open-cluster-management.io,resources=manifestworks,verbs=create;delete
+//+kubebuilder:rbac:groups=multicluster.openshift.io,resources=multiclusterengines,verbs=get;list
+//+kubebuilder:rbac:groups="",resources=configmaps,verbs=get;patch
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -203,12 +210,18 @@ func (r *SearchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	}
 	result, err = r.createConfigMap(ctx, r.PostgresConfigmap(instance))
 	if result != nil {
-		log.Error(err, "Postgres configmap  setup failed")
+		log.Error(err, "Postgres configmap setup failed")
 		return *result, err
 	}
 	result, err = r.createConfigMap(ctx, r.SearchCACert(instance))
 	if result != nil {
 		log.Error(err, "Search CACert setup failed")
+		return *result, err
+	}
+
+	result, err = r.reconcileGlobalSearch(ctx, instance)
+	if err != nil {
+		log.Error(err, "Global Search setup failed")
 		return *result, err
 	}
 
@@ -293,7 +306,7 @@ func (r *SearchReconciler) updateStatus(ctx context.Context, instance *searchv1a
 		})
 		log.Info("No pods found for deployment ", deploymentName, "listing pods failed")
 	}
-	instance = updateStatusCondition(instance, podList)
+	updateStatusCondition(instance, podList)
 	instance.Status.Storage = instance.Spec.DBStorage.StorageClassName
 	instance.Status.DB = DBNAME // This stored in the search-postgres secret, but currently it is a static value
 
@@ -302,8 +315,9 @@ func (r *SearchReconciler) updateStatus(ctx context.Context, instance *searchv1a
 	if err != nil {
 		if errors.IsConflict(err) {
 			log.Error(err, "Failed to update status for Search CR instance: Object has been modified")
+		} else {
+			log.Error(err, "Failed to update status for Search CR instance")
 		}
-		log.Error(err, "Failed to update status for Search CR instance")
 		return err
 	}
 	log.Info("Updated Search CR status successfully")
