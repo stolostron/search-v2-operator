@@ -48,7 +48,7 @@ var (
 	}
 )
 
-var appSearchLabels = map[string]string{
+var appSearchLabels = map[string]interface{}{
 	"app":     "search",
 	"feature": "global-search",
 }
