@@ -11,17 +11,14 @@ rules:
   - configmaps
   verbs:
   - get
-  - list
   - patch
-  - watch
 - apiGroups:
   - authentication.open-cluster-management.io
   resources:
   - managedserviceaccounts
   verbs:
   - create
-  - get
-  - list
+  - delete
 - apiGroups:
   - cluster.open-cluster-management.io
   resources:
@@ -36,8 +33,6 @@ rules:
   verbs:
   - get
   - list
-  - patch
-  - watch
 - apiGroups:
   - search.open-cluster-management.io
   resources:
@@ -64,3 +59,10 @@ rules:
   - get
   - patch
   - update
+- apiGroups:
+  - work.open-cluster-management.io
+  resources:
+  - manifestworks
+  verbs:
+  - create
+  - delete
