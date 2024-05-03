@@ -48,6 +48,11 @@ var (
 	}
 )
 
+var appSearchLabels = map[string]string{
+	"app":     "search",
+	"feature": "global-search",
+}
+
 // Reconcile Global Search.
 //  1. Check the global-search-preview annotation.
 //  2. Validate pre-requisites.
@@ -202,7 +207,6 @@ func (r *SearchReconciler) validateGlobalSearchPrerequisites(ctx context.Context
 //     a. Create a ManagedServiceAccount search-global.
 //     b. Create a ManifestWork search-global-config if it doesn't exist.
 func (r *SearchReconciler) enableGlobalSearch(ctx context.Context, instance *searchv1alpha1.Search) error {
-	
 	errorsList := []error{} // Using this to allow partial errors and combine at the end.
 	logAndTrackError := func(err error, message string, keysAndValues ...any) {
 		if err != nil {
@@ -281,11 +285,8 @@ func (r *SearchReconciler) createManagedServiceAccount(ctx context.Context, clus
 			"apiVersion": "authentication.open-cluster-management.io/v1beta1",
 			"kind":       "ManagedServiceAccount",
 			"metadata": map[string]interface{}{
-				"name": searchGlobal,
-				"labels": map[string]interface{}{
-					"app":     "search",
-					"feature": "global-search",
-				},
+				"name":   searchGlobal,
+				"labels": appSearchLabels,
 			},
 			"spec": map[string]interface{}{
 				"rotation": map[string]interface{}{},
@@ -313,11 +314,8 @@ func (r *SearchReconciler) createManifestWork(ctx context.Context, cluster strin
 			"apiVersion": "work.open-cluster-management.io/v1",
 			"kind":       "ManifestWork",
 			"metadata": map[string]interface{}{
-				"name": searchGlobalConfig,
-				"labels": map[string]interface{}{
-					"app":     "search",
-					"feature": "global-search",
-				},
+				"name":   searchGlobalConfig,
+				"labels": appSearchLabels,
 			},
 			"spec": map[string]interface{}{
 				"workload": map[string]interface{}{
@@ -326,11 +324,8 @@ func (r *SearchReconciler) createManifestWork(ctx context.Context, cluster strin
 							"apiVersion": "rbac.authorization.k8s.io/v1",
 							"kind":       "ClusterRoleBinding",
 							"metadata": map[string]interface{}{
-								"name": "search-global-binding",
-								"labels": map[string]interface{}{
-									"app":     "search",
-									"feature": "global-search",
-								},
+								"name":   "search-global-binding",
+								"labels": appSearchLabels,
 							},
 							"roleRef": map[string]interface{}{
 								"apiGroup": "rbac.authorization.k8s.io",
@@ -352,10 +347,7 @@ func (r *SearchReconciler) createManifestWork(ctx context.Context, cluster strin
 							"metadata": map[string]interface{}{
 								"name":      "search-global-hub",
 								"namespace": "open-cluster-management",
-								"labels": map[string]interface{}{
-									"app":     "search",
-									"feature": "global-search",
-								},
+								"labels":    appSearchLabels,
 							},
 							"spec": map[string]interface{}{
 								"port": map[string]interface{}{
