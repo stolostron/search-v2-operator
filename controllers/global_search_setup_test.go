@@ -26,10 +26,8 @@ func newUnstructured(apiVersion, kind, namespace, name string, props map[string]
 	if namespace != "" {
 		obj.SetNamespace(namespace)
 	}
-	if props != nil {
-		for k, v := range props {
-			obj.Object[k] = v
-		}
+	for k, v := range props {
+		obj.Object[k] = v
 	}
 	return obj
 }

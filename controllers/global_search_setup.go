@@ -148,46 +148,48 @@ func (r *SearchReconciler) reconcileGlobalSearch(ctx context.Context,
 //	b. The ManagedServiceAccount add-on is enabled in the MultiClusterEngine CR.
 //	c. The ClusterProxy addon is enabled in the MultiClusterEngine CR.
 func (r *SearchReconciler) validateGlobalSearchPrerequisites(ctx context.Context) error {
-	log.V(5).Info("Checking global search pre-requisites.")
+	log.V(2).Info("Checking global search dependencies.")
 	// Verify that MulticlusterGlobalHub operator is installed.
 	// oc get multiclusterglobalhub -A
 	multiclusterGlobalHub, err := r.DynamicClient.Resource(multiclusterGlobalHubGvr).List(ctx, metav1.ListOptions{})
 	if err != nil {
-		return fmt.Errorf("MulticlusterGlobalHub operator is not installed.")
+		log.Error(err, "Failed to validate dependency MulticlusterGlobalHub operator.")
+		return fmt.Errorf("Failed to validate dependency MulticlusterGlobalHub operator.")
 	} else if len(multiclusterGlobalHub.Items) > 0 {
 		log.V(5).Info("Found MulticlusterGlobalHub intance.")
 	}
 
-	// Verify that the ManagedServiceAccount and ClusterProxy add-ons are enabled in the MultiClusterEngine CR.
+	// Verify that MulticlusterEngine is installed and has the ManagedServiceAccount and ClusterProxy add-ons enabled.
 	mce, err := r.DynamicClient.Resource(multiclusterengineResourceGvr).
 		Get(ctx, "multiclusterengine", metav1.GetOptions{})
 	if err != nil {
-		log.Error(err, "Failed to get MulticlusterEngine CR.")
-		return fmt.Errorf("Failed to get MulticlusterEngine CR.")
-	} else {
-		log.V(5).Info("Checking that managedserviceaccount and cluster-proxy-addon are enabled in MCE.")
-		managedServiceAccountEnabled := false
-		clusterProxyEnabled := false
-		components := mce.Object["spec"].(map[string]interface{})["overrides"].(map[string]interface{})["components"]
-		for _, component := range components.([]interface{}) {
-			if component.(map[string]interface{})["name"] == "managedserviceaccount" &&
-				component.(map[string]interface{})["enabled"] == true {
-				log.V(5).Info("Managed Service Account add-on is enabled.")
-				managedServiceAccountEnabled = true
-			}
-			if component.(map[string]interface{})["name"] == "cluster-proxy-addon" &&
-				component.(map[string]interface{})["enabled"] == true {
-				log.V(5).Info("Cluster Proxy add-on is enabled.")
-				clusterProxyEnabled = true
-			}
+		log.Error(err, "Failed to validate dependency MulticlusterEngine operator.")
+		return fmt.Errorf("Failed to validate dependency MulticlusterEngine operator.")
+	}
+
+	// Verify that MulticlusterEngine add-ons ManagedServiceAccount and ClusterProxy are enabled.
+	managedServiceAccountEnabled := false
+	clusterProxyEnabled := false
+	components := mce.Object["spec"].(map[string]interface{})["overrides"].(map[string]interface{})["components"]
+	for _, component := range components.([]interface{}) {
+		if component.(map[string]interface{})["name"] == "managedserviceaccount" &&
+			component.(map[string]interface{})["enabled"] == true {
+			log.V(5).Info("Managed Service Account add-on is enabled.")
+			managedServiceAccountEnabled = true
 		}
-		if !managedServiceAccountEnabled {
-			return fmt.Errorf("Managed Service Account add-on is not enabled in MulticlusterEngine.")
-		}
-		if !clusterProxyEnabled {
-			return fmt.Errorf("Cluster Proxy add-on is not enabled in MulticlusterEngine.")
+		if component.(map[string]interface{})["name"] == "cluster-proxy-addon" &&
+			component.(map[string]interface{})["enabled"] == true {
+			log.V(5).Info("Cluster Proxy add-on is enabled.")
+			clusterProxyEnabled = true
 		}
 	}
+	if !managedServiceAccountEnabled {
+		return fmt.Errorf("The managedserviceaccount add-on is not enabled in MulticlusterEngine.")
+	}
+	if !clusterProxyEnabled {
+		return fmt.Errorf("The cluster-proxy-addon is not enabled in MulticlusterEngine.")
+	}
+	log.V(2).Info("Global search dependencies validated.")
 	return nil
 }
 
@@ -200,73 +202,75 @@ func (r *SearchReconciler) validateGlobalSearchPrerequisites(ctx context.Context
 //     a. Create a ManagedServiceAccount search-global.
 //     b. Create a ManifestWork search-global-config if it doesn't exist.
 func (r *SearchReconciler) enableGlobalSearch(ctx context.Context, instance *searchv1alpha1.Search) error {
+	
+	errorsList := []error{} // Using this to allow partial errors and combine at the end.
+	logAndTrackError := func(err error, message string, keysAndValues ...any) {
+		if err != nil {
+			log.Error(err, message, keysAndValues...)
+			errorsList = append(errorsList, err)
+		}
+	}
+
 	// 1. Enable global search feature in the console.
 	// 1a.Add globalSearchFeatureFlag=true to configmap console-mce-config in multicluster-engine namespace.
 	err := r.updateConsoleConfig(ctx, true, "multicluster-engine", "console-mce-config")
-	if err != nil {
-		log.Error(err, "Failed to enable the global search feature in console-mce-config.")
-		return err // QUESTION: Should we return here or continue? Should we rollback other changes?
-	}
+	logAndTrackError(err, "Failed to enable the global search feature in console-mce-config.")
+
 	// 1b. Add globalSearchFeatureFlag=true to configmap console-config in open-cluster-management namespace.
 	err = r.updateConsoleConfig(ctx, true, instance.GetNamespace(), "console-config")
-	if err != nil {
-		log.Error(err, "Failed to enable the global search feature in console-config.")
-		return err // QUESTION: Should we return here or continue? Should we rollback other changes?
-	}
+	logAndTrackError(err, "Failed to enable the global search feature in console-config.")
 
 	// 2. Enable federated search feature in the search-api deployment.
 	err = r.updateSearchApiDeployment(ctx, true, instance)
-	if err != nil {
-		log.Error(err, "Failed to enable the federated global search feature on search-api deployment.")
-		return err // QUESTION: Should we return here or continue? Should we rollback other changes?
-	}
+	logAndTrackError(err, "Failed to enable the federated global search feature on search-api deployment.")
 
 	// Create configuration resources for each Managed Hub.
 	// MANAGED_HUBS=($(oc get managedcluster -o json | jq -r '.items[] | select(.status.clusterClaims[] |
 	//     .name == "hub.open-cluster-management.io" and .value != "NotInstalled") | .metadata.name'))
 	clusterList, err := r.DynamicClient.Resource(managedClusterResourceGvr).List(ctx, metav1.ListOptions{})
-	if err != nil || clusterList == nil || clusterList.Items == nil {
-		log.Error(err, "Failed to list the ManagedClusters to configure global search.")
-		return err // QUESTION: Should we return here or continue? Should we rollback other changes?
-	}
+	logAndTrackError(err, "Failed to list the ManagedClusters to configure global search.")
 
-	for _, cluster := range clusterList.Items {
-		isManagedHub := false
-		if cluster.Object["status"] == nil || cluster.Object["status"].(map[string]interface{})["clusterClaims"] == nil {
-			log.V(5).Info("Cluster doesn't have status or clusterClaims.", "cluster", cluster.GetName())
-			continue
-		}
-		clusterClaims := cluster.Object["status"].(map[string]interface{})["clusterClaims"].([]interface{})
-		for _, claim := range clusterClaims {
-			claimMap := claim.(map[string]interface{})
-			if claimMap["name"] == "hub.open-cluster-management.io" && claimMap["value"] != "NotInstalled" {
-				isManagedHub = true
-				break
+	if err != nil && clusterList != nil {
+		for _, cluster := range clusterList.Items {
+			isManagedHub := false
+			if cluster.Object["status"] == nil || cluster.Object["status"].(map[string]interface{})["clusterClaims"] == nil {
+				log.V(5).Info("Cluster doesn't have status or clusterClaims.", "cluster", cluster.GetName())
+				continue
 			}
-		}
-		if !isManagedHub {
-			log.V(5).Info("Cluster is not a Managed Hub.", "name", cluster.GetName())
-			continue
-		}
+			clusterClaims := cluster.Object["status"].(map[string]interface{})["clusterClaims"].([]interface{})
+			for _, claim := range clusterClaims {
+				claimMap := claim.(map[string]interface{})
+				if claimMap["name"] == "hub.open-cluster-management.io" && claimMap["value"] != "NotInstalled" {
+					isManagedHub = true
+					break
+				}
+			}
+			if !isManagedHub {
+				log.V(5).Info("Cluster is not a Managed Hub.", "name", cluster.GetName())
+				continue
+			}
 
-		log.V(2).Info("Cluster is a Managed Hub. Configuring global search resources.", "name", cluster.GetName())
+			log.V(2).Info("Cluster is a Managed Hub. Configuring global search resources.", "name", cluster.GetName())
 
-		// 3a. Create a ManagedServiceAccount search-global.
-		err = r.createManagedServiceAccount(ctx, cluster.GetName())
-		if err != nil {
-			log.Error(err, "Failed to create ManagedServiceAccount search-global for", "cluster", cluster.GetName())
-			// QUESTION: How should we handle partial errors? Should we continue or rollback?
-		}
+			// 3a. Create a ManagedServiceAccount search-global.
+			err = r.createManagedServiceAccount(ctx, cluster.GetName())
+			logAndTrackError(err, "Failed to create ManagedServiceAccount search-global for", "cluster", cluster.GetName())
 
-		// 3b. Create a ManifestWork search-global-config if it doesn't exist.
-		err = r.createManifestWork(ctx, cluster.GetName())
-		if err != nil {
-			log.Error(err, "Failed to create ManifestWork search-global-config for", "cluster", cluster.GetName())
-			// QUESTION: How should we handle partial errors? Should we continue or rollback?
+			// 3b. Create a ManifestWork search-global-config if it doesn't exist.
+			err = r.createManifestWork(ctx, cluster.GetName())
+			logAndTrackError(err, "Failed to create ManifestWork search-global-config for", "cluster", cluster.GetName())
 		}
 	}
+
+	// Combine all errors.
+	if len(errorsList) > 0 {
+		err = fmt.Errorf("Failed to enable global search. Errors: %v", errorsList)
+		log.Error(err, "Failed to enable global search.")
+		return err
+	}
+
 	log.Info("Global search resources configured.")
-	return err
+	return nil
 }
 
 // Create a ManagedServiceAccount search-global in the Managed Hub namespace.
