@@ -255,7 +255,6 @@ func (r *SearchReconciler) enableGlobalSearch(ctx context.Context, instance *sea
 				log.V(5).Info("Cluster is not a Managed Hub.", "name", cluster.GetName())
 				continue
 			}
-
 			log.V(2).Info("Cluster is a Managed Hub. Configuring global search resources.", "name", cluster.GetName())
 
 			// 3a. Create a ManagedServiceAccount search-global.
@@ -396,8 +395,6 @@ func (r *SearchReconciler) disableGlobalSearch(ctx context.Context, instance *se
 	logAndTrackError(errList, err, "Failed to remove the globalSearchFeatureFlag in configmap console-config.")
 
 	// 2. Disable federated search feature in the search-api.
-	// oc patch search search-v2-operator -n open-cluster-management --type='merge'
-	//    -p '{"spec":{"deployments":{"queryapi":{"envVar":[{"name":"FEATURE_FEDERATED_SEARCH", "value":"false"}]}}}}'
 	err = r.updateSearchApiDeployment(ctx, false, instance)
 	logAndTrackError(errList, err, "Failed to remove the federated global search feature flag from search-api deployment.")
 
@@ -414,7 +411,7 @@ func (r *SearchReconciler) disableGlobalSearch(ctx context.Context, instance *se
 			Delete(ctx, searchGlobal, metav1.DeleteOptions{})
 
 		if err != nil && !errors.IsNotFound(err) { // Ignore NotFound errors.
-			logAndTrackError(errList, err, "Failed to delete ManagedServiceAccount search-global.", "namespace", cluster.GetName())
+			logAndTrackError(errList, err, "Failed to delete ManagedServiceAccount search-global", "cluster", cluster.GetName())
 		}
 
 		// 3b. Delete the ManifestWork search-global-config.
@@ -468,12 +465,11 @@ func (r *SearchReconciler) updateConsoleConfig(ctx context.Context, enabled bool
 }
 
 // Configure the federated global search feature in the search-api deployment.
-// oc patch search search-v2-operator -n open-cluster-management --type='merge'
 //
-//	-p '{"spec":{"deployments":{"queryapi":{"envVar":[{"name":"FEATURE_FEDERATED_SEARCH", "value":"true"}]}}}}'
+//	oc patch search search-v2-operator -n open-cluster-management --type='merge'
+//	    -p '{"spec":{"deployments":{"queryapi":{"envVar":[{"name":"FEATURE_FEDERATED_SEARCH", "value":"true"}]}}}}'
 func (r *SearchReconciler) updateSearchApiDeployment(ctx context.Context, enabled bool,
 	instance *searchv1alpha1.Search) error {
-
 	// Find the env var FEATURE_FEDERATED_SEARCH.
 	existingEnv := corev1.EnvVar{}
 	existingIndex := -1
