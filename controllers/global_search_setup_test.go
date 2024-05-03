@@ -147,7 +147,7 @@ func Test_checkPrerequisites(t *testing.T) {
 		DynamicClient: fakeDynClient(),
 	}
 
-	err := r.validateGlobalSearchPrerequisites(context.Background())
+	err := r.validateGlobalSearchDependencies(context.Background())
 
 	assert.Nil(t, err)
 }
@@ -223,7 +223,7 @@ func Test_disableGlobalSearch(t *testing.T) {
 	searchInst := &searchv1alpha1.Search{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "search-operator",
-			Namespace: "test-namespace",
+			Namespace: "open-cluster-management",
 			Annotations: map[string]string{
 				"global-search-preview": "false",
 			},
@@ -254,14 +254,9 @@ func Test_disableGlobalSearch(t *testing.T) {
 		t.Errorf("error adding search scheme: (%v)", err)
 	}
 
-	// This is the mocked state AFTRE the state is changed.
-	newInst := searchInst.DeepCopy()
-	newInst.Status.Conditions = []metav1.Condition{}
-	newInst.Spec.Deployments.QueryAPI.Env = []corev1.EnvVar{}
-
 	// Create a fake client to mock API calls.
 	r := &SearchReconciler{
-		Client:        fake.NewClientBuilder().WithStatusSubresource(newInst).WithRuntimeObjects(newInst).Build(),
+		Client:        fake.NewClientBuilder().WithStatusSubresource(searchInst).WithRuntimeObjects(searchInst).Build(),
 		DynamicClient: fakeDynClient(),
 		Scheme:        scheme.Scheme,
 	}
