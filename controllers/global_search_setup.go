@@ -548,8 +548,9 @@ func (r *SearchReconciler) commitSearchCRInstanceState(ctx context.Context, inst
 	if err != nil {
 		if errors.IsConflict(err) {
 			log.Error(err, "Failed to update status for Search CR instance: Object has been modified.")
+		} else {
+			log.Error(err, "Failed to update status for Search CR instance.")
 		}
-		log.Error(err, "Failed to update status for Search CR instance.")
 	}
 	return err
 }
