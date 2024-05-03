@@ -257,7 +257,7 @@ func (r *SearchReconciler) enableGlobalSearch(ctx context.Context, instance *sea
 
 			// 3a. Create a ManagedServiceAccount search-global.
 			err = r.createManagedServiceAccount(ctx, cluster.GetName())
-			logAndTrackError(&errList, err, "Failed to create ManagedServiceAccount search-global.", "cluster", cluster.GetName())
+			logAndTrackError(&errList, err, "Failed to create ManagedServiceAccount search-global", "cluster", cluster.GetName())
 
 			// 3b. Create a ManifestWork search-global-config if it doesn't exist.
 			err = r.createManifestWork(ctx, cluster.GetName())
@@ -394,7 +394,7 @@ func (r *SearchReconciler) disableGlobalSearch(ctx context.Context, instance *se
 
 	// 2. Disable federated search feature in the search-api.
 	err = r.updateSearchApiDeployment(ctx, false, instance)
-	logAndTrackError(&errList, err, "Failed to remove the federated global search feature flag from search-api deployment.")
+	logAndTrackError(&errList, err, "Failed to remove env FEATURE_FEDERATED_SEARCH from the search api deployment.")
 
 	// 3. Delete configuration resources for each Managed Hub.
 	// MANAGED_HUBS=($(oc get managedcluster -o json | jq -r '.items[] | select(.status.clusterClaims[] |
@@ -417,7 +417,7 @@ func (r *SearchReconciler) disableGlobalSearch(ctx context.Context, instance *se
 			Delete(ctx, SEARCH_GLOBAL_CONFIG, metav1.DeleteOptions{})
 
 		if err != nil && !errors.IsNotFound(err) { // Ignore NotFound error.
-			logAndTrackError(&errList, err, "Failed to delete ManifestWork search-global-config.", "namespace", cluster.GetName())
+			logAndTrackError(&errList, err, "Failed to delete ManifestWork search-global-config", "namespace", cluster.GetName())
 		}
 	}
 
