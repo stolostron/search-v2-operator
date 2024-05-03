@@ -72,7 +72,17 @@ func defaultMockState() (map[schema.GroupVersionResource]string, []runtime.Objec
 							},
 						},
 					),
-					*newUnstructured("cluster.open-cluster-management.io/v1", "ManagedCluster", "cluster-2", "cluster-2", nil),
+					*newUnstructured("cluster.open-cluster-management.io/v1", "ManagedCluster", "cluster-2", "cluster-2",
+						map[string]interface{}{
+							"status": map[string]interface{}{
+								"clusterClaims": []interface{}{map[string]interface{}{
+									"name":  "hub.open-cluster-management.io",
+									"value": "NotInstalled"},
+								},
+							},
+						},
+					),
+					*newUnstructured("cluster.open-cluster-management.io/v1", "ManagedCluster", "cluster-3", "cluster-3", nil),
 				},
 			},
 			&unstructured.UnstructuredList{
