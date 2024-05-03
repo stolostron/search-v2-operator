@@ -419,6 +419,10 @@ func (r *SearchReconciler) disableGlobalSearch(ctx context.Context, instance *se
 		// 3a. Delete the ManagedServiceAccount search-global.
 		err = r.DynamicClient.Resource(managedServiceAccountGvr).Namespace(cluster.GetName()).
 			Delete(ctx, searchGlobal, metav1.DeleteOptions{})
+		// Ignore NotFound errors.
+		if errors.IsNotFound(err) {
+			err = nil
+		}
 		if err != nil && !errors.IsNotFound(err) {
 			log.Error(err, "Failed to delete ManagedServiceAccount search-global.", "namespace", cluster.GetName())
 		}
@@ -426,6 +430,10 @@ func (r *SearchReconciler) disableGlobalSearch(ctx context.Context, instance *se
 		// 3b. Delete the ManifestWork search-global-config.
 		err = r.DynamicClient.Resource(manifestWorkGvr).Namespace(cluster.GetName()).
 			Delete(ctx, searchGlobalConfig, metav1.DeleteOptions{})
+		// Ignore NotFound errors.
+		if errors.IsNotFound(err) {
+			err = nil
+		}
 		if err != nil && !errors.IsNotFound(err) {
 			log.Error(err, "Failed to delete ManifestWork search-global-config.", "namespace", cluster.GetName())
 		}
@@ -476,12 +484,21 @@ func (r *SearchReconciler) updateSearchApiDeployment(ctx context.Context, enable
 				corev1.EnvVar{Name: "FEATURE_FEDERATED_SEARCH", Value: "true"})
 			changed = true
 		} else {
-			for _, env := range instance.Spec.Deployments.QueryAPI.Env {
-				if env.Name == "FEATURE_FEDERATED_SEARCH" && env.Value != "true" {
-					env.Value = "true"
-					changed = true
+			exists := false
+			for i, env := range instance.Spec.Deployments.QueryAPI.Env {
+				if env.Name == "FEATURE_FEDERATED_SEARCH" {
+					exists = true
+					if env.Value != "true" {
+						instance.Spec.Deployments.QueryAPI.Env[i].Value = "true"
+						changed = true
+					}
 					break
 				}
+			}
+			if !exists {
+				instance.Spec.Deployments.QueryAPI.Env = append(instance.Spec.Deployments.QueryAPI.Env,
+					corev1.EnvVar{Name: "FEATURE_FEDERATED_SEARCH", Value: "true"})
+				changed = true
 			}
 		}
 	} else {
@@ -499,7 +516,7 @@ func (r *SearchReconciler) updateSearchApiDeployment(ctx context.Context, enable
 		}
 	}
 	if changed {
-		err := r.commitSearchCRInstanceState(ctx, instance)
+		err := r.Client.Update(ctx, instance)
 		if err != nil {
 			log.Error(err, "Failed to update Search API env in the Search instance.")
 		}

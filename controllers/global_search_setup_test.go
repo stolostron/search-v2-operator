@@ -41,6 +41,12 @@ func fakeDynClient() *fakeDyn.FakeDynamicClient {
 }
 
 func defaultMockState() (map[schema.GroupVersionResource]string, []runtime.Object) {
+	buildObject := func(apiversion, kind string) map[string]interface{} {
+		return map[string]interface{}{
+			"apiVersion": apiversion,
+			"kind":       kind,
+		}
+	}
 	return map[schema.GroupVersionResource]string{
 			{Group: "operator.open-cluster-management.io", Version: "v1alpha4", Resource: "multiclusterglobalhubs"}: "MulticlusterGlobalHubList",
 			{Group: "cluster.open-cluster-management.io", Version: "v1", Resource: "managedclusters"}:               "ManagedClusterList",
@@ -50,19 +56,13 @@ func defaultMockState() (map[schema.GroupVersionResource]string, []runtime.Objec
 		},
 		[]runtime.Object{
 			&unstructured.UnstructuredList{
-				Object: map[string]interface{}{
-					"apiVersion": "operator.open-cluster-management.io",
-					"kind":       "v1alpha4",
-				},
+				Object: buildObject("operator.open-cluster-management.io/v1alpha4", "MulticlusterGlobalHub"),
 				Items: []unstructured.Unstructured{
 					*newUnstructured("operator.open-cluster-management.io/v1alpha4", "MulticlusterGlobalHub", "ns-foo", "name-foo", nil),
 				},
 			},
 			&unstructured.UnstructuredList{
-				Object: map[string]interface{}{
-					"apiVersion": "cluster.open-cluster-management.io/v1",
-					"kind":       "ManagedCluster",
-				},
+				Object: buildObject("cluster.open-cluster-management.io/v1", "ManagedCluster"),
 				Items: []unstructured.Unstructured{
 					*newUnstructured("cluster.open-cluster-management.io/v1", "ManagedCluster", "cluster-1", "cluster-1",
 						map[string]interface{}{
@@ -78,10 +78,7 @@ func defaultMockState() (map[schema.GroupVersionResource]string, []runtime.Objec
 				},
 			},
 			&unstructured.UnstructuredList{
-				Object: map[string]interface{}{
-					"apiVersion": "multicluster.openshift.io/v1",
-					"kind":       "MultiClusterEngine",
-				},
+				Object: buildObject("multicluster.openshift.io/v1", "MultiClusterEngine"),
 				Items: []unstructured.Unstructured{
 					{
 						Object: map[string]interface{}{
@@ -109,18 +106,18 @@ func defaultMockState() (map[schema.GroupVersionResource]string, []runtime.Objec
 				},
 			},
 			&unstructured.UnstructuredList{
-				Object: map[string]interface{}{
-					"apiVersion": "work.open-cluster-management.io/v1",
-					"kind":       "Manifestwork",
+				Object: buildObject("work.open-cluster-management.io/v1", "Manifestwork"),
+				Items: []unstructured.Unstructured{
+					*newUnstructured("work.open-cluster-management.io/v1", "Manifestwork", "cluster-1", "search-global-config", nil),
+					*newUnstructured("work.open-cluster-management.io/v1", "Manifestwork", "cluster-2", "search-global-config", nil),
 				},
-				Items: []unstructured.Unstructured{},
 			},
 			&unstructured.UnstructuredList{
-				Object: map[string]interface{}{
-					"apiVersion": "authentication.open-cluster-management.io/v1",
-					"kind":       "ManagedServiceAccount",
+				Object: buildObject("authentication.open-cluster-management.io/v1", "ManagedServiceAccount"),
+				Items: []unstructured.Unstructured{
+					*newUnstructured("authentication.open-cluster-management.io/v1", "ManagedServiceAccount", "cluster-1", "search-global", nil),
+					*newUnstructured("authentication.open-cluster-management.io/v1", "ManagedServiceAccount", "cluster-2", "search-global", nil),
 				},
-				Items: []unstructured.Unstructured{},
 			},
 			newUnstructured("v1", "ConfigMap", "multicluster-engine", "console-mce-config",
 				map[string]interface{}{
@@ -249,9 +246,14 @@ func Test_disableGlobalSearch(t *testing.T) {
 		t.Errorf("error adding search scheme: (%v)", err)
 	}
 
+	// This is the mocked state AFTRE the state is changed.
+	newInst := searchInst.DeepCopy()
+	newInst.Status.Conditions = []metav1.Condition{}
+	newInst.Spec.Deployments.QueryAPI.Env = []corev1.EnvVar{}
+
 	// Create a fake client to mock API calls.
 	r := &SearchReconciler{
-		Client:        fake.NewClientBuilder().WithStatusSubresource(searchInst).WithRuntimeObjects(searchInst).Build(),
+		Client:        fake.NewClientBuilder().WithStatusSubresource(newInst).WithRuntimeObjects(newInst).Build(),
 		DynamicClient: fakeDynClient(),
 		Scheme:        scheme.Scheme,
 	}
@@ -260,6 +262,5 @@ func Test_disableGlobalSearch(t *testing.T) {
 
 	assert.Nil(t, err)
 	assert.Empty(t, searchInst.Status.Conditions)
-	// FIXME: This assert is failing, need to fix bug in the implementation.
 	assert.Empty(t, searchInst.Spec.Deployments.QueryAPI.Env)
 }

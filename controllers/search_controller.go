@@ -218,7 +218,7 @@ func (r *SearchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return *result, err
 	}
 
-	_, err = r.reconcileGlobalSearch(ctx, instance)
+	result, err = r.reconcileGlobalSearch(ctx, instance)
 	if err != nil {
 		log.Error(err, "Global Search setup failed")
 		return *result, err
