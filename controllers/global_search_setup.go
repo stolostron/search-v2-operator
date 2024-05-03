@@ -234,7 +234,7 @@ func (r *SearchReconciler) enableGlobalSearch(ctx context.Context, instance *sea
 	clusterList, err := r.DynamicClient.Resource(managedClusterResourceGvr).List(ctx, metav1.ListOptions{})
 	logAndTrackError(err, "Failed to list the ManagedClusters to configure global search.")
 
-	if err != nil && clusterList != nil {
+	if err == nil && clusterList != nil {
 		for _, cluster := range clusterList.Items {
 			isManagedHub := false
 			if cluster.Object["status"] == nil || cluster.Object["status"].(map[string]interface{})["clusterClaims"] == nil {
