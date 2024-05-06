@@ -34,6 +34,13 @@ rules:
   - get
   - list
 - apiGroups:
+  - operator.open-cluster-management.io
+  resources:
+  - multiclusterglobalhubs
+  verbs:
+  - get
+  - list
+- apiGroups:
   - search.open-cluster-management.io
   resources:
   - searches
