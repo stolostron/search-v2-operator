@@ -1,6 +1,6 @@
 # Search Operator
 
-Deploys the Odyssey (OCM Search v2) components.
+Deploys the Open Cluster Management Search v2 components.
 
 ## Installing the Search Operator in a Red Hat OpenShift cluster
 
@@ -175,6 +175,16 @@ search-api
 search-collector
 search-indexer
 search-postgres
+```
+
+## Enable Global Search
+
+**NOTE: The global search feature is tech preview as of ACM 2.11.**
+
+To enable add the annotation `global-search-preview=true` to the search operator instance.
+
+```bash
+oc annotate search search-v2-operator -n open-cluster-management 'global-search-preview=true'
 ```
 
 Version: 0.0.2 06/17/2022
