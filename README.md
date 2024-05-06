@@ -177,11 +177,14 @@ search-indexer
 search-postgres
 ```
 
-## Enable Global Search
+## Global Search Feature
 
 **NOTE: The global search feature is tech preview as of ACM 2.11.**
 
-To enable add the annotation `global-search-preview=true` to the search operator instance.
+Use global search in environments with the Multicluster Global Hub operator to federate the search
+queries to the managed hubs.
+
+To enable global search, add the annotation `global-search-preview=true` to the search operator instance.
 
 ```bash
 oc annotate search search-v2-operator -n open-cluster-management 'global-search-preview=true'
