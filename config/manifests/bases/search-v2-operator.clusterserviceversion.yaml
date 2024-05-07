@@ -10,7 +10,7 @@ spec:
   apiservicedefinitions: {}
   customresourcedefinitions:
     owned:
-    - description: Search is the Schema for the searches API
+    - description: Search is the schema for the searches API.
       displayName: Search
       kind: Search
       name: searches.search.open-cluster-management.io
