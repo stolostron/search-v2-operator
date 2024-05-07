@@ -14,7 +14,7 @@ metadata:
         }
       ]
     capabilities: Basic Install
-    createdAt: "2024-05-07T21:58:57Z"
+    createdAt: "2024-05-07T22:15:34Z"
     operators.operatorframework.io/builder: operator-sdk-v1.34.1
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
   name: search-v2-operator.v0.0.1
@@ -67,8 +67,13 @@ spec:
           - managedclusteraddons/status
           verbs:
           - get
-          - patch
           - update
+        - apiGroups:
+          - authentication.k8s.io
+          resources:
+          - tokenreviews
+          verbs:
+          - create
         - apiGroups:
           - authentication.open-cluster-management.io
           resources:
@@ -76,6 +81,30 @@ spec:
           verbs:
           - create
           - delete
+        - apiGroups:
+          - authorization.k8s.io
+          resources:
+          - subjectaccessreviews
+          verbs:
+          - create
+          - get
+        - apiGroups:
+          - certificates.k8s.io
+          resources:
+          - certificatesigningrequests
+          - certificatesigningrequests/approval
+          verbs:
+          - create
+          - get
+          - list
+          - update
+          - watch
+        - apiGroups:
+          - certificates.k8s.io
+          resources:
+          - signers
+          verbs:
+          - approve
         - apiGroups:
           - cluster.open-cluster-management.io
           resources:
@@ -92,9 +121,6 @@ spec:
           - delete
           - get
           - list
-          - patch
-          - update
-          - watch
         - apiGroups:
           - multicluster.openshift.io
           resources:
@@ -126,8 +152,6 @@ spec:
           resources:
           - searches
           verbs:
-          - create
-          - delete
           - get
           - list
           - patch

@@ -35,8 +35,13 @@ rules:
   - managedclusteraddons/status
   verbs:
   - get
-  - patch
   - update
+- apiGroups:
+  - authentication.k8s.io
+  resources:
+  - tokenreviews
+  verbs:
+  - create
 - apiGroups:
   - authentication.open-cluster-management.io
   resources:
@@ -44,6 +49,30 @@ rules:
   verbs:
   - create
   - delete
+- apiGroups:
+  - authorization.k8s.io
+  resources:
+  - subjectaccessreviews
+  verbs:
+  - create
+  - get
+- apiGroups:
+  - certificates.k8s.io
+  resources:
+  - certificatesigningrequests
+  - certificatesigningrequests/approval
+  verbs:
+  - create
+  - get
+  - list
+  - update
+  - watch
+- apiGroups:
+  - certificates.k8s.io
+  resources:
+  - signers
+  verbs:
+  - approve
 - apiGroups:
   - cluster.open-cluster-management.io
   resources:
@@ -60,9 +89,6 @@ rules:
   - delete
   - get
   - list
-  - patch
-  - update
-  - watch
 - apiGroups:
   - multicluster.openshift.io
   resources:
@@ -94,8 +120,6 @@ rules:
   resources:
   - searches
   verbs:
-  - create
-  - delete
   - get
   - list
   - patch
