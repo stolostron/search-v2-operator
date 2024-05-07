@@ -14,7 +14,7 @@ metadata:
         }
       ]
     capabilities: Basic Install
-    createdAt: "2024-05-07T22:21:24Z"
+    createdAt: "2024-05-07T22:29:58Z"
     operators.operatorframework.io/builder: operator-sdk-v1.34.1
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
   name: search-v2-operator.v0.0.1
@@ -306,7 +306,7 @@ spec:
   - acm
   - ocm
   links:
-  - name: Search V2 Operator
+  - name: Search Operator
     url: https://github.com/stolostron/search-v2-operator
   maturity: alpha
   provider:
