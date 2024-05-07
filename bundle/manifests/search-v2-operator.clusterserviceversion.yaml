@@ -14,7 +14,7 @@ metadata:
         }
       ]
     capabilities: Basic Install
-    createdAt: "2024-05-07T20:20:00Z"
+    createdAt: "2024-05-07T21:58:57Z"
     operators.operatorframework.io/builder: operator-sdk-v1.34.1
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
   name: search-v2-operator.v0.0.1
@@ -45,6 +45,31 @@ spec:
           - get
           - patch
         - apiGroups:
+          - addon.open-cluster-management.io
+          resources:
+          - addondeploymentconfigs
+          - clustermanagementaddons
+          - managedclusteraddons
+          verbs:
+          - get
+          - list
+        - apiGroups:
+          - addon.open-cluster-management.io
+          resources:
+          - clustermanagementaddons/finalizers
+          - managedclusteraddons/finalizers
+          verbs:
+          - update
+        - apiGroups:
+          - addon.open-cluster-management.io
+          resources:
+          - clustermanagementaddons/status
+          - managedclusteraddons/status
+          verbs:
+          - get
+          - patch
+          - update
+        - apiGroups:
           - authentication.open-cluster-management.io
           resources:
           - managedserviceaccounts
@@ -59,6 +84,18 @@ spec:
           - get
           - list
         - apiGroups:
+          - monitoring.coreos.com
+          resources:
+          - servicemonitors
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
           - multicluster.openshift.io
           resources:
           - multiclusterengines
@@ -70,6 +107,18 @@ spec:
           resources:
           - multiclusterglobalhubs
           verbs:
+          - get
+          - list
+        - apiGroups:
+          - rbac.authorization.k8s.io
+          resources:
+          - clusterrole
+          - clusterrolebinding
+          - role
+          - rolebinding
+          verbs:
+          - create
+          - delete
           - get
           - list
         - apiGroups:
@@ -105,6 +154,8 @@ spec:
           verbs:
           - create
           - delete
+          - get
+          - list
         - apiGroups:
           - authentication.k8s.io
           resources:

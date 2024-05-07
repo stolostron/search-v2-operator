@@ -13,6 +13,31 @@ rules:
   - get
   - patch
 - apiGroups:
+  - addon.open-cluster-management.io
+  resources:
+  - addondeploymentconfigs
+  - clustermanagementaddons
+  - managedclusteraddons
+  verbs:
+  - get
+  - list
+- apiGroups:
+  - addon.open-cluster-management.io
+  resources:
+  - clustermanagementaddons/finalizers
+  - managedclusteraddons/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - addon.open-cluster-management.io
+  resources:
+  - clustermanagementaddons/status
+  - managedclusteraddons/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
   - authentication.open-cluster-management.io
   resources:
   - managedserviceaccounts
@@ -27,6 +52,18 @@ rules:
   - get
   - list
 - apiGroups:
+  - monitoring.coreos.com
+  resources:
+  - servicemonitors
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
   - multicluster.openshift.io
   resources:
   - multiclusterengines
@@ -38,6 +75,18 @@ rules:
   resources:
   - multiclusterglobalhubs
   verbs:
+  - get
+  - list
+- apiGroups:
+  - rbac.authorization.k8s.io
+  resources:
+  - clusterrole
+  - clusterrolebinding
+  - role
+  - rolebinding
+  verbs:
+  - create
+  - delete
   - get
   - list
 - apiGroups:
@@ -73,3 +122,5 @@ rules:
   verbs:
   - create
   - delete
+  - get
+  - list
