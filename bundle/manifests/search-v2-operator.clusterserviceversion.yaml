@@ -14,7 +14,7 @@ metadata:
         }
       ]
     capabilities: Basic Install
-    createdAt: "2024-05-07T22:29:58Z"
+    createdAt: "2024-05-08T18:33:30Z"
     operators.operatorframework.io/builder: operator-sdk-v1.34.1
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
   name: search-v2-operator.v0.0.1
@@ -227,7 +227,7 @@ spec:
                 - --leader-elect
                 command:
                 - /manager
-                image: controller:latest
+                image: quay.io/stolostron/search-v2-operator:latest
                 livenessProbe:
                   httpGet:
                     path: /healthz
