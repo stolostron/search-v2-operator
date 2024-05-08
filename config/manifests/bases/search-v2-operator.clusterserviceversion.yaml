@@ -25,7 +25,7 @@ spec:
       deployments: null
     strategy: ""
   installModes:
-  - supported: false
+  - supported: true
     type: OwnNamespace
   - supported: false
     type: SingleNamespace
@@ -34,12 +34,13 @@ spec:
   - supported: true
     type: AllNamespaces
   keywords:
-  - search
-  - Advanced Cluster Management
-  - Open Cluster Management
-  - stolostron
-  - acm
-  - ocm
+    - Advanced Cluster Management
+    - acm
+    - Open Cluster Management
+    - ocm
+    - odyssey
+    - search
+    - stolostron
   links:
   - name: Search Operator
     url: https://github.com/stolostron/search-v2-operator

@@ -308,10 +308,10 @@ spec:
           verbs:
           - create
           - patch
-        serviceAccountName: search-v2-operator-controller-manager
+        serviceAccountName: search-v2-operator
     strategy: deployment
   installModes:
-  - supported: false
+  - supported: true
     type: OwnNamespace
   - supported: false
     type: SingleNamespace
@@ -320,11 +320,13 @@ spec:
   - supported: true
     type: AllNamespaces
   keywords:
-  - search
-  - Advanced Cluster Management
-  - Open Cluster Management
-  - stolostron
-  - acm
+    - Advanced Cluster Management
+    - acm
+    - Open Cluster Management
+    - ocm
+    - odyssey
+    - search
+    - stolostron
   - ocm
   links:
   - name: Search Operator
