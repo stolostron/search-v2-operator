@@ -177,6 +177,41 @@ search-indexer
 search-postgres
 ```
 
+### How to use a custom/PR operator image in cluster for testing
+
+1. Create a configmap pointing to the custom/PR image
+```
+oc apply -f - <<EOF
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: searchoperatorimagecm
+  namespace: open-cluster-management      # this is the MCH namespace
+data:
+  manifest.json: |-
+    [
+      {
+        "image-remote": "quay.io/stolostron",
+        "image-key":    "search_v2_operator",
+        "image-name":   "search-v2-operator",
+        "image-digest": "sha256:773dad423666ca95f27ffc49f117db2c7fab70252abd21a7f4c844986418fa60"
+      }
+    ]
+EOF
+```
+2. Annotate MCH to point to this configmap
+```
+kubectl annotate mch multiclusterhub --overwrite mch-imageOverridesCM=searchoperatorimagecm # Provide the configmap as an override to the MCH
+```
+3. Point back to the original image
+
+Remove this annotation to revert back to the original manifest
+```
+kubectl annotate mch multiclusterhub mch-imageOverridesCM- --overwrite # Remove annotation   
+
+kubectl delete configmap searchoperatorimagecm # Delete configmap
+```
+
 ## Global Search Feature
 
 **NOTE: The global search feature is tech preview as of ACM 2.11.**
