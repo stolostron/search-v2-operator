@@ -327,7 +327,6 @@ spec:
     - odyssey
     - search
     - stolostron
-  - ocm
   links:
   - name: Search Operator
     url: https://github.com/stolostron/search-v2-operator
