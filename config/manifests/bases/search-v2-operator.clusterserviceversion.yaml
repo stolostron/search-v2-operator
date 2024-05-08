@@ -10,7 +10,7 @@ spec:
   apiservicedefinitions: {}
   customresourcedefinitions:
     owned:
-    - description: Search is the Schema for the searches API
+    - description: Search is the schema for the searches API.
       displayName: Search
       kind: Search
       name: searches.search.open-cluster-management.io
@@ -25,7 +25,7 @@ spec:
       deployments: null
     strategy: ""
   installModes:
-  - supported: false
+  - supported: true
     type: OwnNamespace
   - supported: false
     type: SingleNamespace
@@ -34,15 +34,16 @@ spec:
   - supported: true
     type: AllNamespaces
   keywords:
-  - search
   - Advanced Cluster Management
-  - Open Cluster Management
-  - stolostron
   - acm
+  - Open Cluster Management
   - ocm
+  - odyssey
+  - search
+  - stolostron
   links:
-  - name: Search V2 Operator
-    url: https://search-v2-operator.domain
+  - name: Search Operator
+    url: https://github.com/stolostron/search-v2-operator
   maturity: alpha
   provider:
     name: Red Hat

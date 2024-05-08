@@ -9,13 +9,13 @@ metadata:
           "kind": "Search",
           "metadata": {
             "name": "search-v2-operator"
-            "namespace": "open-cluster-management"
           },
           "spec": null
         }
       ]
     capabilities: Basic Install
-    operators.operatorframework.io/builder: operator-sdk-v1.15.0
+    createdAt: "2024-05-08T18:33:30Z"
+    operators.operatorframework.io/builder: operator-sdk-v1.34.1
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
   name: search-v2-operator.v0.0.1
   namespace: placeholder
@@ -23,158 +23,175 @@ spec:
   apiservicedefinitions: {}
   customresourcedefinitions:
     owned:
-      - description: Search is the Schema for the searches API
-        displayName: Search
-        kind: Search
-        name: searches.search.open-cluster-management.io
-        version: v1alpha1
+    - description: Search is the schema for the searches API.
+      displayName: Search
+      kind: Search
+      name: searches.search.open-cluster-management.io
+      version: v1alpha1
   description: Installs search components and manages lifecycle
   displayName: search-operator
   icon:
-    - base64data: ""
-      mediatype: ""
+  - base64data: ""
+    mediatype: ""
   install:
     spec:
       clusterPermissions:
-        - rules:
-            - apiGroups:
-                - monitoring.coreos.com
-              resources:
-                - servicemonitors
-              verbs:
-                - create
-                - delete
-                - get
-                - list
-                - patch
-                - update
-                - watch
-            - apiGroups:
-                - search.open-cluster-management.io
-              resources:
-                - searches
-              verbs:
-                - create
-                - delete
-                - get
-                - list
-                - patch
-                - update
-                - watch
-            - apiGroups:
-                - search.open-cluster-management.io
-              resources:
-                - searches/finalizers
-              verbs:
-                - update
-            - apiGroups:
-                - search.open-cluster-management.io
-              resources:
-                - searches/status
-              verbs:
-                - get
-                - patch
-                - update
-            - apiGroups:
-                - authentication.k8s.io
-              resources:
-                - tokenreviews
-              verbs:
-                - create
-            - apiGroups:
-                - authorization.k8s.io
-              resources:
-                - subjectaccessreviews
-              verbs:
-                - create
-            - apiGroups:
-                - rbac.authorization.k8s.io
-              resources:
-                - clusterrolebindings
-                - clusterroles
-              verbs:
-                - '*'
-            - apiGroups:
-                - authorization.k8s.io
-              resources:
-                - subjectaccessreviews
-              verbs:
-                - get
-                - create
-            - apiGroups:
-                - certificates.k8s.io
-              resources:
-                - certificatesigningrequests
-                - certificatesigningrequests/approval
-              verbs:
-                - get
-                - list
-                - watch
-                - create
-                - update
-            - apiGroups:
-                - certificates.k8s.io
-              resources:
-                - signers
-              verbs:
-                - approve
-            - apiGroups:
-                - cluster.open-cluster-management.io
-              resources:
-                - managedclusters
-              verbs:
-                - get
-                - list
-                - watch
-            - apiGroups:
-                - work.open-cluster-management.io
-              resources:
-                - manifestworks
-              verbs:
-                - get
-                - list
-                - watch
-                - create
-                - update
-                - delete
-                - deletecollection
-                - patch
-            - apiGroups:
-                - addon.open-cluster-management.io
-              resources:
-                - managedclusteraddons
-                - addondeploymentconfigs
-                - clustermanagementaddons
-                - managedclusteraddons/finalizers
-                - clustermanagementaddons/finalizers
-                - managedclusteraddons/status
-                - clustermanagementaddons/status
-              verbs:
-                - get
-                - list
-                - watch
-                - create
-                - update
-                - delete
-                - patch
-            - apiGroups:
-                - rbac.authorization.k8s.io
-              resources:
-                - roles
-                - rolebindings
-              verbs:
-                - get
-                - list
-                - watch
-                - create
-                - update
-                - delete
-            - apiGroups:
-                - proxy.open-cluster-management.io
-              resources:
-                - clusterstatuses/aggregator
-              verbs:
-                - create
+      - rules:
+        - apiGroups:
+          - ""
+          resources:
+          - configmaps
+          verbs:
+          - get
+          - patch
+        - apiGroups:
+          - addon.open-cluster-management.io
+          resources:
+          - addondeploymentconfigs
+          - clustermanagementaddons
+          - managedclusteraddons
+          verbs:
+          - get
+          - list
+        - apiGroups:
+          - addon.open-cluster-management.io
+          resources:
+          - clustermanagementaddons/finalizers
+          - managedclusteraddons/finalizers
+          verbs:
+          - update
+        - apiGroups:
+          - addon.open-cluster-management.io
+          resources:
+          - clustermanagementaddons/status
+          - managedclusteraddons/status
+          verbs:
+          - get
+          - update
+        - apiGroups:
+          - authentication.k8s.io
+          resources:
+          - tokenreviews
+          verbs:
+          - create
+        - apiGroups:
+          - authentication.open-cluster-management.io
+          resources:
+          - managedserviceaccounts
+          verbs:
+          - create
+          - delete
+        - apiGroups:
+          - authorization.k8s.io
+          resources:
+          - subjectaccessreviews
+          verbs:
+          - create
+          - get
+        - apiGroups:
+          - certificates.k8s.io
+          resources:
+          - certificatesigningrequests
+          - certificatesigningrequests/approval
+          verbs:
+          - create
+          - get
+          - list
+          - update
+          - watch
+        - apiGroups:
+          - certificates.k8s.io
+          resources:
+          - signers
+          verbs:
+          - approve
+        - apiGroups:
+          - cluster.open-cluster-management.io
+          resources:
+          - managedclusters
+          verbs:
+          - get
+          - list
+        - apiGroups:
+          - monitoring.coreos.com
+          resources:
+          - servicemonitors
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+        - apiGroups:
+          - multicluster.openshift.io
+          resources:
+          - multiclusterengines
+          verbs:
+          - get
+          - list
+        - apiGroups:
+          - operator.open-cluster-management.io
+          resources:
+          - multiclusterglobalhubs
+          verbs:
+          - get
+          - list
+        - apiGroups:
+          - rbac.authorization.k8s.io
+          resources:
+          - clusterrole
+          - clusterrolebinding
+          - role
+          - rolebinding
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+        - apiGroups:
+          - search.open-cluster-management.io
+          resources:
+          - searches
+          verbs:
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - search.open-cluster-management.io
+          resources:
+          - searches/finalizers
+          verbs:
+          - update
+        - apiGroups:
+          - search.open-cluster-management.io
+          resources:
+          - searches/status
+          verbs:
+          - get
+          - patch
+          - update
+        - apiGroups:
+          - work.open-cluster-management.io
+          resources:
+          - manifestworks
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+        - apiGroups:
+          - authentication.k8s.io
+          resources:
+          - tokenreviews
+          verbs:
+          - create
+        - apiGroups:
+          - authorization.k8s.io
+          resources:
+          - subjectaccessreviews
+          verbs:
+          - create
           serviceAccountName: search-v2-operator
       deployments:
         - name: search-v2-operator-controller-manager
@@ -259,67 +276,60 @@ spec:
                 serviceAccountName: search-v2-operator
                 terminationGracePeriodSeconds: 10
       permissions:
-        - rules:
-            - apiGroups:
-                - apps
-              resources:
-                - deployments
-                - replicasets
-              verbs:
-                - '*'
-            - apiGroups:
-                - ""
-              resources:
-                - configmaps
-                - secrets
-                - serviceaccounts
-                - services
-                - persistentvolumeclaims
-                - pods
-                - endpoints
-              verbs:
-                - '*'
-            - apiGroups:
-                - coordination.k8s.io
-              resources:
-                - leases
-              verbs:
-                - get
-                - list
-                - watch
-                - create
-                - update
-                - patch
-                - delete
-            - apiGroups:
-                - ""
-              resources:
-                - events
-              verbs:
-                - create
-                - patch
-          serviceAccountName: search-v2-operator
+      - rules:
+        - apiGroups:
+          - ""
+          resources:
+          - configmaps
+          verbs:
+          - get
+          - list
+          - watch
+          - create
+          - update
+          - patch
+          - delete
+        - apiGroups:
+          - coordination.k8s.io
+          resources:
+          - leases
+          verbs:
+          - get
+          - list
+          - watch
+          - create
+          - update
+          - patch
+          - delete
+        - apiGroups:
+          - ""
+          resources:
+          - events
+          verbs:
+          - create
+          - patch
+        serviceAccountName: search-v2-operator
     strategy: deployment
   installModes:
-    - supported: true
-      type: OwnNamespace
-    - supported: false
-      type: SingleNamespace
-    - supported: false
-      type: MultiNamespace
-    - supported: true
-      type: AllNamespaces
+  - supported: true
+    type: OwnNamespace
+  - supported: false
+    type: SingleNamespace
+  - supported: false
+    type: MultiNamespace
+  - supported: true
+    type: AllNamespaces
   keywords:
-    - Advanced Cluster Management
-    - acm
-    - Open Cluster Management
-    - ocm
-    - odyssey
-    - search
-    - stolostron
+  - Advanced Cluster Management
+  - acm
+  - Open Cluster Management
+  - ocm
+  - odyssey
+  - search
+  - stolostron
   links:
-    - name: Search Operator
-      url: https://github.com/stolostron/search-v2-operator
+  - name: Search Operator
+    url: https://github.com/stolostron/search-v2-operator
   maturity: alpha
   provider:
     name: Red Hat
