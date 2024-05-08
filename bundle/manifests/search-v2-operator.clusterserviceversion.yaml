@@ -320,13 +320,13 @@ spec:
   - supported: true
     type: AllNamespaces
   keywords:
-    - Advanced Cluster Management
-    - acm
-    - Open Cluster Management
-    - ocm
-    - odyssey
-    - search
-    - stolostron
+  - Advanced Cluster Management
+  - acm
+  - Open Cluster Management
+  - ocm
+  - odyssey
+  - search
+  - stolostron
   links:
   - name: Search Operator
     url: https://github.com/stolostron/search-v2-operator
