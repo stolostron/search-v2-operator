@@ -199,6 +199,7 @@ spec:
             replicas: 1
             selector:
               matchLabels:
+                control-plane: controller-manager
             strategy: {}
             template:
               metadata:
@@ -271,9 +272,9 @@ spec:
                 imagePullSecrets:
                   - name: search-pull-secret
                 securityContext:
-                  allowPrivilegeEscalation: false
-              serviceAccountName: search-v2-operator
-              terminationGracePeriodSeconds: 10
+                  runAsNonRoot: true
+                serviceAccountName: search-v2-operator
+                terminationGracePeriodSeconds: 10
       permissions:
       - rules:
         - apiGroups:
