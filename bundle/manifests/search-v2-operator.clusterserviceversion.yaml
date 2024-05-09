@@ -236,7 +236,6 @@ spec:
                 - --leader-elect
                 command:
                 - /manager
-                name: manager
                 env:
                 - name: WATCH_NAMESPACE
                   valueFrom:
@@ -257,7 +256,6 @@ spec:
                     port: 8081
                   initialDelaySeconds: 15
                   periodSeconds: 20
-                name: manager
                 readinessProbe:
                   httpGet:
                     path: /readyz
