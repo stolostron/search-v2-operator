@@ -107,7 +107,7 @@ cd ./scripts
 - Update the CRDs in your target cluster with `make install`.
 
 **Committing changes:**
-- Run `make genreate; make manifests; make bundle` before committing changes.
+- Run `make generate; make manifests; make bundle` before committing changes.
 
 
 ## Building search-v2-operator in local machine
