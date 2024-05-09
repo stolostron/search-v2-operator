@@ -36,7 +36,7 @@ IMAGE_TAG_BASE ?= open-cluster-management.io/search-v2-operator
 BUNDLE_IMG ?= $(IMAGE_TAG_BASE)-bundle:v$(VERSION)
 
 # Image URL to use all building/pushing image targets
-IMG ?= quay.io/stolostron/search-v2-operator:latest
+IMG ?= quay.io/stolostron/search-v2-operator:2.7.0-dc0fc8c59239b6a0a3f440b7752101523d87f597
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
 ENVTEST_K8S_VERSION = 1.22
 
@@ -216,3 +216,6 @@ setup:
 	export COLLECTOR_IMAGE=$(shell kubectl get deploy/search-collector -n open-cluster-management -o jsonpath="{..image}")	
 	export API_IMAGE=$(shell kubectl get deploy/search-api -n open-cluster-management -o jsonpath="{..image}")
 	export INDEXER_IMAGE=$(shell kubectl get deploy/search-indexer -n open-cluster-management -o jsonpath="{..image}")
+
+clean:
+	rm -rf bin/

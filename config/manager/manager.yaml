@@ -11,6 +11,7 @@ metadata:
   name: controller-manager
   namespace: system
   labels:
+    app: search
     control-plane: controller-manager
 spec:
   selector:
@@ -20,6 +21,7 @@ spec:
   template:
     metadata:
       labels:
+        app: search
         control-plane: controller-manager
     spec:
       securityContext:
@@ -27,6 +29,19 @@ spec:
       containers:
       - command:
         - /manager
+        env:
+        - name: WATCH_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: POSTGRES_IMAGE
+          value: registry.redhat.io/rhel8/postgresql-13:1-56
+        - name: INDEXER_IMAGE
+          value: quay.io/stolostron/search-indexer:2.7.0-4c1b1f4f692d5f8be9fca699ea26573227250f39
+        - name: COLLECTOR_IMAGE
+          value: quay.io/stolostron/search-collector:2.7.0-de589fdba4effc06198db8250c1ae3118125d685
+        - name: API_IMAGE
+          value: quay.io/stolostron/search-v2-api:2.7.0-69590634c2de51ceec786af47ca5fb00f42a631a
         args:
         - --leader-elect
         image: controller:latest
@@ -48,9 +63,11 @@ spec:
         resources:
           limits:
             cpu: 200m
-            memory: 100Mi
+            memory: 1024Mi
           requests:
-            cpu: 100m
-            memory: 20Mi
+            cpu: 50m
+            memory: 256Mi
       serviceAccountName: controller-manager
       terminationGracePeriodSeconds: 10
+      imagePullSecrets:
+        - name: search-pull-secret
