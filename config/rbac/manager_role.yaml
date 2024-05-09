@@ -4,42 +4,41 @@ metadata:
   creationTimestamp: null
   name: manager-role
 rules:
-- rules:
-  - apiGroups:
-    - apps
-    resources:
-    - deployments
-    - replicasets
-    verbs:
-    - '*'
-  - apiGroups:
-    - ""
-    resources:
-    - configmaps
-    - secrets
-    - serviceaccounts
-    - services
-    - persistentvolumeclaims
-    - pods
-    - endpoints
-    verbs:
-    - '*'
-  - apiGroups:
-    - coordination.k8s.io
-    resources:
-    - leases
-    verbs:
-    - get
-    - list
-    - watch
-    - create
-    - update
-    - patch
-    - delete
-  - apiGroups:
-    - ""
-    resources:
-    - events
-    verbs:
-    - create
-    - patch
+- apiGroups:
+  - apps
+  resources:
+  - deployments
+  - replicasets
+  verbs:
+  - '*'
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  - secrets
+  - serviceaccounts
+  - services
+  - persistentvolumeclaims
+  - pods
+  - endpoints
+  verbs:
+  - '*'
+- apiGroups:
+  - coordination.k8s.io
+  resources:
+  - leases
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - ""
+  resources:
+  - events
+  verbs:
+  - create
+  - patch

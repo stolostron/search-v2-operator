@@ -278,17 +278,24 @@ spec:
       permissions:
       - rules:
         - apiGroups:
+          - apps
+          resources:
+          - deployments
+          - replicasets
+          verbs:
+          - '*'
+        - apiGroups:
           - ""
           resources:
           - configmaps
+          - secrets
+          - serviceaccounts
+          - services
+          - persistentvolumeclaims
+          - pods
+          - endpoints
           verbs:
-          - get
-          - list
-          - watch
-          - create
-          - update
-          - patch
-          - delete
+          - '*'
         - apiGroups:
           - coordination.k8s.io
           resources:
