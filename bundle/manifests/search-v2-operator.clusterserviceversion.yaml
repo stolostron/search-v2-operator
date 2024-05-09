@@ -51,6 +51,7 @@ spec:
           - clustermanagementaddons
           - managedclusteraddons
           verbs:
+          - delete
           - get
           - list
           - update
