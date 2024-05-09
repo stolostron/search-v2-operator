@@ -53,6 +53,7 @@ spec:
           verbs:
           - get
           - list
+          - update
         - apiGroups:
           - addon.open-cluster-management.io
           resources:
@@ -113,6 +114,14 @@ spec:
           - get
           - list
         - apiGroups:
+          - coordination.k8s.io
+          resources:
+          - leases
+          verbs:
+          - create
+          - patch
+          - update
+        - apiGroups:
           - monitoring.coreos.com
           resources:
           - servicemonitors
@@ -136,12 +145,27 @@ spec:
           - get
           - list
         - apiGroups:
+          - proxy.open-cluster-management.io
+          resources:
+          - clusterstatuses/aggregator
+          verbs:
+          - create
+        - apiGroups:
+          - rbac.authentication.k8s.io
           - rbac.authorization.k8s.io
           resources:
-          - clusterrole
-          - clusterrolebinding
-          - role
-          - rolebinding
+          - uids
+          - userextras/authentication.kubernetes.io/pod-name
+          - userextras/authentication.kubernetes.io/pod-uid
+          verbs:
+          - impersonate
+        - apiGroups:
+          - rbac.authorization.k8s.io
+          resources:
+          - clusterrolebindings
+          - clusterroles
+          - rolebindings
+          - roles
           verbs:
           - create
           - delete
