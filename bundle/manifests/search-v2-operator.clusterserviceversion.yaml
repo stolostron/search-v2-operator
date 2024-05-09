@@ -192,7 +192,7 @@ spec:
           - subjectaccessreviews
           verbs:
           - create
-          serviceAccountName: search-v2-operator
+        serviceAccountName: search-v2-operator
       deployments:
         - name: search-v2-operator-controller-manager
           spec:
@@ -308,7 +308,7 @@ spec:
           verbs:
           - create
           - patch
-      serviceAccountName: search-v2-operator
+        serviceAccountName: search-v2-operator
     strategy: deployment
   installModes:
   - supported: true
