@@ -19,6 +19,7 @@ rules:
   - clustermanagementaddons
   - managedclusteraddons
   verbs:
+  - create
   - delete
   - get
   - list
