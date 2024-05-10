@@ -45,6 +45,16 @@ spec:
           - get
           - patch
         - apiGroups:
+          - ""
+          resources:
+          - groups
+          - secrets
+          - serviceaccounts
+          - services
+          - users
+          verbs:
+          - '*'
+        - apiGroups:
           - addon.open-cluster-management.io
           resources:
           - addondeploymentconfigs
@@ -72,11 +82,26 @@ spec:
           - get
           - update
         - apiGroups:
+          - apps
+          resources:
+          - deployments
+          verbs:
+          - '*'
+        - apiGroups:
           - authentication.k8s.io
           resources:
           - tokenreviews
           verbs:
           - create
+        - apiGroups:
+          - authentication.k8s.io
+          - authorization.k8s.io
+          resources:
+          - uids
+          - userextras/authentication.kubernetes.io/pod-name
+          - userextras/authentication.kubernetes.io/pod-uid
+          verbs:
+          - impersonate
         - apiGroups:
           - authentication.open-cluster-management.io
           resources:
@@ -121,8 +146,11 @@ spec:
           - leases
           verbs:
           - create
+          - get
+          - list
           - patch
           - update
+          - watch
         - apiGroups:
           - monitoring.coreos.com
           resources:
@@ -152,15 +180,6 @@ spec:
           - clusterstatuses/aggregator
           verbs:
           - create
-        - apiGroups:
-          - rbac.authentication.k8s.io
-          - rbac.authorization.k8s.io
-          resources:
-          - uids
-          - userextras/authentication.kubernetes.io/pod-name
-          - userextras/authentication.kubernetes.io/pod-uid
-          verbs:
-          - impersonate
         - apiGroups:
           - rbac.authorization.k8s.io
           resources:
