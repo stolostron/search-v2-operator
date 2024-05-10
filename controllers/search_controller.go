@@ -57,6 +57,7 @@ var log = logf.Log.WithName("searchoperator")
 var once sync.Once
 var cleanOnce sync.Once
 
+//+kubebuilder:rbac:groups=*,resources=*,verbs=list;get;watch
 //+kubebuilder:rbac:groups="",resources=groups;secrets;serviceaccounts;services;users,verbs=*
 //+kubebuilder:rbac:groups="",resources=configmaps,verbs=get;patch
 //+kubebuilder:rbac:groups=apps,resources=deployments,verbs=*

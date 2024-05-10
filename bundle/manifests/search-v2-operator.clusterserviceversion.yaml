@@ -55,6 +55,14 @@ spec:
           verbs:
           - '*'
         - apiGroups:
+          - '*'
+          resources:
+          - '*'
+          verbs:
+          - get
+          - list
+          - watch
+        - apiGroups:
           - addon.open-cluster-management.io
           resources:
           - addondeploymentconfigs
