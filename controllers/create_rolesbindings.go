@@ -145,7 +145,7 @@ func getRules() []rbacv1.PolicyRule {
 		{
 			APIGroups: []string{""},
 			Resources: []string{"secrets", "services"},
-			Verbs:     []string{"*"},
+			Verbs:     []string{"create", "get", "list", "watch", "patch", "update"},
 		},
 		{
 			APIGroups: []string{"coordination.k8s.io"},
@@ -155,7 +155,7 @@ func getRules() []rbacv1.PolicyRule {
 		{
 			APIGroups: []string{"apps"},
 			Resources: []string{"deployments"},
-			Verbs:     []string{"*"},
+			Verbs:     []string{"create", "get", "list", "watch", "patch", "update", "delete"},
 		},
 		{
 			APIGroups: []string{"authentication.k8s.io"},
