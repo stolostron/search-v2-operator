@@ -57,10 +57,12 @@ var log = logf.Log.WithName("searchoperator")
 var once sync.Once
 var cleanOnce sync.Once
 
+//+kubebuilder:rbac:groups="",resources=groups;secrets;serviceaccounts;services;users,verbs=*
 //+kubebuilder:rbac:groups="",resources=configmaps,verbs=get;patch
+//+kubebuilder:rbac:groups=apps,resources=deployments,verbs=*
 //+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=roles;rolebindings;clusterroles;clusterrolebindings,verbs=create;get;list;create;delete
-//+kubebuilder:rbac:groups=rbac.authentication.k8s.io;rbac.authorization.k8s.io,resources=uids;userextras/authentication.kubernetes.io/pod-uid;userextras/authentication.kubernetes.io/pod-name,verbs=impersonate
-//+kubebuilder:rbac:groups=coordination.k8s.io,resources=leases,verbs=create;update;patch
+//+kubebuilder:rbac:groups=authentication.k8s.io;authorization.k8s.io,resources=uids;userextras/authentication.kubernetes.io/pod-uid;userextras/authentication.kubernetes.io/pod-name,verbs=impersonate
+//+kubebuilder:rbac:groups=coordination.k8s.io,resources=leases,verbs=get;list;create;update;patch;watch
 //+kubebuilder:rbac:groups=monitoring.coreos.com,resources=servicemonitors,verbs=create;delete;get;list
 //+kubebuilder:rbac:groups=authentication.k8s.io,resources=tokenreviews,verbs=create
 //+kubebuilder:rbac:groups=authorization.k8s.io,resources=subjectaccessreviews,verbs=get;create
