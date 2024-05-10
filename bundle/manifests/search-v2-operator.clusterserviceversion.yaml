@@ -14,7 +14,7 @@ metadata:
         }
       ]
     capabilities: Basic Install
-    createdAt: "2024-05-09T17:27:30Z"
+    createdAt: "2024-05-10T19:58:42Z"
     operators.operatorframework.io/builder: operator-sdk-v1.34.1
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
   name: search-v2-operator.v0.0.1
@@ -95,6 +95,7 @@ spec:
           - managedclusteraddons/status
           verbs:
           - get
+          - patch
           - update
         - apiGroups:
           - apps

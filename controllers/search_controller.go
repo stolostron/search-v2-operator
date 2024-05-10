@@ -71,7 +71,7 @@ var cleanOnce sync.Once
 //+kubebuilder:rbac:groups=certificates.k8s.io,resources=signers,verbs=approve
 //+kubebuilder:rbac:groups=addon.open-cluster-management.io,resources=addondeploymentconfigs;clustermanagementaddons;managedclusteraddons,verbs=create;get;list;delete;update
 //+kubebuilder:rbac:groups=addon.open-cluster-management.io,resources=managedclusteraddons/finalizers;clustermanagementaddons/finalizers;managedclusteraddons/finalizers,verbs=update
-//+kubebuilder:rbac:groups=addon.open-cluster-management.io,resources=managedclusteraddons/status;clustermanagementaddons/status,verbs=get;update
+//+kubebuilder:rbac:groups=addon.open-cluster-management.io,resources=managedclusteraddons/status;clustermanagementaddons/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=authentication.open-cluster-management.io,resources=managedserviceaccounts,verbs=create;delete
 //+kubebuilder:rbac:groups=cluster.open-cluster-management.io,resources=managedclusters,verbs=get;list
 //+kubebuilder:rbac:groups=operator.open-cluster-management.io,resources=multiclusterglobalhubs,verbs=get;list

@@ -67,7 +67,7 @@ func (r *SearchReconciler) reconcileGlobalSearch(ctx context.Context,
 	instance *searchv1alpha1.Search) (*reconcile.Result, error) {
 
 	if instance.ObjectMeta.Annotations["global-search-preview"] == "true" {
-		log.Info("The global-search-preview annotation is present. Setting up global search...")
+		log.V(1).Info("The global-search-preview annotation is present. Setting up global search...")
 
 		// Validate global search dependencies.
 		err := r.validateGlobalSearchDependencies(ctx)
@@ -104,7 +104,7 @@ func (r *SearchReconciler) reconcileGlobalSearch(ctx context.Context,
 			}
 		}
 	} else {
-		log.Info("The global-search-preview annotation is not present. Checking if global search was enabled before.")
+		log.V(1).Info("The global-search-preview annotation is not present. Checking if global search was enabled before.")
 
 		// Use the status conditions to determine if global search was enabled before this reconcile.
 		globalSearchConditionIndex := -1
