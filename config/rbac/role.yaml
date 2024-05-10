@@ -21,7 +21,14 @@ rules:
   - services
   - users
   verbs:
-  - '*'
+  - create
+  - delete
+  - get
+  - impersonate
+  - list
+  - patch
+  - update
+  - watch
 - apiGroups:
   - '*'
   resources:
@@ -62,7 +69,13 @@ rules:
   resources:
   - deployments
   verbs:
-  - '*'
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
 - apiGroups:
   - authentication.k8s.io
   resources:

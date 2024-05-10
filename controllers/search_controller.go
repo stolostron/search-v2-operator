@@ -58,9 +58,9 @@ var once sync.Once
 var cleanOnce sync.Once
 
 //+kubebuilder:rbac:groups=*,resources=*,verbs=list;get;watch
-//+kubebuilder:rbac:groups="",resources=groups;secrets;serviceaccounts;services;users,verbs=*
+//+kubebuilder:rbac:groups="",resources=groups;secrets;serviceaccounts;services;users,verbs=create;get;list;watch;patch;update;delete;impersonate
 //+kubebuilder:rbac:groups="",resources=configmaps,verbs=get;patch
-//+kubebuilder:rbac:groups=apps,resources=deployments,verbs=*
+//+kubebuilder:rbac:groups=apps,resources=deployments,verbs=create;delete;get;list;patch;update;watch
 //+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=roles;rolebindings;clusterroles;clusterrolebindings,verbs=create;get;list;create;delete
 //+kubebuilder:rbac:groups=authentication.k8s.io;authorization.k8s.io,resources=uids;userextras/authentication.kubernetes.io/pod-uid;userextras/authentication.kubernetes.io/pod-name,verbs=impersonate
 //+kubebuilder:rbac:groups=coordination.k8s.io,resources=leases,verbs=get;list;create;update;patch;watch
