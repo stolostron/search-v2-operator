@@ -14,7 +14,7 @@ metadata:
         }
       ]
     capabilities: Basic Install
-    createdAt: "2024-05-08T18:33:30Z"
+    createdAt: "2024-05-10T19:58:42Z"
     operators.operatorframework.io/builder: operator-sdk-v1.34.1
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
   name: search-v2-operator.v0.0.1
@@ -95,6 +95,7 @@ spec:
           - managedclusteraddons/status
           verbs:
           - get
+          - patch
           - update
         - apiGroups:
           - apps
@@ -260,7 +261,10 @@ spec:
           - create
         serviceAccountName: search-v2-operator
       deployments:
-      - name: search-v2-operator-controller-manager
+      - label:
+          app: search
+          control-plane: controller-manager
+        name: search-v2-operator-controller-manager
         spec:
           replicas: 1
           selector:
@@ -270,6 +274,7 @@ spec:
           template:
             metadata:
               labels:
+                app: search
                 control-plane: controller-manager
             spec:
               containers:
@@ -278,7 +283,7 @@ spec:
                 - --upstream=http://127.0.0.1:8080/
                 - --logtostderr=true
                 - --v=10
-                - "--tls-min-version=VersionTLS13"
+                - --tls-min-version=VersionTLS13
                 image: gcr.io/kubebuilder/kube-rbac-proxy:v0.8.0
                 name: kube-rbac-proxy
                 ports:
@@ -288,7 +293,7 @@ spec:
                 resources:
                   limits:
                     cpu: 200m
-                    memory: 1024Mi
+                    memory: 1Gi
                   requests:
                     cpu: 100m
                     memory: 256Mi
@@ -298,14 +303,6 @@ spec:
                 - --leader-elect
                 command:
                 - /manager
-                image: quay.io/stolostron/search-v2-operator:2.7.0-dc0fc8c59239b6a0a3f440b7752101523d87f597
-                livenessProbe:
-                  httpGet:
-                    path: /healthz
-                    port: 8081
-                  initialDelaySeconds: 15
-                  periodSeconds: 20
-                name: manager
                 env:
                 - name: WATCH_NAMESPACE
                   valueFrom:
@@ -319,6 +316,13 @@ spec:
                   value: quay.io/stolostron/search-collector:2.7.0-de589fdba4effc06198db8250c1ae3118125d685
                 - name: API_IMAGE
                   value: quay.io/stolostron/search-v2-api:2.7.0-69590634c2de51ceec786af47ca5fb00f42a631a
+                image: quay.io/stolostron/search-v2-operator:2.7.0-dc0fc8c59239b6a0a3f440b7752101523d87f597
+                livenessProbe:
+                  httpGet:
+                    path: /healthz
+                    port: 8081
+                  initialDelaySeconds: 15
+                  periodSeconds: 20
                 readinessProbe:
                   httpGet:
                     path: /readyz
@@ -328,7 +332,7 @@ spec:
                 resources:
                   limits:
                     cpu: 200m
-                    memory: 1024Mi
+                    memory: 1Gi
                   requests:
                     cpu: 50m
                     memory: 256Mi
@@ -336,7 +340,7 @@ spec:
                   allowPrivilegeEscalation: false
               imagePullPolicy: Always
               imagePullSecrets:
-                - name: search-pull-secret
+              - name: search-pull-secret
               securityContext:
                 runAsNonRoot: true
               serviceAccountName: search-v2-operator
