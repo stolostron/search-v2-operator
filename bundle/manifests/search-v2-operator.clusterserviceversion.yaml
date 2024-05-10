@@ -53,7 +53,14 @@ spec:
           - services
           - users
           verbs:
-          - '*'
+          - create
+          - delete
+          - get
+          - impersonate
+          - list
+          - patch
+          - update
+          - watch
         - apiGroups:
           - '*'
           resources:
@@ -94,7 +101,13 @@ spec:
           resources:
           - deployments
           verbs:
-          - '*'
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
         - apiGroups:
           - authentication.k8s.io
           resources:
