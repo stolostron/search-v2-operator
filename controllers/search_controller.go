@@ -79,7 +79,7 @@ var cleanOnce sync.Once
 //+kubebuilder:rbac:groups=search.open-cluster-management.io,resources=searches,verbs=get;list;watch;update;patch
 //+kubebuilder:rbac:groups=search.open-cluster-management.io,resources=searches/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=search.open-cluster-management.io,resources=searches/finalizers,verbs=update
-//+kubebuilder:rbac:groups=work.open-cluster-management.io,resources=manifestworks,verbs=create;delete;get;list
+//+kubebuilder:rbac:groups=work.open-cluster-management.io,resources=manifestworks,verbs=create;delete;get;list;patch
 //+kubebuilder:rbac:groups=multicluster.openshift.io,resources=multiclusterengines,verbs=get;list
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
