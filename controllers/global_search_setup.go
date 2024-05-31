@@ -339,29 +339,6 @@ func (r *SearchReconciler) createManifestWork(ctx context.Context, cluster strin
 								},
 							},
 						},
-						// FUTURE: Will remove this Route resource and use cluster-proxy-addon instead.
-						map[string]interface{}{
-							"apiVersion": "route.openshift.io/v1",
-							"kind":       "Route",
-							"metadata": map[string]interface{}{
-								"name":      "search-global-hub",
-								"namespace": "open-cluster-management",
-								"labels":    appSearchLabels,
-							},
-							"spec": map[string]interface{}{
-								"port": map[string]interface{}{
-									"targetPort": "search-api",
-								},
-								"tls": map[string]interface{}{
-									"termination": "passthrough",
-								},
-								"to": map[string]interface{}{
-									"kind": "Service",
-									"name": "search-search-api",
-									// "weight": 100,
-								},
-							},
-						},
 					},
 				},
 			},
