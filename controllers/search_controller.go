@@ -242,7 +242,7 @@ func (r *SearchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	}
 	result, err = r.addEnvToSearchAPI(ctx, instance)
 	if err != nil {
-		log.Error(err, "Adding hub name to search api failed")
+		log.Error(err, "Adding HUB_NAME env to search api deployment failed")
 		return *result, err
 	}
 

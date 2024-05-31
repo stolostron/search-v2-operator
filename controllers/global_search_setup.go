@@ -345,7 +345,7 @@ func (r *SearchReconciler) createManifestWork(ctx context.Context, cluster strin
 							"apiVersion": "v1",
 							"kind":       "ConfigMap",
 							"metadata": map[string]interface{}{
-								"name":      "search-hub-name",
+								"name":      SEARCH_GLOBAL_CONFIG,
 								"labels":    appSearchLabels,
 								"namespace": namespace,
 							},
@@ -479,7 +479,7 @@ func (r *SearchReconciler) updateConsoleConfig(ctx context.Context, enabled bool
 // Check if the search api deployment is configured with the input envVar or needs an update.
 // Returns true if it doesn't need an update and false if it does.
 func searchAPIEnvVar(instance *searchv1alpha1.Search, enabled bool, inputEnv corev1.EnvVar) bool {
-	klog.Infof("Searching for envVar %s with value %s in Search CR", inputEnv.Name, inputEnv.Value)
+	klog.V(2).Infof("Searching for envVar %s with value %s in Search CR", inputEnv.Name, inputEnv.Value)
 	existingEnv := corev1.EnvVar{}
 	existingIndex := -1
 	for i, env := range instance.Spec.Deployments.QueryAPI.Env {
@@ -527,10 +527,10 @@ func (r *SearchReconciler) updateSearchApiDeployment(ctx context.Context, enable
 	// Find the env var FEATURE_FEDERATED_SEARCH.
 	needNoUpdate := searchAPIEnvVar(instance, enabled, env)
 	if needNoUpdate {
-		klog.Info("Update to Search API deployment envVar not required ", "envVar", env.Name)
+		klog.V(2).Info("Update to Search API deployment envVar not required ", "envVar ", env.Name)
 		return nil
 	}
-	klog.Info("Updating envVar for Search API deployment")
+	klog.V(2).Info("Updating envVar for Search API deployment")
 
 	// Write the updated instance.
 	err := r.Client.Update(ctx, instance)
