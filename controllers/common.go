@@ -387,7 +387,7 @@ func (r *SearchReconciler) addEnvToSearchAPI(ctx context.Context,
 		log.Error(err, "Could not fetch configmap search-global-config")
 		return &reconcile.Result{}, err
 	} else if errors.IsNotFound(err) {
-		log.Info("search-global-config configmap not present")
+		log.V(2).Info("search-global-config configmap not present")
 	} else {
 		err := r.updateSearchApiDeployment(ctx, true, instance, corev1.EnvVar{Name: "HUB_NAME", Value: found.Data["hubName"]})
 		if err != nil {
