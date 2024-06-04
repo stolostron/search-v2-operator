@@ -4,6 +4,7 @@ go 1.21
 
 require (
 	github.com/cloudflare/cfssl v1.6.4
+	github.com/stretchr/testify v1.9.0
 	k8s.io/api v0.29.0
 	k8s.io/apimachinery v0.29.0
 	k8s.io/client-go v0.29.0
@@ -17,7 +18,6 @@ require (
 	github.com/evanphx/json-patch/v5 v5.6.0 // indirect
 	github.com/google/gnostic-models v0.6.8 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
-	github.com/stretchr/testify v1.9.0 // indirect
 )
 
 require (

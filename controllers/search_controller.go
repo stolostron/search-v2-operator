@@ -240,6 +240,11 @@ func (r *SearchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		log.Error(err, "Global Search setup failed")
 		return *result, err
 	}
+	result, err = r.addEnvToSearchAPI(ctx, instance)
+	if err != nil {
+		log.Error(err, "Adding HUB_NAME env to search api deployment failed")
+		return *result, err
+	}
 
 	once.Do(func() {
 		addon.CreateAddonOnce(ctx, instance)

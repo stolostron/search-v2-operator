@@ -376,6 +376,29 @@ func isResourcesCustomized(deploymentName string, instance *searchv1alpha1.Searc
 	return deploymentConfig.Resources != nil
 }
 
+func (r *SearchReconciler) addEnvToSearchAPI(ctx context.Context,
+	instance *searchv1alpha1.Search) (*reconcile.Result, error) {
+	found := &corev1.ConfigMap{}
+	err := r.Get(ctx, types.NamespacedName{
+		Name:      SEARCH_GLOBAL_CONFIG,
+		Namespace: instance.Namespace,
+	}, found)
+	if err != nil && !errors.IsNotFound(err) {
+		log.Error(err, "Could not fetch configmap search-global-config")
+		return &reconcile.Result{}, err
+	} else if errors.IsNotFound(err) {
+		log.V(2).Info("search-global-config configmap not present")
+	} else {
+		err := r.updateSearchApiDeployment(ctx, true, instance, corev1.EnvVar{Name: "HUB_NAME", Value: found.Data["hubName"]})
+		if err != nil {
+			log.Error(err, "Failed to set env HUB_NAME on search-api deployment")
+			return &reconcile.Result{}, err
+		}
+		log.V(2).Info("Updated search api deployment with HUB_NAME env variable")
+	}
+	return nil, nil
+}
+
 func (r *SearchReconciler) createConfigMap(ctx context.Context, cm *corev1.ConfigMap) (*reconcile.Result, error) {
 	found := &corev1.ConfigMap{}
 	err := r.Get(ctx, types.NamespacedName{
