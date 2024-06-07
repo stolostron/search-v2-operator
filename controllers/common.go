@@ -18,11 +18,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
-/*
-	#nosec G101
-
-gosec will flag the "secrets" as security violations. This flag will allow us to ignore it as a false positive.
-*/
 const (
 	apiDeploymentName       = "search-api"
 	collectorDeploymentName = "search-collector"
