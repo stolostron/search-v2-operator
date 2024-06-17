@@ -8,13 +8,14 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 )
 
 // Starting with ACM 2.10, the ClusterManagementAddon is owned by the mch operator.
 // We should delete this function once 2.9 is no longer supported.
-func (r *SearchReconciler) deleteClusterManagementAddon(instance *searchv1alpha1.Search) error {
-	log.Info("Deleting ClusterManagementAddon search-collector")
+func (r *SearchReconciler) removeOwnerRefClusterManagementAddon(instance *searchv1alpha1.Search) error {
+	log.Info("Checking owner for ClusterManagementAddon search-collector")
 	cma := &addonapiv1alpha1.ClusterManagementAddOn{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "ClusterManagementAddon",
@@ -23,22 +24,28 @@ func (r *SearchReconciler) deleteClusterManagementAddon(instance *searchv1alpha1
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "search-collector",
 			Namespace: instance.GetNamespace(),
-			// Only delete the ClusterManagementAddon if it's owned by the Search operator.
-			OwnerReferences: []metav1.OwnerReference{
-				{
-					APIVersion: "search.open-cluster-management.io/v1alpha1",
-					Kind:       "Search",
-					Name:       "search-v2-operator",
-				},
-			},
 		},
 	}
-	err := r.Delete(context.TODO(), cma)
+	err := r.Get(context.TODO(), types.NamespacedName{Name: "search-collector",
+		Namespace: instance.GetNamespace()}, cma)
 	if err != nil && !errors.IsNotFound(err) {
-		log.Error(err, "Failed to delete ClusterManagementAddon", "name", cma)
+		log.Error(err, "Failed to get ClusterManagementAddon", "name", cma)
 		return err
 	}
-	log.Info("ClusterManagementAddon search-collector deleted", "name", cma)
+	for i, ref := range cma.ObjectMeta.OwnerReferences {
+		if ref.Kind == "Search" {
+			// remove Search from owners list
+			cma.OwnerReferences = append(cma.OwnerReferences[:i], cma.OwnerReferences[i+1:]...)
+			err := r.Update(context.TODO(), cma)
+			if err != nil {
+				log.Error(err, "Failed to remove Search ownerreference from ClusterManagementAddon", "name", cma)
+				return err
+			}
+			log.Info("Search Owner reference removed from ClusterManagementAddon", "name", cma)
+			return nil
+		}
+	}
+	log.Info("ClusterManagementAddon not owned by Search. No updates required.", "name", cma)
 	return nil
 }
 
