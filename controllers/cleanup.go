@@ -32,9 +32,10 @@ func (r *SearchReconciler) removeOwnerRefClusterManagementAddon(instance *search
 		log.Error(err, "Failed to get ClusterManagementAddon", "name", cma)
 		return err
 	}
-	for _, ref := range cma.ObjectMeta.OwnerReferences {
+	for i, ref := range cma.ObjectMeta.OwnerReferences {
 		if ref.Kind == "Search" {
-			cma.OwnerReferences = nil
+			// remove Search from owners list
+			cma.OwnerReferences = append(cma.OwnerReferences[:i], cma.OwnerReferences[i+1:]...)
 			err := r.Update(context.TODO(), cma)
 			if err != nil {
 				log.Error(err, "Failed to remove Search ownerreference from ClusterManagementAddon", "name", cma)
