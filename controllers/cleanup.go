@@ -41,13 +41,10 @@ func (r *SearchReconciler) removeOwnerRefClusterManagementAddon(instance *search
 				return err
 			}
 			log.Info("Search Owner reference removed from ClusterManagementAddon", "name", cma)
-			break
+			return nil
 		}
 	}
-	if err != nil && !errors.IsNotFound(err) {
-		log.Error(err, "Failed to remove owner ref for ClusterManagementAddon", "name", cma)
-		return err
-	}
+	log.Info("ClusterManagementAddon not owned by Search. No updates required.", "name", cma)
 	return nil
 }
 
