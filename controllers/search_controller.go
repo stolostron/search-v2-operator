@@ -259,7 +259,7 @@ func (r *SearchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 
 		// delete ClusterManagementAddon
 		// Starting with ACM 2.10, the ClusterManagementAddon is owned by the mch operator.
-		err := r.deleteClusterManagementAddon(instance)
+		err := r.removeOwnerRefClusterManagementAddon(instance)
 		if err != nil {
 			log.Error(err, "Failed to delete ClusterManagementAddon")
 		}
@@ -347,7 +347,7 @@ func (r *SearchReconciler) updateStatus(ctx context.Context, instance *searchv1a
 }
 
 func (r *SearchReconciler) finalizeSearch(instance *searchv1alpha1.Search) error {
-	err := r.deleteClusterManagementAddon(instance)
+	err := r.removeOwnerRefClusterManagementAddon(instance)
 	if err != nil {
 		return err
 	}
