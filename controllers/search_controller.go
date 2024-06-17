@@ -223,7 +223,7 @@ func (r *SearchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		// We can remove this migration step after ACM 2.8 End of Life.
 		r.deleteLegacyServiceMonitorSetup(instance)
 
-		// delete ClusterManagementAddon
+		// remove Search ownerref from ClusterManagementAddon
 		// Starting with ACM 2.10, the ClusterManagementAddon is owned by the mch operator.
 		err := r.removeOwnerRefClusterManagementAddon(instance)
 		if err != nil {
