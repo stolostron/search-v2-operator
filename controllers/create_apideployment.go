@@ -23,6 +23,7 @@ func (r *SearchReconciler) APIDeployment(instance *searchv1alpha1.Search) *appsv
 			newSecretEnvVar("DB_PASS", "database-password", "search-postgres"),
 			newSecretEnvVar("DB_NAME", "database-name", "search-postgres"),
 			newEnvVar("DB_HOST", "search-postgres."+instance.Namespace+".svc"),
+			newEnvVar("POD_NAMESPACE", instance.Namespace),
 		},
 		VolumeMounts: []corev1.VolumeMount{
 			{
