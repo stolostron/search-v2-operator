@@ -62,10 +62,6 @@ func getImagePullSecretName() string {
 	return "search-pull-secret"
 }
 
-func getClusterManagementAddonName() string {
-	return "search-collector"
-}
-
 func getDefaultDBConfig(varName string) string {
 	value, okay := dbDefaultMap[varName]
 	if okay {
