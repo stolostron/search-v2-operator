@@ -102,6 +102,12 @@ func (r *SearchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		}
 		return ctrl.Result{}, err
 	}
+	// Start the addon framework part of search controller.
+	// This is in charge of approving CertificateSigningRequest for managed clusters.
+	once.Do(func() {
+		addon.CreateAddonOnce(ctx, instance)
+	})
+
 	// Update status
 	if strings.HasPrefix(req.Name, "Pod/") {
 		podName := strings.Split(req.Name, "/")[1]
@@ -155,11 +161,6 @@ func (r *SearchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	result, err = r.createRoles(ctx, r.GlobalSearchUserClusterRole(instance))
 	if result != nil {
 		log.Error(err, "GlobalSearchUserClusterRole setup failed")
-		return *result, err
-	}
-	result, err = r.createAddOnDeploymentConfig(ctx, r.NewAddOnDeploymentConfig(instance))
-	if result != nil {
-		log.Error(err, "AddOnDeploymentConfig  setup failed")
 		return *result, err
 	}
 	result, err = r.createRoleBinding(ctx, r.ClusterRoleBinding(instance))
@@ -245,10 +246,6 @@ func (r *SearchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		log.Error(err, "Adding HUB_NAME env to search api deployment failed")
 		return *result, err
 	}
-
-	once.Do(func() {
-		addon.CreateAddonOnce(ctx, instance)
-	})
 
 	cleanOnce.Do(func() {
 		// delete legacy servicemonitor setup

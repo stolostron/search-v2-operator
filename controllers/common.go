@@ -14,7 +14,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
@@ -61,10 +60,6 @@ func getServiceAccountName() string {
 
 func getImagePullSecretName() string {
 	return "search-pull-secret"
-}
-
-func getClusterManagementAddonName() string {
-	return "search-collector"
 }
 
 func getDefaultDBConfig(varName string) string {
@@ -562,10 +557,6 @@ func (r *SearchReconciler) createSecret(ctx context.Context, secret *corev1.Secr
 }
 
 func DeploymentEquals(current, new *appsv1.Deployment) bool {
-	return equality.Semantic.DeepEqual(current.Spec, new.Spec)
-}
-
-func AddonDeploymentConfigEquals(current, new *addonv1alpha1.AddOnDeploymentConfig) bool {
 	return equality.Semantic.DeepEqual(current.Spec, new.Spec)
 }
 
