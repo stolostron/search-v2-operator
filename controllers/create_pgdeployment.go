@@ -155,10 +155,18 @@ func (r *SearchReconciler) PGDeployment(instance *searchv1alpha1.Search) *appsv1
 
 	deployment.Spec.Template.Spec.SecurityContext = getPodSecurityContext()
 	deployment.Spec.Template.Spec.Containers = []corev1.Container{postgresContainer}
-	terminationGracePeriodSeconds := int64(120) // 2 minutes
-	deployment.Spec.Template.Spec.TerminationGracePeriodSeconds = &terminationGracePeriodSeconds
 	deployment.Spec.Template.Spec.Volumes = volumes
 	deployment.Spec.Template.Spec.ServiceAccountName = getServiceAccountName()
+
+	// Use a recreate strategy to reduce the posibility of data corruption.
+	// Should consider using a StatefulSet instead to guarantee that at most 1 postgres pod exists at a time.
+	deployment.Spec.Strategy = appsv1.DeploymentStrategy{
+		Type: appsv1.RecreateDeploymentStrategyType,
+	}
+	// Increase the termination grce period to reduce the posibility of data corruption.
+	terminationGracePeriodSeconds := int64(120) // 2 minutes
+	deployment.Spec.Template.Spec.TerminationGracePeriodSeconds = &terminationGracePeriodSeconds
+
 	if getNodeSelector(deploymentName, instance) != nil {
 		deployment.Spec.Template.Spec.NodeSelector = getNodeSelector(deploymentName, instance)
 	}
