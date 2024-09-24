@@ -14,7 +14,7 @@ metadata:
         }
       ]
     capabilities: Basic Install
-    createdAt: "2024-05-20T20:14:40Z"
+    createdAt: "2024-09-24T18:48:52Z"
     operators.operatorframework.io/builder: operator-sdk-v1.34.1
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
   name: search-v2-operator.v0.0.1
@@ -120,6 +120,9 @@ spec:
           - authorization.k8s.io
           resources:
           - uids
+          - userextras/authentication.kubernetes.io/credential-id
+          - userextras/authentication.kubernetes.io/node-name
+          - userextras/authentication.kubernetes.io/node-uid
           - userextras/authentication.kubernetes.io/pod-name
           - userextras/authentication.kubernetes.io/pod-uid
           verbs:
@@ -340,7 +343,6 @@ spec:
                     memory: 256Mi
                 securityContext:
                   allowPrivilegeEscalation: false
-              imagePullPolicy: Always
               imagePullSecrets:
               - name: search-pull-secret
               securityContext:
