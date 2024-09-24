@@ -169,7 +169,11 @@ func getRules() []rbacv1.PolicyRule {
 		},
 		{
 			APIGroups: []string{"authentication.k8s.io", "authorization.k8s.io"},
-			Resources: []string{"uids", "userextras/authentication.kubernetes.io/pod-name",
+			Resources: []string{"uids",
+				"userextras/authentication.kubernetes.io/credential-id",
+				"userextras/authentication.kubernetes.io/node-name",
+				"userextras/authentication.kubernetes.io/node-uid",
+				"userextras/authentication.kubernetes.io/pod-name",
 				"userextras/authentication.kubernetes.io/pod-uid"},
 			Verbs: []string{"impersonate"},
 		},
