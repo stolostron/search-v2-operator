@@ -307,8 +307,6 @@ func (r *SearchReconciler) createManagedServiceAccount(ctx context.Context, clus
 // The manifestwork is used to create the following resources in the Managed Hub.
 //  1. ClusterRole global-search-user.
 //  2. ClusterRoleBinding search-global-binding.
-//  3. Route search-global-hub.
-
 func (r *SearchReconciler) createManifestWork(ctx context.Context, cluster string, namespace string) error {
 	manifestWork := &unstructured.Unstructured{
 		Object: map[string]interface{}{
@@ -351,29 +349,6 @@ func (r *SearchReconciler) createManifestWork(ctx context.Context, cluster strin
 							},
 							"data": map[string]interface{}{
 								"hubName": cluster,
-							},
-						},
-						// FUTURE: Will remove this Route resource and use cluster-proxy-addon instead.
-						map[string]interface{}{
-							"apiVersion": "route.openshift.io/v1",
-							"kind":       "Route",
-							"metadata": map[string]interface{}{
-								"name":      "search-global-hub",
-								"namespace": namespace,
-								"labels":    appSearchLabels,
-							},
-							"spec": map[string]interface{}{
-								"port": map[string]interface{}{
-									"targetPort": "search-api",
-								},
-								"tls": map[string]interface{}{
-									"termination": "passthrough",
-								},
-								"to": map[string]interface{}{
-									"kind": "Service",
-									"name": "search-search-api",
-									// "weight": 100,
-								},
 							},
 						},
 					},
