@@ -102,6 +102,12 @@ func (r *SearchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		}
 		return ctrl.Result{}, err
 	}
+	// Start the addon framework part of search controller.
+	// This is in charge of approving CertificateSigningRequest for managed clusters.
+	once.Do(func() {
+		addon.CreateAddonOnce(ctx, instance)
+	})
+
 	// Update status
 	if strings.HasPrefix(req.Name, "Pod/") {
 		podName := strings.Split(req.Name, "/")[1]
@@ -155,11 +161,6 @@ func (r *SearchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	result, err = r.createRoles(ctx, r.GlobalSearchUserClusterRole(instance))
 	if result != nil {
 		log.Error(err, "GlobalSearchUserClusterRole setup failed")
-		return *result, err
-	}
-	result, err = r.createAddOnDeploymentConfig(ctx, r.NewAddOnDeploymentConfig(instance))
-	if result != nil {
-		log.Error(err, "AddOnDeploymentConfig  setup failed")
 		return *result, err
 	}
 	result, err = r.createRoleBinding(ctx, r.ClusterRoleBinding(instance))
@@ -240,10 +241,11 @@ func (r *SearchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		log.Error(err, "Global Search setup failed")
 		return *result, err
 	}
-
-	once.Do(func() {
-		addon.CreateAddonOnce(ctx, instance)
-	})
+	result, err = r.addEnvToSearchAPI(ctx, instance)
+	if err != nil {
+		log.Error(err, "Adding HUB_NAME env to search api deployment failed")
+		return *result, err
+	}
 
 	cleanOnce.Do(func() {
 		// delete legacy servicemonitor setup
@@ -252,11 +254,11 @@ func (r *SearchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		// We can remove this migration step after ACM 2.8 End of Life.
 		r.deleteLegacyServiceMonitorSetup(instance)
 
-		// delete ClusterManagementAddon
+		// remove Search ownerref from ClusterManagementAddon
 		// Starting with ACM 2.10, the ClusterManagementAddon is owned by the mch operator.
-		err := r.deleteClusterManagementAddon(instance)
+		err := r.removeOwnerRefClusterManagementAddon(instance)
 		if err != nil {
-			log.Error(err, "Failed to delete ClusterManagementAddon")
+			log.Error(err, "Failed to remove Search ownerRef from ClusterManagementAddon")
 		}
 	})
 
@@ -342,7 +344,7 @@ func (r *SearchReconciler) updateStatus(ctx context.Context, instance *searchv1a
 }
 
 func (r *SearchReconciler) finalizeSearch(instance *searchv1alpha1.Search) error {
-	err := r.deleteClusterManagementAddon(instance)
+	err := r.removeOwnerRefClusterManagementAddon(instance)
 	if err != nil {
 		return err
 	}

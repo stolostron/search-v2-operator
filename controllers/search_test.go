@@ -205,17 +205,6 @@ func TestSearch_controller(t *testing.T) {
 		t.Errorf("Failed to get serviceaccount %s: %v", getRoleBindingName(), err)
 	}
 
-	//check for AddonDeploymentConfig
-	adc := &addonv1alpha1.AddOnDeploymentConfig{}
-	err = cl.Get(context.TODO(), types.NamespacedName{
-		Name:      getClusterManagementAddonName(),
-		Namespace: namespace,
-	}, adc)
-
-	if err != nil {
-		t.Errorf("Failed to get AddOnDeploymentConfig %s: %v", getClusterManagementAddonName(), err)
-	}
-
 	//check for PVC
 	pvc := &corev1.PersistentVolumeClaim{}
 	storageClassName := search.Spec.DBStorage.StorageClassName
