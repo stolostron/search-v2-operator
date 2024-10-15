@@ -158,23 +158,22 @@ func (r *SearchReconciler) validateGlobalSearchDependencies(ctx context.Context)
 	multiclusterGlobalHub, err := r.DynamicClient.Resource(multiclusterGlobalHubGvr).List(ctx, metav1.ListOptions{})
 	if err != nil {
 		log.Error(err, "Failed to validate dependency MulticlusterGlobalHub operator.")
-		return fmt.Errorf("Failed to validate dependency MulticlusterGlobalHub operator.")
+		return fmt.Errorf("failed to validate dependency MulticlusterGlobalHub operator")
 	} else if len(multiclusterGlobalHub.Items) > 0 {
 		log.V(5).Info("Found MulticlusterGlobalHub intance.")
 	}
 
 	// Verify that MulticlusterEngine is installed and has the ManagedServiceAccount and ClusterProxy add-ons enabled.
-	mce, err := r.DynamicClient.Resource(multiclusterengineResourceGvr).
-		Get(ctx, "multiclusterengine", metav1.GetOptions{})
-	if err != nil {
+	mces, err := r.DynamicClient.Resource(multiclusterengineResourceGvr).List(ctx, metav1.ListOptions{})
+	if err != nil || len(mces.Items) == 0 {
 		log.Error(err, "Failed to validate dependency MulticlusterEngine operator.")
-		return fmt.Errorf("Failed to validate dependency MulticlusterEngine operator.")
+		return fmt.Errorf("failed to validate dependency MulticlusterEngine operator")
 	}
 
 	// Verify that MulticlusterEngine add-ons ManagedServiceAccount and ClusterProxy are enabled.
 	managedServiceAccountEnabled := false
 	clusterProxyEnabled := false
-	components := mce.Object["spec"].(map[string]interface{})["overrides"].(map[string]interface{})["components"]
+	components := mces.Items[0].Object["spec"].(map[string]interface{})["overrides"].(map[string]interface{})["components"]
 	for _, component := range components.([]interface{}) {
 		if component.(map[string]interface{})["name"] == "managedserviceaccount" &&
 			component.(map[string]interface{})["enabled"] == true {
@@ -188,10 +187,10 @@ func (r *SearchReconciler) validateGlobalSearchDependencies(ctx context.Context)
 		}
 	}
 	if !managedServiceAccountEnabled {
-		return fmt.Errorf("The managedserviceaccount add-on is not enabled in MulticlusterEngine.")
+		return fmt.Errorf("the managedserviceaccount add-on is not enabled in MulticlusterEngine")
 	}
 	if !clusterProxyEnabled {
-		return fmt.Errorf("The cluster-proxy-addon is not enabled in MulticlusterEngine.")
+		return fmt.Errorf("the cluster-proxy-addon is not enabled in MulticlusterEngine")
 	}
 	log.V(2).Info("Global search dependencies validated.")
 	return nil
