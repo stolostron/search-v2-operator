@@ -108,6 +108,7 @@ func defaultMockState() (map[schema.GroupVersionResource]string, []runtime.Objec
 										},
 									},
 								},
+								"targetNamespace": "multicluster-engine",
 							},
 						},
 					},
