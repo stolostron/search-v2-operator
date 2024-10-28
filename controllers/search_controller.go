@@ -148,17 +148,17 @@ func (r *SearchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		log.Error(err, "SearchServiceAccount setup failed")
 		return *result, err
 	}
-	result, err = r.createRoles(ctx, r.ClusterRole(instance))
+	result, err = r.createUpdateRoles(ctx, r.ClusterRole(instance))
 	if result != nil {
 		log.Error(err, "ClusterRole setup failed")
 		return *result, err
 	}
-	result, err = r.createRoles(ctx, r.AddonClusterRole(instance))
+	result, err = r.createUpdateRoles(ctx, r.AddonClusterRole(instance))
 	if result != nil {
 		log.Error(err, "AddonClusterRole setup failed")
 		return *result, err
 	}
-	result, err = r.createRoles(ctx, r.GlobalSearchUserClusterRole(instance))
+	result, err = r.createUpdateRoles(ctx, r.GlobalSearchUserClusterRole(instance))
 	if result != nil {
 		log.Error(err, "GlobalSearchUserClusterRole setup failed")
 		return *result, err
