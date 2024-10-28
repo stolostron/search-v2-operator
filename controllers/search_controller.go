@@ -62,7 +62,7 @@ var cleanOnce sync.Once
 //+kubebuilder:rbac:groups="",resources=groups;secrets;serviceaccounts;services;users,verbs=create;get;list;watch;patch;update;delete;impersonate
 //+kubebuilder:rbac:groups="",resources=configmaps,verbs=get;update
 //+kubebuilder:rbac:groups=apps,resources=deployments,verbs=create;delete;get;list;patch;update;watch
-//+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=roles;rolebindings;clusterroles;clusterrolebindings,verbs=create;get;list;create;delete
+//+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=roles;rolebindings;clusterroles;clusterrolebindings,verbs=create;get;list;update;delete
 //+kubebuilder:rbac:groups=authentication.k8s.io;authorization.k8s.io,resources=uids;userextras/authentication.kubernetes.io/credential-id;userextras/authentication.kubernetes.io/node-name;userextras/authentication.kubernetes.io/node-uid;userextras/authentication.kubernetes.io/pod-uid;userextras/authentication.kubernetes.io/pod-name,verbs=impersonate
 //+kubebuilder:rbac:groups=coordination.k8s.io,resources=leases,verbs=get;list;create;update;patch;watch
 //+kubebuilder:rbac:groups=monitoring.coreos.com,resources=servicemonitors,verbs=create;delete;get;list
