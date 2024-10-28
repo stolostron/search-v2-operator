@@ -31,12 +31,6 @@ func (r *SearchReconciler) createUpdateRoles(ctx context.Context, instance *sear
 		}
 		log.Info("Created clusterrole " + crole.Name)
 		log.V(9).Info("Created  clusterrole ", "clusterrole", crole)
-
-		err := controllerutil.SetControllerReference(instance, crole, r.Scheme)
-		if err != nil {
-			log.Info("Could not set control for ClusterRole" + crole.Name)
-		}
-
 	} else {
 		// compare existing and expected. If different, update
 		if !equality.Semantic.DeepEqual(existing.Rules, crole.Rules) {
