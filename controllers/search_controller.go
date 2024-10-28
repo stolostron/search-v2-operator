@@ -18,6 +18,7 @@ package controllers
 
 import (
 	"context"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -282,8 +283,6 @@ func (r *SearchReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			&searchv1alpha1.Search{}, handler.OnlyControllerOwner()), builder.WithPredicates(pred)).
 		Watches(&corev1.Secret{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(),
 			&searchv1alpha1.Search{}, handler.OnlyControllerOwner()), builder.WithPredicates(pred)).
-		Watches(&rbacv1.ClusterRole{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(),
-			&searchv1alpha1.Search{}, handler.OnlyControllerOwner()), builder.WithPredicates(pred)).
 		Watches(&corev1.Pod{}, handler.EnqueueRequestsFromMapFunc(
 			func(ctx context.Context, a client.Object) []reconcile.Request {
 				// Trigger reconcile if search pod
@@ -300,6 +299,21 @@ func (r *SearchReconciler) SetupWithManager(mgr ctrl.Manager) error {
 					return nil
 				}
 
+			}),
+		).
+		Watches(&rbacv1.ClusterRole{}, handler.EnqueueRequestsFromMapFunc(
+			func(ctx context.Context, a client.Object) []reconcile.Request {
+				if a.GetName() == "search" {
+					return []reconcile.Request{
+						{
+							NamespacedName: types.NamespacedName{
+								Name:      "ClusterRole/" + a.GetName(),
+								Namespace: os.Getenv("WATCH_NAMESPACE"),
+							},
+						},
+					}
+				}
+				return nil
 			}),
 		).
 		Complete(r)
