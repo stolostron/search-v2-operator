@@ -14,7 +14,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
-func (r *SearchReconciler) createUpdateRoles(ctx context.Context, instance *searchv1alpha1.Search,
+func (r *SearchReconciler) createUpdateRoles(ctx context.Context,
 	crole *rbacv1.ClusterRole,
 ) (*reconcile.Result, error) {
 
