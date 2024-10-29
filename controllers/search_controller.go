@@ -303,7 +303,7 @@ func (r *SearchReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		).
 		Watches(&rbacv1.ClusterRole{}, handler.EnqueueRequestsFromMapFunc(
 			func(ctx context.Context, a client.Object) []reconcile.Request {
-				if a.GetName() == "search" {
+				if a.GetName() == getRoleName() {
 					return []reconcile.Request{
 						{
 							NamespacedName: types.NamespacedName{
