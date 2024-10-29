@@ -18,11 +18,11 @@ func (r *SearchReconciler) createUpdateRoles(ctx context.Context, instance *sear
 	crole *rbacv1.ClusterRole,
 ) (*reconcile.Result, error) {
 
-	existing := &rbacv1.ClusterRole{}
+	existingClusterRole := &rbacv1.ClusterRole{}
 	err := r.Get(ctx, types.NamespacedName{
 		Name:      crole.Name,
 		Namespace: crole.Namespace,
-	}, existing)
+	}, existingClusterRole)
 	if err != nil && errors.IsNotFound(err) {
 		err = r.Create(ctx, crole)
 		if err != nil {
@@ -30,10 +30,10 @@ func (r *SearchReconciler) createUpdateRoles(ctx context.Context, instance *sear
 			return &reconcile.Result{}, err
 		}
 		log.Info("Created clusterrole " + crole.Name)
-		log.V(9).Info("Created  clusterrole ", "clusterrole", crole)
+		log.V(9).Info("Created clusterrole ", "clusterrole", crole)
 	} else {
-		// compare existing and expected. If different, update
-		if !equality.Semantic.DeepEqual(existing.Rules, crole.Rules) {
+		// If existing resource is different from the new one, update it
+		if !equality.Semantic.DeepEqual(existingClusterRole.Rules, crole.Rules) {
 			err = r.Update(ctx, crole)
 			if err != nil {
 				log.Error(err, "Could not update clusterrole "+crole.Name)
