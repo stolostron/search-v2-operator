@@ -18,6 +18,7 @@ package controllers
 
 import (
 	"context"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -32,6 +33,7 @@ import (
 	searchv1alpha1 "github.com/stolostron/search-v2-operator/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -61,7 +63,7 @@ var cleanOnce sync.Once
 //+kubebuilder:rbac:groups="",resources=groups;secrets;serviceaccounts;services;users,verbs=create;get;list;watch;patch;update;delete;impersonate
 //+kubebuilder:rbac:groups="",resources=configmaps,verbs=get;update
 //+kubebuilder:rbac:groups=apps,resources=deployments,verbs=create;delete;get;list;patch;update;watch
-//+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=roles;rolebindings;clusterroles;clusterrolebindings,verbs=create;get;list;create;delete
+//+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=roles;rolebindings;clusterroles;clusterrolebindings,verbs=create;get;list;update;delete
 //+kubebuilder:rbac:groups=authentication.k8s.io;authorization.k8s.io,resources=uids;userextras/authentication.kubernetes.io/credential-id;userextras/authentication.kubernetes.io/node-name;userextras/authentication.kubernetes.io/node-uid;userextras/authentication.kubernetes.io/pod-uid;userextras/authentication.kubernetes.io/pod-name,verbs=impersonate
 //+kubebuilder:rbac:groups=coordination.k8s.io,resources=leases,verbs=get;list;create;update;patch;watch
 //+kubebuilder:rbac:groups=monitoring.coreos.com,resources=servicemonitors,verbs=create;delete;get;list
@@ -148,17 +150,17 @@ func (r *SearchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		log.Error(err, "SearchServiceAccount setup failed")
 		return *result, err
 	}
-	result, err = r.createRoles(ctx, r.ClusterRole(instance))
+	result, err = r.createUpdateRoles(ctx, r.ClusterRole(instance))
 	if result != nil {
 		log.Error(err, "ClusterRole setup failed")
 		return *result, err
 	}
-	result, err = r.createRoles(ctx, r.AddonClusterRole(instance))
+	result, err = r.createUpdateRoles(ctx, r.AddonClusterRole(instance))
 	if result != nil {
 		log.Error(err, "AddonClusterRole setup failed")
 		return *result, err
 	}
-	result, err = r.createRoles(ctx, r.GlobalSearchUserClusterRole(instance))
+	result, err = r.createUpdateRoles(ctx, r.GlobalSearchUserClusterRole(instance))
 	if result != nil {
 		log.Error(err, "GlobalSearchUserClusterRole setup failed")
 		return *result, err
@@ -297,6 +299,21 @@ func (r *SearchReconciler) SetupWithManager(mgr ctrl.Manager) error {
 					return nil
 				}
 
+			}),
+		).
+		Watches(&rbacv1.ClusterRole{}, handler.EnqueueRequestsFromMapFunc(
+			func(ctx context.Context, a client.Object) []reconcile.Request {
+				if a.GetName() == getRoleName() {
+					return []reconcile.Request{
+						{
+							NamespacedName: types.NamespacedName{
+								Name:      "ClusterRole/" + a.GetName(),
+								Namespace: os.Getenv("WATCH_NAMESPACE"),
+							},
+						},
+					}
+				}
+				return nil
 			}),
 		).
 		Complete(r)

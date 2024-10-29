@@ -6,6 +6,7 @@ import (
 
 	searchv1alpha1 "github.com/stolostron/search-v2-operator/api/v1alpha1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -13,15 +14,15 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
-func (r *SearchReconciler) createRoles(ctx context.Context,
+func (r *SearchReconciler) createUpdateRoles(ctx context.Context,
 	crole *rbacv1.ClusterRole,
 ) (*reconcile.Result, error) {
 
-	found := &rbacv1.ClusterRole{}
+	existingClusterRole := &rbacv1.ClusterRole{}
 	err := r.Get(ctx, types.NamespacedName{
 		Name:      crole.Name,
 		Namespace: crole.Namespace,
-	}, found)
+	}, existingClusterRole)
 	if err != nil && errors.IsNotFound(err) {
 		err = r.Create(ctx, crole)
 		if err != nil {
@@ -29,7 +30,15 @@ func (r *SearchReconciler) createRoles(ctx context.Context,
 			return &reconcile.Result{}, err
 		}
 		log.Info("Created clusterrole " + crole.Name)
-		log.V(9).Info("Created  clusterrole ", "clusterrole", crole)
+		log.V(9).Info("Created clusterrole ", "clusterrole", crole)
+	} else if !equality.Semantic.DeepEqual(existingClusterRole.Rules, crole.Rules) {
+		err = r.Update(ctx, crole)
+		if err != nil {
+			log.Error(err, "Could not update clusterrole "+crole.Name)
+			return &reconcile.Result{}, err
+		}
+		log.Info("Updated clusterrole " + crole.Name)
+		log.V(9).Info("Updated clusterrole ", "clusterrole", crole)
 	}
 	return nil, nil
 }
