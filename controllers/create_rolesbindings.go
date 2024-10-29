@@ -31,17 +31,14 @@ func (r *SearchReconciler) createUpdateRoles(ctx context.Context, instance *sear
 		}
 		log.Info("Created clusterrole " + crole.Name)
 		log.V(9).Info("Created clusterrole ", "clusterrole", crole)
-	} else {
-		// If existing resource is different from the new one, update it
-		if !equality.Semantic.DeepEqual(existingClusterRole.Rules, crole.Rules) {
-			err = r.Update(ctx, crole)
-			if err != nil {
-				log.Error(err, "Could not update clusterrole "+crole.Name)
-				return &reconcile.Result{}, err
-			}
-			log.Info("Updated clusterrole " + crole.Name)
-			log.V(9).Info("Updated clusterrole ", "clusterrole", crole)
+	} else if !equality.Semantic.DeepEqual(existingClusterRole.Rules, crole.Rules) {
+		err = r.Update(ctx, crole)
+		if err != nil {
+			log.Error(err, "Could not update clusterrole "+crole.Name)
+			return &reconcile.Result{}, err
 		}
+		log.Info("Updated clusterrole " + crole.Name)
+		log.V(9).Info("Updated clusterrole ", "clusterrole", crole)
 	}
 	return nil, nil
 }
