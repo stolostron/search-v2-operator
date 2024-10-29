@@ -116,7 +116,7 @@ func (r *SearchReconciler) reconcileGlobalSearch(ctx context.Context,
 			}
 		}
 		if globalSearchConditionIndex > -1 {
-			log.V(1).Info("The global-search-preview annotation is not present. Disabling global search...")
+			log.V(1).Info("Annotation global-search-preview removed. Disabling global search.")
 			err := r.disableGlobalSearch(ctx, instance)
 			if err != nil {
 				log.Error(err, "Failed to disable global search.")
