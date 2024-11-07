@@ -216,9 +216,16 @@ func logAndTrackError(errorList *[]error, err error, message string, keysAndValu
 func (r *SearchReconciler) enableGlobalSearch(ctx context.Context, instance *searchv1alpha1.Search) error {
 	errList := []error{} // Using this to allow partial errors and combine at the end.
 
+	mceInstallNS, err := r.getMCETargetNamespace(ctx)
+	if err != nil {
+		logAndTrackError(&errList, err, "Failed to get mce installed namespace.")
+		// will using the default namespace if failed to get the installed namespace from MCE CR
+		mceInstallNS = "multicluster-engine"
+	}
+
 	// 1. Enable global search feature in the console.
 	// 1a.Add globalSearchFeatureFlag=true to configmap console-mce-config in multicluster-engine namespace.
-	err := r.updateConsoleConfig(ctx, true, "multicluster-engine", "console-mce-config")
+	err = r.updateConsoleConfig(ctx, true, mceInstallNS, "console-mce-config")
 	logAndTrackError(&errList, err, "Failed to set globalSearchFeatureFlag=true in console-mce-config.")
 
 	// 1b. Add globalSearchFeatureFlag=true to configmap console-config in open-cluster-management namespace.
@@ -372,9 +379,17 @@ func (r *SearchReconciler) createManifestWork(ctx context.Context, cluster strin
 //  3. Delete configuration resources for each Managed Hub.
 func (r *SearchReconciler) disableGlobalSearch(ctx context.Context, instance *searchv1alpha1.Search) error {
 	errList := []error{}
+
+	mceInstallNS, err := r.getMCETargetNamespace(ctx)
+	if err != nil {
+		logAndTrackError(&errList, err, "Failed to get mce installed namespace.")
+		// will using the default namespace if failed to get the installed namespace from MCE CR
+		mceInstallNS = "multicluster-engine"
+	}
+
 	// 1. Disable global search feature in the console.
 	// 1a. Remove the globalSearchFeatureFlag key to configmap console-mce-config in multicluster-engine namespace.
-	err := r.updateConsoleConfig(ctx, false, "multicluster-engine", "console-mce-config")
+	err = r.updateConsoleConfig(ctx, false, mceInstallNS, "console-mce-config")
 	logAndTrackError(&errList, err, "Failed to remove the globalSearchFeatureFlag in configmap console-mce-config.")
 
 	// 1b. Remove the globalSearchFeatureFlag key to configmap console-config in open-cluster-management namespace.
@@ -558,4 +573,24 @@ func (r *SearchReconciler) commitSearchCRInstanceState(ctx context.Context, inst
 		}
 	}
 	return err
+}
+
+// Get the MCE TargetNamespace
+func (r *SearchReconciler) getMCETargetNamespace(ctx context.Context) (string, error) {
+	multiclusterengine, err := r.DynamicClient.Resource(multiclusterengineResourceGvr).List(ctx, metav1.ListOptions{})
+	if err != nil {
+		log.Error(err, "Failed to get the mce resources.")
+		return "", fmt.Errorf("failed to get the mce resources")
+	}
+	if len(multiclusterengine.Items) == 0 {
+		return "", fmt.Errorf("failed to get the mce resources")
+	}
+	targetNS, found, err := unstructured.NestedString(multiclusterengine.Items[0].Object, "spec", "targetNamespace")
+	if err != nil {
+		return "", err
+	}
+	if !found {
+		return "", fmt.Errorf("failed to get the mce target namespace in spec")
+	}
+	return targetNS, nil
 }
