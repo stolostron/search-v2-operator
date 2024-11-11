@@ -249,6 +249,12 @@ func (r *SearchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return *result, err
 	}
 
+	result, err = r.reconcileVirtualMachineSetup(ctx, instance)
+	if err != nil {
+		log.Error(err, "Virtual Machine setup failed")
+		return *result, err
+	}
+
 	cleanOnce.Do(func() {
 		// delete legacy servicemonitor setup
 		// Starting with ACM 2.9, ServiceMonitors are created in the open-cluster-management namespace.
