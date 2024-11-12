@@ -16,8 +16,9 @@ import (
 )
 
 const (
-	CONDITION_VM_ACTIONS = "VirtualMachineActionsReady"
-	msaName              = "vm-actor"
+	CONDITION_VM_ACTIONS  = "VirtualMachineActionsReady"
+	clusterPermissionName = "vm-actions"
+	managedSAName         = "vm-actor"
 )
 
 var (
@@ -86,7 +87,7 @@ func (r *SearchReconciler) reconcileVirtualMachineSetup(ctx context.Context,
 				r.updateVMStatus(ctx, instance, metav1.Condition{
 					Type:               CONDITION_VM_ACTIONS,
 					Status:             metav1.ConditionFalse,
-					Reason:             "VirtualMachineActionsDisabled",
+					Reason:             "VirtualMachineActionsError",
 					Message:            "Failed to disable virtual machine actions.",
 					LastTransitionTime: metav1.Now(),
 				})
@@ -198,7 +199,7 @@ func (r *SearchReconciler) createVMManagedServiceAccount(ctx context.Context, cl
 			"apiVersion": "authentication.open-cluster-management.io/v1beta1",
 			"kind":       "ManagedServiceAccount",
 			"metadata": map[string]interface{}{
-				"name":   msaName,
+				"name":   managedSAName,
 				"labels": appSearchVMLabels,
 			},
 			"spec": map[string]interface{}{
@@ -209,7 +210,7 @@ func (r *SearchReconciler) createVMManagedServiceAccount(ctx context.Context, cl
 	_, err := r.DynamicClient.Resource(managedServiceAccountGvr).Namespace(cluster).
 		Create(ctx, managedSA, metav1.CreateOptions{})
 	if err != nil && errors.IsAlreadyExists(err) {
-		log.V(5).Info("Found ManagedServiceAccount vm-actor.", "namespace", cluster)
+		log.V(5).Info("ManagedServiceAccount already exists", "name", managedSAName, "namespace", cluster)
 		return nil
 	}
 	return err
@@ -223,7 +224,7 @@ func (r *SearchReconciler) createVMClusterPermission(ctx context.Context, cluste
 			"apiVersion": "rbac.open-cluster-management.io/v1alpha1",
 			"kind":       "ClusterPermission",
 			"metadata": map[string]interface{}{
-				"name":   "vm-actions",
+				"name":   clusterPermissionName,
 				"labels": appSearchVMLabels,
 			},
 			"spec": map[string]interface{}{
@@ -245,7 +246,7 @@ func (r *SearchReconciler) createVMClusterPermission(ctx context.Context, cluste
 				"clusterRoleBinding": map[string]interface{}{
 					"subject": map[string]interface{}{
 						"kind":      "ServiceAccount",
-						"name":      msaName,
+						"name":      managedSAName,
 						"namespace": "open-cluster-management-agent-addon",
 					},
 				},
@@ -278,27 +279,29 @@ func (r *SearchReconciler) disableVirtualMachineActions(ctx context.Context) err
 		logAndTrackError(&errList, err, "Failed to list ManagedClusters.")
 	}
 	for _, cluster := range clusterList.Items {
-		// 2a. Delete the ManagedServiceAccount vm-actor.
+		// 2a. Delete the ManagedServiceAccount.
 		err = r.DynamicClient.Resource(managedServiceAccountGvr).Namespace(cluster.GetName()).
-			Delete(ctx, msaName, metav1.DeleteOptions{})
+			Delete(ctx, managedSAName, metav1.DeleteOptions{})
 
 		if err != nil && !errors.IsNotFound(err) { // Ignore NotFound errors.
-			logAndTrackError(&errList, err, "Failed to delete ManagedServiceAccount", "name", msaName, "cluster", cluster.GetName())
+			logAndTrackError(&errList, err, "Failed to delete ManagedServiceAccount",
+				"name", managedSAName, "namespace", cluster.GetName())
 		}
 
 		// 2b. Delete the ClusterPermission vm-actions.
 		err = r.DynamicClient.Resource(clusterPermissionGvr).Namespace(cluster.GetName()).
-			Delete(ctx, "vm-actions", metav1.DeleteOptions{})
+			Delete(ctx, clusterPermissionName, metav1.DeleteOptions{})
 
 		if err != nil && !errors.IsNotFound(err) { // Ignore NotFound error.
-			logAndTrackError(&errList, err, "Failed to delete ClusterPermission vm-actions", "namespace", cluster.GetName())
+			logAndTrackError(&errList, err, "Failed to delete ClusterPermission.",
+				"name", clusterPermissionName, "namespace", cluster.GetName())
 		}
 	}
 
 	// Combine all errors.
 	if len(errList) > 0 {
 		err = fmt.Errorf("Failed to disable virtual machine actions. Errors: %v", errList)
-		log.Error(err, "Failed to disable virtual machine actions.")
+		log.Error(err, "")
 		return err
 	}
 
