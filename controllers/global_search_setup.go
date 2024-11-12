@@ -219,7 +219,7 @@ func (r *SearchReconciler) enableGlobalSearch(ctx context.Context, instance *sea
 	mceInstallNS, err := r.getMCETargetNamespace(ctx)
 	if err != nil {
 		logAndTrackError(&errList, err, "Failed to get mce installed namespace.")
-		// will using the default namespace if failed to get the installed namespace from MCE CR
+		// will use the default namespace if failed to get the installed namespace from MCE CR
 		mceInstallNS = "multicluster-engine"
 	}
 
@@ -383,7 +383,7 @@ func (r *SearchReconciler) disableGlobalSearch(ctx context.Context, instance *se
 	mceInstallNS, err := r.getMCETargetNamespace(ctx)
 	if err != nil {
 		logAndTrackError(&errList, err, "Failed to get mce installed namespace.")
-		// will using the default namespace if failed to get the installed namespace from MCE CR
+		// will use the default namespace if failed to get the installed namespace from MCE CR
 		mceInstallNS = "multicluster-engine"
 	}
 
