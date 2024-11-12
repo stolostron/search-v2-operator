@@ -40,26 +40,8 @@ func defaultMockStateVM() (map[schema.GroupVersionResource]string, []runtime.Obj
 			&unstructured.UnstructuredList{
 				Object: buildObject("cluster.open-cluster-management.io/v1", "ManagedCluster"),
 				Items: []unstructured.Unstructured{
-					*newUnstructured("cluster.open-cluster-management.io/v1", "ManagedCluster", "cluster-1", "cluster-1",
-						map[string]interface{}{
-							"status": map[string]interface{}{
-								"clusterClaims": []interface{}{map[string]interface{}{
-									"name":  "hub.open-cluster-management.io",
-									"value": "Installed"},
-								},
-							},
-						},
-					),
-					*newUnstructured("cluster.open-cluster-management.io/v1", "ManagedCluster", "cluster-2", "cluster-2",
-						map[string]interface{}{
-							"status": map[string]interface{}{
-								"clusterClaims": []interface{}{map[string]interface{}{
-									"name":  "hub.open-cluster-management.io",
-									"value": "NotInstalled"},
-								},
-							},
-						},
-					),
+					*newUnstructured("cluster.open-cluster-management.io/v1", "ManagedCluster", "cluster-1", "cluster-1", nil),
+					*newUnstructured("cluster.open-cluster-management.io/v1", "ManagedCluster", "cluster-2", "cluster-2", nil),
 					*newUnstructured("cluster.open-cluster-management.io/v1", "ManagedCluster", "cluster-3", "cluster-3", nil),
 				},
 			},
@@ -94,7 +76,10 @@ func defaultMockStateVM() (map[schema.GroupVersionResource]string, []runtime.Obj
 			},
 			&unstructured.UnstructuredList{
 				Object: buildObject("rbac.open-cluster-management.io/v1alpha1", "ClusterPermission"),
-				Items:  []unstructured.Unstructured{},
+				Items: []unstructured.Unstructured{
+					*newUnstructured("rbac.open-cluster-management.io/v1alpha1", "ClusterPermission", "cluster-1", "vm-actions", nil),
+					*newUnstructured("rbac.open-cluster-management.io/v1alpha1", "ClusterPermission", "cluster-2", "vm-actions", nil),
+				},
 			},
 			&unstructured.UnstructuredList{
 				Object: buildObject("authentication.open-cluster-management.io/v1", "ManagedServiceAccount"),
@@ -175,7 +160,7 @@ func Test_VM_enableActions(t *testing.T) {
 		Scheme:        scheme.Scheme,
 	}
 
-	_, err = r.reconcileVirtualMachineSetup(context.Background(), searchInst)
+	_, err = r.reconcileVirtualMachineConfiguration(context.Background(), searchInst)
 	if err != nil {
 		t.Fatalf("Failed to enable virtual machine actions: %v", err)
 	}
@@ -217,7 +202,7 @@ func Test_VM_disableActions(t *testing.T) {
 		Scheme:        scheme.Scheme,
 	}
 
-	_, err = r.reconcileVirtualMachineSetup(context.Background(), searchInst)
+	_, err = r.reconcileVirtualMachineConfiguration(context.Background(), searchInst)
 
 	assert.Nil(t, err)
 	assert.Empty(t, searchInst.Status.Conditions)

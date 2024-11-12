@@ -249,7 +249,7 @@ func (r *SearchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return *result, err
 	}
 
-	result, err = r.reconcileVirtualMachineSetup(ctx, instance)
+	result, err = r.reconcileVirtualMachineConfiguration(ctx, instance)
 	if err != nil {
 		log.Error(err, "Virtual Machine setup failed")
 		return *result, err
