@@ -153,16 +153,8 @@ func (r *SearchReconciler) validateVirtualMachineDependencies(ctx context.Contex
 func (r *SearchReconciler) enableVMActions(ctx context.Context) error {
 	errList := []error{} // Using this to allow partial errors and combine at the end.
 
-	mceInstallNS, err := r.getMCETargetNamespace(ctx)
-	if err != nil {
-		logAndTrackError(&errList, err, "Failed to get mce installed namespace.")
-		// will using the default namespace if failed to get the installed namespace from MCE CR
-		mceInstallNS = "multicluster-engine"
-	}
-
 	// 1. Enable virtual machine actions feature in the console.
-	//   Add VIRTUAL_MACHINE_ACTIONS=enabled to configmap console-mce-config in multicluster-engine namespace.
-	err = r.updateConsoleConfigVM(ctx, true, mceInstallNS, "console-mce-config")
+	err := r.updateConsoleConfigVM(ctx, true)
 	logAndTrackError(&errList, err, "Failed to set VIRTUAL_MACHINE_ACTIONS=enabled in console-mce-config.")
 
 	// 2. Create ManagedServiceAccount and ClusterPermission resources for each Managed Cluster.
@@ -272,15 +264,8 @@ func (r *SearchReconciler) createVMClusterPermission(ctx context.Context, cluste
 func (r *SearchReconciler) disableVirtualMachineActions(ctx context.Context) error {
 	errList := []error{}
 
-	mceInstallNS, err := r.getMCETargetNamespace(ctx)
-	if err != nil {
-		logAndTrackError(&errList, err, "Failed to get mce installed namespace.")
-		// will using the default namespace if failed to get the installed namespace from MCE CR
-		mceInstallNS = "multicluster-engine"
-	}
 	// 1. Disable virtual machine actions in the console.
-	//    Remove the VIRTUAL_MACHINE_ACTIONS key from configmap console-mce-config in multicluster-engine namespace.
-	err = r.updateConsoleConfigVM(ctx, false, mceInstallNS, "console-mce-config")
+	err := r.updateConsoleConfigVM(ctx, false)
 	logAndTrackError(&errList, err, "Failed to remove the VIRTUAL_MACHINE_ACTIONS in configmap console-mce-config.")
 
 	// 2. Delete ManagedServiceAccount and ClusterPermission resources.
@@ -319,7 +304,14 @@ func (r *SearchReconciler) disableVirtualMachineActions(ctx context.Context) err
 
 // Update flag VIRTUAL_MACHINE_ACTIONS in console config.
 // oc patch configmap {name} -n {namespace} -p '{"data": {"VIRTUAL_MACHINE_ACTIONS": "enabled"}}'
-func (r *SearchReconciler) updateConsoleConfigVM(ctx context.Context, enabled bool, namespace, name string) error {
+func (r *SearchReconciler) updateConsoleConfigVM(ctx context.Context, enabled bool) error {
+	name := "console-mce-config"
+	namespace, err := r.getMCETargetNamespace(ctx)
+	if err != nil {
+		log.Error(err, "Failed to get mce installed namespace. Using multicluster-engine as default namespace.")
+		namespace = "multicluster-engine"
+	}
+
 	consoleConfig, err := r.DynamicClient.Resource(corev1.SchemeGroupVersion.WithResource("configmaps")).
 		Namespace(namespace).Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
