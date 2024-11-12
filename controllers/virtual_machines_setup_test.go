@@ -94,22 +94,18 @@ func defaultMockStateVM() (map[schema.GroupVersionResource]string, []runtime.Obj
 			},
 			&unstructured.UnstructuredList{
 				Object: buildObject("rbac.open-cluster-management.io/v1alpha1", "ClusterPermission"),
-				Items:  []unstructured.Unstructured{
-					// *newUnstructured("rbac.open-cluster-management.io/v1alpha1", "ClusterPermission", "cluster-1", "vm-actions", nil),
-				},
+				Items:  []unstructured.Unstructured{},
 			},
 			&unstructured.UnstructuredList{
 				Object: buildObject("authentication.open-cluster-management.io/v1", "ManagedServiceAccount"),
 				Items: []unstructured.Unstructured{
-					*newUnstructured("authentication.open-cluster-management.io/v1", "ManagedServiceAccount", "cluster-1", "search-global", nil),
-					*newUnstructured("authentication.open-cluster-management.io/v1", "ManagedServiceAccount", "cluster-2", "search-global", nil),
+					*newUnstructured("authentication.open-cluster-management.io/v1", "ManagedServiceAccount", "cluster-1", "vm-actor", nil),
+					*newUnstructured("authentication.open-cluster-management.io/v1", "ManagedServiceAccount", "cluster-2", "vm-actor", nil),
 				},
 			},
 			newUnstructured("v1", "ConfigMap", "multicluster-engine", "console-mce-config",
 				map[string]interface{}{
-					"data": map[string]interface{}{
-						"VIRTUAL_MACHINE_ACTIONS": "enabled",
-					},
+					"data": map[string]interface{}{},
 				}),
 		}
 }
@@ -154,7 +150,7 @@ func Test_VM_disableConsole(t *testing.T) {
 	assert.Nil(t, consoleMceConfig.Object["data"].(map[string]interface{})["VIRTUAL_MACHINE_ACTIONS"])
 }
 
-func Test_enableVMActions(t *testing.T) {
+func Test_VM_enableActions(t *testing.T) {
 	// Create a fake client to mock API calls.
 	searchInst := &searchv1alpha1.Search{
 		ObjectMeta: metav1.ObjectMeta{
