@@ -45,7 +45,7 @@ func (r *SearchReconciler) reconcileVirtualMachineSetup(ctx context.Context,
 	instance *searchv1alpha1.Search) (*reconcile.Result, error) {
 
 	if instance.ObjectMeta.Annotations["virtual-machine-preview"] == "true" {
-		log.V(1).Info("The virtual-machine-preview annotation is present. Setting up Virtual machine actions.")
+		log.V(1).Info("The virtual-machine-preview annotation is present. Setting up virtual machine actions.")
 
 		err := r.validateVirtualMachineDependencies(ctx)
 		if err != nil {
@@ -79,7 +79,7 @@ func (r *SearchReconciler) reconcileVirtualMachineSetup(ctx context.Context,
 			}
 		}
 		if vmActionsConditionIndex > -1 {
-			log.V(1).Info("Virtual Machine actions were enabled before. Disabling virtual machine actions.")
+			log.V(1).Info("The virtual-machine-preview annotation was removed. Removing VM actions configuration.")
 			err := r.disableVirtualMachineActions(ctx)
 			if err != nil {
 
@@ -151,10 +151,10 @@ func (r *SearchReconciler) validateVirtualMachineDependencies(ctx context.Contex
 
 // Logic to enable virtual machine actions.
 //  1. Enable virtual machine actions feature in the console.
-//     a. Add VIRTUAL_MACHINE_ACTIONS=enabled to configmap console-mce-config in multicluster-engine namespace.
+//     Add VIRTUAL_MACHINE_ACTIONS=enabled to configmap console-mce-config in namespace multicluster-engine.
 //  2. Create configuration resources for each Managed Hub.
-//     a. Create a ManagedServiceAccount vm-actor.
-//     b. Create a ClusterPermission vm-actions if it doesn't exist.
+//     a. Create a ManagedServiceAccount.
+//     b. Create a ClusterPermission.
 func (r *SearchReconciler) enableVMActions(ctx context.Context) error {
 	errList := []error{} // Using this to allow partial errors and combine at the end.
 
@@ -170,13 +170,15 @@ func (r *SearchReconciler) enableVMActions(ctx context.Context) error {
 		for _, cluster := range clusterList.Items {
 			// FUTURE: Check if kubevirt.io is installed in the managed cluster.
 
-			// a. Create the ManagedServiceAccount vm-actor.
+			// a. Create the ManagedServiceAccount.
 			err = r.createVMManagedServiceAccount(ctx, cluster.GetName())
-			logAndTrackError(&errList, err, "Failed to create ManagedServiceAccount vm-actor", "cluster", cluster.GetName())
+			logAndTrackError(&errList, err, "Failed to create ManagedServiceAccount",
+				"name", managedSAName, "namespace", cluster.GetName())
 
-			// b. Create the ClusterPermission vm-actions.
+			// b. Create the ClusterPermission.
 			err = r.createVMClusterPermission(ctx, cluster.GetName())
-			logAndTrackError(&errList, err, "Failed to create ClusterPermission vm-actions", "cluster", cluster.GetName())
+			logAndTrackError(&errList, err, "Failed to create ClusterPermission",
+				"name", clusterPermissionName, "namespace", cluster.GetName())
 		}
 	}
 
@@ -210,7 +212,7 @@ func (r *SearchReconciler) createVMManagedServiceAccount(ctx context.Context, cl
 	_, err := r.DynamicClient.Resource(managedServiceAccountGvr).Namespace(cluster).
 		Create(ctx, managedSA, metav1.CreateOptions{})
 	if err != nil && errors.IsAlreadyExists(err) {
-		log.V(5).Info("ManagedServiceAccount already exists", "name", managedSAName, "namespace", cluster)
+		log.V(5).Info("Found existing ManagedServiceAccount", "name", managedSAName, "namespace", cluster)
 		return nil
 	}
 	return err
@@ -257,7 +259,7 @@ func (r *SearchReconciler) createVMClusterPermission(ctx context.Context, cluste
 		Create(ctx, clusterPermission, metav1.CreateOptions{})
 
 	if err != nil && errors.IsAlreadyExists(err) {
-		log.V(5).Info("Found existing ClusterPermission vm-actions.", "namespace", cluster)
+		log.V(5).Info("Found existing ClusterPermission", "name", clusterPermissionName, "namespace", cluster)
 		return nil
 	}
 	return err
@@ -301,7 +303,6 @@ func (r *SearchReconciler) disableVirtualMachineActions(ctx context.Context) err
 	// Combine all errors.
 	if len(errList) > 0 {
 		err = fmt.Errorf("Failed to disable virtual machine actions. Errors: %v", errList)
-		log.Error(err, "")
 		return err
 	}
 
@@ -309,7 +310,7 @@ func (r *SearchReconciler) disableVirtualMachineActions(ctx context.Context) err
 	return nil
 }
 
-// Update flag VIRTUAL_MACHINE_ACTIONS in console config.
+// Update flag VIRTUAL_MACHINE_ACTIONS in console-mce-config.
 // oc patch configmap {name} -n {namespace} -p '{"data": {"VIRTUAL_MACHINE_ACTIONS": "enabled"}}'
 func (r *SearchReconciler) updateConsoleConfigVM(ctx context.Context, enabled bool) error {
 	name := "console-mce-config"
@@ -367,7 +368,6 @@ func (r *SearchReconciler) updateVMStatus(ctx context.Context, instance *searchv
 		instance.Status.Conditions[existingConditionIndex] = status
 	} else {
 		// Nothing has changed.
-		log.V(3).Info("Virtual Machine actions status condition did not change.")
 		return
 	}
 
@@ -378,5 +378,5 @@ func (r *SearchReconciler) updateVMStatus(ctx context.Context, instance *searchv
 		return
 	}
 
-	log.Info("Successfully updated virtual machine actions status condition in search CR.")
+	log.Info("Successfully updated VirtualMachineActionsReady status condition in search CR.")
 }
