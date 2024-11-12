@@ -163,7 +163,7 @@ func (r *SearchReconciler) enableVMActions(ctx context.Context) error {
 
 	if err == nil && clusterList != nil {
 		for _, cluster := range clusterList.Items {
-			// TODO: Check if kubevirt.io is installed in the managed cluster.
+			// FUTURE: Check if kubevirt.io is installed in the managed cluster.
 
 			// a. Create the ManagedServiceAccount vm-actor.
 			err = r.createVMManagedServiceAccount(ctx, cluster.GetName())
@@ -226,15 +226,15 @@ func (r *SearchReconciler) createVMClusterPermission(ctx context.Context, cluste
 				"clusterRole": map[string]interface{}{
 					"rules": []interface{}{
 						map[string]interface{}{
-							"apiGroups": []string{"subresources.kubevirt.io"},
-							"resources": []string{
+							"apiGroups": []interface{}{"subresources.kubevirt.io"},
+							"resources": []interface{}{
 								"virtualmachines/start",
 								"virtualmachines/stop",
 								"virtualmachines/restart",
 								"virtualmachineinstances/pause",
 								"virtualmachineinstances/unpause",
 							},
-							"verbs": []string{"update"},
+							"verbs": []interface{}{"update"},
 						},
 					},
 				},

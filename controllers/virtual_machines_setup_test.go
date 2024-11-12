@@ -6,12 +6,15 @@ import (
 	"context"
 	"testing"
 
+	searchv1alpha1 "github.com/stolostron/search-v2-operator/api/v1alpha1"
 	"github.com/stretchr/testify/assert"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	fakeDyn "k8s.io/client-go/dynamic/fake"
 	"k8s.io/client-go/kubernetes/scheme"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
 func fakeDynClientVM() *fakeDyn.FakeDynamicClient {
@@ -28,19 +31,12 @@ func defaultMockStateVM() (map[schema.GroupVersionResource]string, []runtime.Obj
 		}
 	}
 	return map[schema.GroupVersionResource]string{
-			{Group: "operator.open-cluster-management.io", Version: "v1alpha4", Resource: "multiclusterglobalhubs"}: "MulticlusterGlobalHubList",
-			{Group: "cluster.open-cluster-management.io", Version: "v1", Resource: "managedclusters"}:               "ManagedClusterList",
-			{Group: "multicluster.openshift.io", Version: "v1", Resource: "multiclusterengines"}:                    "MultiClusterEngineList",
-			{Group: "work.open-cluster-management.io", Version: "v1", Resource: "manifestworks"}:                    "ManifestworkList",
-			{Group: "authentication.open-cluster-management.io", Version: "v1", Resource: "managedserviceacounts"}:  "ManagedServiceAccountList",
+			{Group: "cluster.open-cluster-management.io", Version: "v1", Resource: "managedclusters"}:              "ManagedClusterList",
+			{Group: "multicluster.openshift.io", Version: "v1", Resource: "multiclusterengines"}:                   "MultiClusterEngineList",
+			{Group: "rbac.open-cluster-management.io", Version: "v1alpha1", Resource: "clusterpermissions"}:        "ClusterPermissionList",
+			{Group: "authentication.open-cluster-management.io", Version: "v1", Resource: "managedserviceacounts"}: "ManagedServiceAccountList",
 		},
 		[]runtime.Object{
-			&unstructured.UnstructuredList{
-				Object: buildObject("operator.open-cluster-management.io/v1alpha4", "MulticlusterGlobalHub"),
-				Items: []unstructured.Unstructured{
-					*newUnstructured("operator.open-cluster-management.io/v1alpha4", "MulticlusterGlobalHub", "ns-foo", "name-foo", nil),
-				},
-			},
 			&unstructured.UnstructuredList{
 				Object: buildObject("cluster.open-cluster-management.io/v1", "ManagedCluster"),
 				Items: []unstructured.Unstructured{
@@ -97,10 +93,9 @@ func defaultMockStateVM() (map[schema.GroupVersionResource]string, []runtime.Obj
 				},
 			},
 			&unstructured.UnstructuredList{
-				Object: buildObject("work.open-cluster-management.io/v1", "Manifestwork"),
-				Items: []unstructured.Unstructured{
-					*newUnstructured("work.open-cluster-management.io/v1", "Manifestwork", "cluster-1", "search-global-config", nil),
-					*newUnstructured("work.open-cluster-management.io/v1", "Manifestwork", "cluster-2", "search-global-config", nil),
+				Object: buildObject("rbac.open-cluster-management.io/v1alpha1", "ClusterPermission"),
+				Items:  []unstructured.Unstructured{
+					// *newUnstructured("rbac.open-cluster-management.io/v1alpha1", "ClusterPermission", "cluster-1", "vm-actions", nil),
 				},
 			},
 			&unstructured.UnstructuredList{
@@ -113,12 +108,8 @@ func defaultMockStateVM() (map[schema.GroupVersionResource]string, []runtime.Obj
 			newUnstructured("v1", "ConfigMap", "multicluster-engine", "console-mce-config",
 				map[string]interface{}{
 					"data": map[string]interface{}{
-						"globalSearchFeatureFlag": "true",
+						"VIRTUAL_MACHINE_ACTIONS": "enabled",
 					},
-				}),
-			newUnstructured("v1", "ConfigMap", "open-cluster-management", "console-config",
-				map[string]interface{}{
-					"data": map[string]interface{}{},
 				}),
 		}
 }
@@ -135,17 +126,51 @@ func Test_VM_checkPrerequisites(t *testing.T) {
 	assert.Nil(t, err)
 }
 
-// func Test_VM_enableConsole(t *testing.T) {
-// 	// Create a fake client to mock API calls.
-// 	fakeConfigMap := newUnstructured("v1", "ConfigMap", "open-cluster-management", "console-config",
-// 		map[string]interface{}{"data": map[string]interface{}{}})
+func Test_VM_enableConsole(t *testing.T) {
+	// Create a fake client to mock API calls.
+	r := &SearchReconciler{
+		Scheme:        scheme.Scheme,
+		DynamicClient: fakeDynClientVM(),
+	}
 
-// 	r := &SearchReconciler{
-// 		Scheme:        scheme.Scheme,
-// 		DynamicClient: fakeDyn.NewSimpleDynamicClient(scheme.Scheme, fakeConfigMap),
-// 	}
+	err := r.updateConsoleConfigVM(context.Background(), true)
+	assert.Nil(t, err)
 
-// 	err := r.updateConsoleConfigVM(context.Background(), true, "open-cluster-management", "console-config")
+	consoleMceConfig, _ := r.DynamicClient.Resource(schema.GroupVersionResource{Group: "", Version: "v1", Resource: "configmaps"}).Namespace("multicluster-engine").Get(context.Background(), "console-mce-config", metav1.GetOptions{})
+	assert.Equal(t, "enabled", consoleMceConfig.Object["data"].(map[string]interface{})["VIRTUAL_MACHINE_ACTIONS"])
+}
 
-// 	assert.Nil(t, err)
-// }
+func Test_enableVMActions(t *testing.T) {
+	// Create a fake client to mock API calls.
+	searchInst := &searchv1alpha1.Search{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "search-operator",
+			Namespace: "open-cluster-management",
+			Annotations: map[string]string{
+				"virtual-machines-preview": "true",
+			},
+		},
+		Spec: searchv1alpha1.SearchSpec{},
+	}
+
+	err := searchv1alpha1.SchemeBuilder.AddToScheme(scheme.Scheme)
+	if err != nil {
+		t.Errorf("error adding search scheme: (%v)", err)
+	}
+
+	// Create a fake client to mock API calls.
+	r := &SearchReconciler{
+		Client:        fake.NewClientBuilder().WithStatusSubresource(searchInst).WithRuntimeObjects(searchInst).Build(),
+		DynamicClient: fakeDynClientVM(),
+		Scheme:        scheme.Scheme,
+	}
+
+	_, err = r.reconcileVirtualMachineSetup(context.Background(), searchInst)
+	if err != nil {
+		t.Fatalf("Failed to enable virtual machine actions: %v", err)
+	}
+
+	assert.NotEmpty(t, searchInst.Status.Conditions)
+	assert.Equal(t, "VirtualMachineActionsReady", searchInst.Status.Conditions[0].Type)
+	assert.Equal(t, metav1.ConditionTrue, searchInst.Status.Conditions[0].Status)
+}
