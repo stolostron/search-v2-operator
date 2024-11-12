@@ -58,10 +58,6 @@ func getServiceAccountName() string {
 	return "search-serviceaccount"
 }
 
-func getImagePullSecretName() string {
-	return "search-pull-secret"
-}
-
 func getDefaultDBConfig(varName string) string {
 	value, okay := dbDefaultMap[varName]
 	if okay {

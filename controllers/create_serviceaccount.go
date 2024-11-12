@@ -29,6 +29,13 @@ func (r *SearchReconciler) createSearchServiceAccount(ctx context.Context,
 			return &reconcile.Result{}, err
 		}
 	}
+	if len(found.ImagePullSecrets) > 1 {
+		if err = r.Update(ctx, sa); err != nil {
+			log.Error(err, "Could not update serviceaccount "+sa.Name)
+			return &reconcile.Result{}, err
+		}
+		log.Info("Updated serviceaccount " + sa.Name)
+	}
 	log.V(2).Info("Created serviceaccount", "ServiceAccount", sa.Name)
 	return nil, nil
 }
@@ -44,9 +51,6 @@ func (r *SearchReconciler) SearchServiceAccount(instance *searchv1alpha1.Search)
 			Name:      getServiceAccountName(),
 			Namespace: instance.GetNamespace(),
 		},
-		ImagePullSecrets: []corev1.LocalObjectReference{{
-			Name: getImagePullSecretName(),
-		}},
 	}
 
 	err := controllerutil.SetControllerReference(instance, sa, r.Scheme)
