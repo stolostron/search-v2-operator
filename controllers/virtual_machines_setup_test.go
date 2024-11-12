@@ -140,6 +140,20 @@ func Test_VM_enableConsole(t *testing.T) {
 	assert.Equal(t, "enabled", consoleMceConfig.Object["data"].(map[string]interface{})["VIRTUAL_MACHINE_ACTIONS"])
 }
 
+func Test_VM_disableConsole(t *testing.T) {
+	// Create a fake client to mock API calls.
+	r := &SearchReconciler{
+		Scheme:        scheme.Scheme,
+		DynamicClient: fakeDynClientVM(),
+	}
+
+	err := r.updateConsoleConfigVM(context.Background(), false)
+	assert.Nil(t, err)
+
+	consoleMceConfig, _ := r.DynamicClient.Resource(schema.GroupVersionResource{Group: "", Version: "v1", Resource: "configmaps"}).Namespace("multicluster-engine").Get(context.Background(), "console-mce-config", metav1.GetOptions{})
+	assert.Nil(t, consoleMceConfig.Object["data"].(map[string]interface{})["VIRTUAL_MACHINE_ACTIONS"])
+}
+
 func Test_enableVMActions(t *testing.T) {
 	// Create a fake client to mock API calls.
 	searchInst := &searchv1alpha1.Search{
@@ -173,4 +187,42 @@ func Test_enableVMActions(t *testing.T) {
 	assert.NotEmpty(t, searchInst.Status.Conditions)
 	assert.Equal(t, "VirtualMachineActionsReady", searchInst.Status.Conditions[0].Type)
 	assert.Equal(t, metav1.ConditionTrue, searchInst.Status.Conditions[0].Status)
+}
+
+func Test_VM_disableActions(t *testing.T) {
+	// Create a fake client to mock API calls.
+	searchInst := &searchv1alpha1.Search{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "search-operator",
+			Namespace: "open-cluster-management",
+			Annotations: map[string]string{
+				"virtual-machines-preview": "false",
+			},
+		},
+		Spec: searchv1alpha1.SearchSpec{},
+		Status: searchv1alpha1.SearchStatus{
+			Conditions: []metav1.Condition{
+				{
+					Type:   "VirtualMachineActionsReady",
+					Status: metav1.ConditionTrue,
+				},
+			},
+		},
+	}
+	err := searchv1alpha1.SchemeBuilder.AddToScheme(scheme.Scheme)
+	if err != nil {
+		t.Errorf("error adding search scheme: (%v)", err)
+	}
+
+	// Create a fake client to mock API calls.
+	r := &SearchReconciler{
+		Client:        fake.NewClientBuilder().WithStatusSubresource(searchInst).WithRuntimeObjects(searchInst).Build(),
+		DynamicClient: fakeDynClientVM(),
+		Scheme:        scheme.Scheme,
+	}
+
+	_, err = r.reconcileVirtualMachineSetup(context.Background(), searchInst)
+
+	assert.Nil(t, err)
+	assert.Empty(t, searchInst.Status.Conditions)
 }

@@ -17,6 +17,7 @@ import (
 
 const (
 	CONDITION_VM_ACTIONS = "VirtualMachineActionsReady"
+	msaName   = "vm-actor"
 )
 
 var (
@@ -91,13 +92,15 @@ func (r *SearchReconciler) reconcileVirtualMachineSetup(ctx context.Context,
 				return &reconcile.Result{}, err
 			}
 
-			r.updateVMStatus(ctx, instance, metav1.Condition{
-				Type:               CONDITION_VM_ACTIONS,
-				Status:             metav1.ConditionFalse,
-				Reason:             "None",
-				Message:            "None",
-				LastTransitionTime: metav1.Now(),
-			})
+			// Remove the status condition.
+			instance.Status.Conditions = append(instance.Status.Conditions[:vmActionsConditionIndex],
+				instance.Status.Conditions[vmActionsConditionIndex+1:]...)
+
+			err = r.commitSearchCRInstanceState(ctx, instance)
+			if err != nil {
+				log.Error(err, "Failed to update Search CR instance status.")
+				return &reconcile.Result{}, err
+			}
 		}
 	}
 	return &reconcile.Result{}, nil
@@ -194,7 +197,7 @@ func (r *SearchReconciler) createVMManagedServiceAccount(ctx context.Context, cl
 			"apiVersion": "authentication.open-cluster-management.io/v1beta1",
 			"kind":       "ManagedServiceAccount",
 			"metadata": map[string]interface{}{
-				"name":   "vm-actor",
+				"name":   msaName,
 				"labels": appSearchVMLabels,
 			},
 			"spec": map[string]interface{}{
@@ -241,7 +244,7 @@ func (r *SearchReconciler) createVMClusterPermission(ctx context.Context, cluste
 				"clusterRoleBinding": map[string]interface{}{
 					"subject": map[string]interface{}{
 						"kind":      "ServiceAccount",
-						"name":      "vm-actor",
+						"name":      msaName,
 						"namespace": "open-cluster-management-agent-addon",
 					},
 				},
@@ -276,10 +279,10 @@ func (r *SearchReconciler) disableVirtualMachineActions(ctx context.Context) err
 	for _, cluster := range clusterList.Items {
 		// 2a. Delete the ManagedServiceAccount vm-actor.
 		err = r.DynamicClient.Resource(managedServiceAccountGvr).Namespace(cluster.GetName()).
-			Delete(ctx, "vm-actor", metav1.DeleteOptions{})
+			Delete(ctx, msaName, metav1.DeleteOptions{})
 
 		if err != nil && !errors.IsNotFound(err) { // Ignore NotFound errors.
-			logAndTrackError(&errList, err, "Failed to delete ManagedServiceAccount vm-actor", "cluster", cluster.GetName())
+			logAndTrackError(&errList, err, "Failed to delete ManagedServiceAccount", "name", msaName, "cluster", cluster.GetName())
 		}
 
 		// 2b. Delete the ClusterPermission vm-actions.
