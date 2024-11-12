@@ -157,7 +157,7 @@ func Test_VM_enableActions(t *testing.T) {
 			Name:      "search-operator",
 			Namespace: "open-cluster-management",
 			Annotations: map[string]string{
-				"virtual-machines-preview": "true",
+				"virtual-machine-preview": "true",
 			},
 		},
 		Spec: searchv1alpha1.SearchSpec{},
@@ -192,7 +192,7 @@ func Test_VM_disableActions(t *testing.T) {
 			Name:      "search-operator",
 			Namespace: "open-cluster-management",
 			Annotations: map[string]string{
-				"virtual-machines-preview": "false",
+				"virtual-machine-preview": "false",
 			},
 		},
 		Spec: searchv1alpha1.SearchSpec{},

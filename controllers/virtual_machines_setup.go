@@ -17,7 +17,7 @@ import (
 
 const (
 	CONDITION_VM_ACTIONS = "VirtualMachineActionsReady"
-	msaName   = "vm-actor"
+	msaName              = "vm-actor"
 )
 
 var (
@@ -28,12 +28,12 @@ var (
 	}
 	appSearchVMLabels = map[string]interface{}{
 		"app":     "search",
-		"feature": "virtual-machines",
+		"feature": "virtual-machine",
 	}
 )
 
 // Reconcile Virtual Machines feature.
-//  1. Check the virtual-machines-preview annotation.
+//  1. Check the virtual-machine-preview annotation.
 //  2. Validate dependencies.
 //     a. The ManagedServiceAccount add-on is enabled in the MultiClusterEngine CR.
 //     b. The ClusterProxy addon is enabled in the MultiClusterEngine CR.
@@ -43,8 +43,8 @@ var (
 func (r *SearchReconciler) reconcileVirtualMachineSetup(ctx context.Context,
 	instance *searchv1alpha1.Search) (*reconcile.Result, error) {
 
-	if instance.ObjectMeta.Annotations["virtual-machines-preview"] == "true" {
-		log.V(1).Info("The virtual-machines-preview annotation is present. Setting up Virtual machine actions.")
+	if instance.ObjectMeta.Annotations["virtual-machine-preview"] == "true" {
+		log.V(1).Info("The virtual-machine-preview annotation is present. Setting up Virtual machine actions.")
 
 		err := r.validateVirtualMachineDependencies(ctx)
 		if err != nil {
@@ -67,7 +67,7 @@ func (r *SearchReconciler) reconcileVirtualMachineSetup(ctx context.Context,
 		})
 
 	} else {
-		log.V(3).Info("The virtual-machines-preview annotation is not present.")
+		log.V(3).Info("The virtual-machine-preview annotation is not present.")
 
 		// Use the status conditions to determine if VM actions was enabled before this reconcile.
 		vmActionsConditionIndex := -1
@@ -81,6 +81,7 @@ func (r *SearchReconciler) reconcileVirtualMachineSetup(ctx context.Context,
 			log.V(1).Info("Virtual Machine actions were enabled before. Disabling virtual machine actions.")
 			err := r.disableVirtualMachineActions(ctx)
 			if err != nil {
+
 				log.Error(err, "Failed to disable virtual machine actions.")
 				r.updateVMStatus(ctx, instance, metav1.Condition{
 					Type:               CONDITION_VM_ACTIONS,
