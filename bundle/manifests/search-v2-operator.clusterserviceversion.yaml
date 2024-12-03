@@ -14,7 +14,7 @@ metadata:
         }
       ]
     capabilities: Basic Install
-    createdAt: "2024-10-28T17:11:33Z"
+    createdAt: "2024-12-03T20:24:18Z"
     operators.operatorframework.io/builder: operator-sdk-v1.34.1
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
   name: search-v2-operator.v0.0.1
@@ -134,6 +134,7 @@ spec:
           verbs:
           - create
           - delete
+          - get
         - apiGroups:
           - authorization.k8s.io
           resources:
@@ -218,6 +219,14 @@ spec:
           - get
           - list
           - update
+        - apiGroups:
+          - rbac.open-cluster-management.io
+          resources:
+          - clusterpermissions
+          verbs:
+          - create
+          - delete
+          - get
         - apiGroups:
           - search.open-cluster-management.io
           resources:
