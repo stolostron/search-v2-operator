@@ -261,7 +261,10 @@ func getRequests(deployment string, instance *searchv1alpha1.Search) corev1.Reso
 
 func getLimits(deployment string, instance *searchv1alpha1.Search) corev1.ResourceList {
 	var cpu, memory, hugepages2Mi, hugepages1Gi resource.Quantity
-	memory = resource.MustParse(defaultResoureMap[deployment]["MemoryLimit"])
+
+	if defaultMemLimit, exists := defaultResoureMap[deployment]["MemoryLimit"]; exists {
+		memory = resource.MustParse(defaultMemLimit)
+	}
 	if !isResourcesCustomized(deployment, instance) {
 		return corev1.ResourceList{
 			corev1.ResourceMemory: memory,
