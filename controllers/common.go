@@ -233,78 +233,83 @@ func getResourceRequirements(deploymentName string, instance *searchv1alpha1.Sea
 }
 
 func getRequests(deployment string, instance *searchv1alpha1.Search) corev1.ResourceList {
-	var cpu, memory, hugepages2Mi, hugepages1Gi resource.Quantity
-	cpu = resource.MustParse(defaultResoureMap[deployment]["CPURequest"])
-	memory = resource.MustParse(defaultResoureMap[deployment]["MemoryRequest"])
-	if !isResourcesCustomized(deployment, instance) {
+	requests := corev1.ResourceList{}
+	deploymentConfig := getDeploymentConfig(deployment, instance)
+
+	if deploymentConfig.Resources != nil && deploymentConfig.Resources.Requests != nil {
+		cpu := *deploymentConfig.Resources.Requests.Cpu()
+		if cpu.String() != "<nil>" && cpu.CmpInt64(0) != 0 {
+			requests[corev1.ResourceCPU] = cpu
+		}
+
+		memory := *deploymentConfig.Resources.Requests.Memory()
+		if memory.String() != "<nil>" && memory.CmpInt64(0) != 0 {
+			requests[corev1.ResourceMemory] = memory
+		}
+		if deploymentConfig.Resources.Requests.Name(ResourceHugePages2Mi, resource.BinarySI) != nil {
+			hugepages2Mi := *deploymentConfig.Resources.Requests.Name(ResourceHugePages2Mi, resource.BinarySI)
+			if hugepages2Mi.String() != "<nil>" && hugepages2Mi.CmpInt64(0) != 0 {
+				requests[ResourceHugePages2Mi] = hugepages2Mi
+			}
+		}
+		if deploymentConfig.Resources.Requests.Name(ResourceHugePages1Gi, resource.BinarySI) != nil {
+			hugepages1Gi := *deploymentConfig.Resources.Requests.Name(ResourceHugePages1Gi, resource.BinarySI)
+			if hugepages1Gi.String() != "<nil>" && hugepages1Gi.CmpInt64(0) != 0 {
+				requests[ResourceHugePages1Gi] = hugepages1Gi
+			}
+		}
+
+	} else {
+		// Use default resource requests.
+		cpu := resource.MustParse(defaultResoureMap[deployment]["CPURequest"])
+		memory := resource.MustParse(defaultResoureMap[deployment]["MemoryRequest"])
 		return corev1.ResourceList{
 			corev1.ResourceCPU:    cpu,
 			corev1.ResourceMemory: memory,
 		}
 	}
-	deploymentConfig := getDeploymentConfig(deployment, instance)
-	if deploymentConfig.Resources.Requests.Cpu() != nil {
-		cpu = *deploymentConfig.Resources.Requests.Cpu()
-	}
-	if deploymentConfig.Resources.Requests.Memory() != nil {
-		memory = *deploymentConfig.Resources.Requests.Memory()
-	}
-	if deploymentConfig.Resources.Requests.Name(ResourceHugePages2Mi, resource.BinarySI) != nil {
-		hugepages2Mi = *deploymentConfig.Resources.Requests.Name(ResourceHugePages2Mi, resource.BinarySI)
-	}
-	if deploymentConfig.Resources.Requests.Name(ResourceHugePages1Gi, resource.BinarySI) != nil {
-		hugepages1Gi = *deploymentConfig.Resources.Requests.Name(ResourceHugePages1Gi, resource.BinarySI)
-	}
 
-	return limitRequestPopulatedCheck(cpu, memory, hugepages2Mi, hugepages1Gi, "request", deployment)
+	return requests
 }
 
 func getLimits(deployment string, instance *searchv1alpha1.Search) corev1.ResourceList {
-	var cpu, memory, hugepages2Mi, hugepages1Gi resource.Quantity
-
-	if defaultMemLimit, exists := defaultResoureMap[deployment]["MemoryLimit"]; exists {
-		memory = resource.MustParse(defaultMemLimit)
-	}
-	if !isResourcesCustomized(deployment, instance) {
-		return corev1.ResourceList{
-			corev1.ResourceMemory: memory,
-		}
-	}
+	limits := corev1.ResourceList{}
 	deploymentConfig := getDeploymentConfig(deployment, instance)
 
-	if deploymentConfig.Resources.Limits.Cpu() != nil {
-		cpu = *deploymentConfig.Resources.Limits.Cpu()
-	}
-	if deploymentConfig.Resources.Limits.Memory() != nil {
-		memory = *deploymentConfig.Resources.Limits.Memory()
-	}
-	if deploymentConfig.Resources.Limits.Name(ResourceHugePages2Mi, resource.BinarySI) != nil {
-		hugepages2Mi = *deploymentConfig.Resources.Limits.Name(ResourceHugePages2Mi, resource.BinarySI)
-	}
-	if deploymentConfig.Resources.Limits.Name(ResourceHugePages1Gi, resource.BinarySI) != nil {
-		hugepages1Gi = *deploymentConfig.Resources.Limits.Name(ResourceHugePages1Gi, resource.BinarySI)
-	}
+	if deploymentConfig.Resources != nil && deploymentConfig.Resources.Limits != nil {
+		cpu := *deploymentConfig.Resources.Limits.Cpu()
+		if cpu.String() != "<nil>" && cpu.CmpInt64(0) != 0 {
+			limits[corev1.ResourceCPU] = cpu
+		}
 
-	return limitRequestPopulatedCheck(cpu, memory, hugepages2Mi, hugepages1Gi, "limit", deployment)
-}
+		memory := *deploymentConfig.Resources.Limits.Memory()
+		if memory.String() != "<nil>" && memory.CmpInt64(0) != 0 {
+			limits[corev1.ResourceMemory] = memory
+		}
 
-func limitRequestPopulatedCheck(cpu, memory, hugepages2Mi, hugepages1Gi resource.Quantity,
-	resource, deployment string) corev1.ResourceList {
-	resourceList := corev1.ResourceList{}
+		if deploymentConfig.Resources.Limits.Name(ResourceHugePages2Mi, resource.BinarySI) != nil {
+			hugepages2Mi := *deploymentConfig.Resources.Limits.Name(ResourceHugePages2Mi, resource.BinarySI)
+			if hugepages2Mi.String() != "<nil>" && hugepages2Mi.CmpInt64(0) != 0 {
+				limits[ResourceHugePages2Mi] = hugepages2Mi
+			}
+		}
 
-	if cpu.String() != "<nil>" && cpu.CmpInt64(0) != 0 {
-		resourceList[corev1.ResourceCPU] = cpu
+		if deploymentConfig.Resources.Limits.Name(ResourceHugePages1Gi, resource.BinarySI) != nil {
+			hugepages1Gi := *deploymentConfig.Resources.Limits.Name(ResourceHugePages1Gi, resource.BinarySI)
+			if hugepages1Gi.String() != "<nil>" && hugepages1Gi.CmpInt64(0) != 0 {
+				limits[ResourceHugePages1Gi] = hugepages1Gi
+			}
+		}
+	} else {
+		// Use default limits
+		if mem, exists := defaultResoureMap[deployment]["MemoryLimit"]; exists {
+			memory := resource.MustParse(mem)
+			return corev1.ResourceList{
+				corev1.ResourceMemory: memory,
+			}
+		}
 	}
-	if memory.String() != "<nil>" && memory.CmpInt64(0) != 0 {
-		resourceList[corev1.ResourceMemory] = memory
-	}
-	if hugepages2Mi.String() != "<nil>" && hugepages2Mi.CmpInt64(0) != 0 {
-		resourceList[ResourceHugePages2Mi] = hugepages2Mi
-	}
-	if hugepages1Gi.String() != "<nil>" && hugepages1Gi.CmpInt64(0) != 0 {
-		resourceList[ResourceHugePages1Gi] = hugepages1Gi
-	}
-	return resourceList
+	return limits
 }
 
 func getReplicaCount(deploymentName string, instance *searchv1alpha1.Search) *int32 {
@@ -348,26 +353,6 @@ func getImageSha(deploymentName string, instance *searchv1alpha1.Search) string 
 	}
 	log.V(2).Info("Unknown deployment ", "name", deploymentName)
 	return ""
-}
-
-func hasDeployments(instance *searchv1alpha1.Search) bool {
-	return instance.Spec.Deployments.DeepCopy() != nil
-}
-
-func isDeploymentCustomized(deploymentName string, instance *searchv1alpha1.Search) bool {
-	if !hasDeployments(instance) {
-		return false
-	}
-	deploymentConfig := getDeploymentConfig(deploymentName, instance)
-	return deploymentConfig.DeepCopy() != nil
-}
-
-func isResourcesCustomized(deploymentName string, instance *searchv1alpha1.Search) bool {
-	if !isDeploymentCustomized(deploymentName, instance) {
-		return false
-	}
-	deploymentConfig := getDeploymentConfig(deploymentName, instance)
-	return deploymentConfig.Resources != nil
 }
 
 func (r *SearchReconciler) addEnvToSearchAPI(ctx context.Context,
