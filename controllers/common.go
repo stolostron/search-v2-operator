@@ -236,33 +236,34 @@ func getRequests(deployment string, instance *searchv1alpha1.Search) corev1.Reso
 	requests := corev1.ResourceList{}
 	resources := getDeploymentConfig(deployment, instance).Resources
 
+	// Set default requests. These will get overwritten if we find custom requests later.
+	if cpu, exists := defaultResoureMap[deployment]["CPURequest"]; exists {
+		requests[corev1.ResourceCPU] = resource.MustParse(cpu)
+	}
+	if memory, exists := defaultResoureMap[deployment]["MemoryRequest"]; exists {
+		requests[corev1.ResourceMemory] = resource.MustParse(memory)
+	}
+
+	// Use custom resource requests if these are provided in the search cr instance.
 	if resources != nil && resources.Requests != nil {
 		cpu := *resources.Requests.Cpu()
-		if cpu.String() != "<nil>" && cpu.CmpInt64(0) != 0 {
+		if !cpu.IsZero() {
 			requests[corev1.ResourceCPU] = cpu
 		}
 
 		memory := *resources.Requests.Memory()
-		if memory.String() != "<nil>" && memory.CmpInt64(0) != 0 {
+		if !memory.IsZero() {
 			requests[corev1.ResourceMemory] = memory
 		}
 
 		hugepages2Mi := *resources.Requests.Name(ResourceHugePages2Mi, resource.BinarySI)
-		if hugepages2Mi.String() != "<nil>" && hugepages2Mi.CmpInt64(0) != 0 {
+		if !hugepages2Mi.IsZero() {
 			requests[ResourceHugePages2Mi] = hugepages2Mi
 		}
 
 		hugepages1Gi := *resources.Requests.Name(ResourceHugePages1Gi, resource.BinarySI)
-		if hugepages1Gi.String() != "<nil>" && hugepages1Gi.CmpInt64(0) != 0 {
+		if !hugepages1Gi.IsZero() {
 			requests[ResourceHugePages1Gi] = hugepages1Gi
-		}
-	} else {
-		// Use default requests.
-		if cpu, exists := defaultResoureMap[deployment]["CPURequest"]; exists {
-			requests[corev1.ResourceCPU] = resource.MustParse(cpu)
-		}
-		if memory, exists := defaultResoureMap[deployment]["MemoryRequest"]; exists {
-			requests[corev1.ResourceMemory] = resource.MustParse(memory)
 		}
 	}
 
@@ -273,32 +274,34 @@ func getLimits(deployment string, instance *searchv1alpha1.Search) corev1.Resour
 	limits := corev1.ResourceList{}
 	resources := getDeploymentConfig(deployment, instance).Resources
 
+	// Set default memory limit. It will get overwritten if we find custom limits later.
+	if memory, exists := defaultResoureMap[deployment]["MemoryLimit"]; exists {
+		limits[corev1.ResourceMemory] = resource.MustParse(memory)
+	}
+
+	// Use custom resource limits if these are provided in the search cr instance.
 	if resources != nil && resources.Limits != nil {
 		cpu := *resources.Limits.Cpu()
-		if cpu.String() != "<nil>" && cpu.CmpInt64(0) != 0 {
+		if !cpu.IsZero() {
 			limits[corev1.ResourceCPU] = cpu
 		}
 
 		memory := *resources.Limits.Memory()
-		if memory.String() != "<nil>" && memory.CmpInt64(0) != 0 {
+		if !memory.IsZero() {
 			limits[corev1.ResourceMemory] = memory
 		}
 
 		hugepages2Mi := *resources.Limits.Name(ResourceHugePages2Mi, resource.BinarySI)
-		if hugepages2Mi.String() != "<nil>" && hugepages2Mi.CmpInt64(0) != 0 {
+		if !hugepages2Mi.IsZero() {
 			limits[ResourceHugePages2Mi] = hugepages2Mi
 		}
 
 		hugepages1Gi := *resources.Limits.Name(ResourceHugePages1Gi, resource.BinarySI)
-		if hugepages1Gi.String() != "<nil>" && hugepages1Gi.CmpInt64(0) != 0 {
+		if !hugepages1Gi.IsZero() {
 			limits[ResourceHugePages1Gi] = hugepages1Gi
 		}
-	} else {
-		// Use default memory limit
-		if memory, exists := defaultResoureMap[deployment]["MemoryLimit"]; exists {
-			limits[corev1.ResourceMemory] = resource.MustParse(memory)
-		}
 	}
+
 	return limits
 }
 
