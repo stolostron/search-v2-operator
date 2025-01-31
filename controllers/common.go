@@ -260,12 +260,12 @@ func getRequests(deployment string, instance *searchv1alpha1.Search) corev1.Reso
 		}
 
 	} else {
-		// Use default resource requests.
-		cpu := resource.MustParse(defaultResoureMap[deployment]["CPURequest"])
-		memory := resource.MustParse(defaultResoureMap[deployment]["MemoryRequest"])
-		return corev1.ResourceList{
-			corev1.ResourceCPU:    cpu,
-			corev1.ResourceMemory: memory,
+		// Use default requests.
+		if cpu, exists := defaultResoureMap[deployment]["CPURequest"]; exists {
+			requests[corev1.ResourceCPU] = resource.MustParse(cpu)
+		}
+		if memory, exists := defaultResoureMap[deployment]["MemoryRequest"]; exists {
+			requests[corev1.ResourceMemory] = resource.MustParse(memory)
 		}
 	}
 
@@ -301,12 +301,9 @@ func getLimits(deployment string, instance *searchv1alpha1.Search) corev1.Resour
 			}
 		}
 	} else {
-		// Use default limits
-		if mem, exists := defaultResoureMap[deployment]["MemoryLimit"]; exists {
-			memory := resource.MustParse(mem)
-			return corev1.ResourceList{
-				corev1.ResourceMemory: memory,
-			}
+		// Use default memory limit
+		if memory, exists := defaultResoureMap[deployment]["MemoryLimit"]; exists {
+			limits[corev1.ResourceMemory] = resource.MustParse(memory)
 		}
 	}
 	return limits
