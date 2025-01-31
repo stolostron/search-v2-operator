@@ -2,10 +2,10 @@
 package controllers
 
 const (
-	default_API_CPURequest    = "5m"
+	default_API_CPURequest    = "10m"
 	default_API_MemoryRequest = "512Mi"
 
-	default_Indexer_CPURequest    = "5m"
+	default_Indexer_CPURequest    = "10m"
 	default_Indexer_MemoryRequest = "32Mi"
 
 	default_Collector_CPURequest    = "25m"
