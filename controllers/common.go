@@ -246,19 +246,16 @@ func getRequests(deployment string, instance *searchv1alpha1.Search) corev1.Reso
 		if memory.String() != "<nil>" && memory.CmpInt64(0) != 0 {
 			requests[corev1.ResourceMemory] = memory
 		}
-		if deploymentConfig.Resources.Requests.Name(ResourceHugePages2Mi, resource.BinarySI) != nil {
-			hugepages2Mi := *deploymentConfig.Resources.Requests.Name(ResourceHugePages2Mi, resource.BinarySI)
-			if hugepages2Mi.String() != "<nil>" && hugepages2Mi.CmpInt64(0) != 0 {
-				requests[ResourceHugePages2Mi] = hugepages2Mi
-			}
-		}
-		if deploymentConfig.Resources.Requests.Name(ResourceHugePages1Gi, resource.BinarySI) != nil {
-			hugepages1Gi := *deploymentConfig.Resources.Requests.Name(ResourceHugePages1Gi, resource.BinarySI)
-			if hugepages1Gi.String() != "<nil>" && hugepages1Gi.CmpInt64(0) != 0 {
-				requests[ResourceHugePages1Gi] = hugepages1Gi
-			}
+
+		hugepages2Mi := *deploymentConfig.Resources.Requests.Name(ResourceHugePages2Mi, resource.BinarySI)
+		if hugepages2Mi.String() != "<nil>" && hugepages2Mi.CmpInt64(0) != 0 {
+			requests[ResourceHugePages2Mi] = hugepages2Mi
 		}
 
+		hugepages1Gi := *deploymentConfig.Resources.Requests.Name(ResourceHugePages1Gi, resource.BinarySI)
+		if hugepages1Gi.String() != "<nil>" && hugepages1Gi.CmpInt64(0) != 0 {
+			requests[ResourceHugePages1Gi] = hugepages1Gi
+		}
 	} else {
 		// Use default requests.
 		if cpu, exists := defaultResoureMap[deployment]["CPURequest"]; exists {
@@ -287,18 +284,14 @@ func getLimits(deployment string, instance *searchv1alpha1.Search) corev1.Resour
 			limits[corev1.ResourceMemory] = memory
 		}
 
-		if deploymentConfig.Resources.Limits.Name(ResourceHugePages2Mi, resource.BinarySI) != nil {
-			hugepages2Mi := *deploymentConfig.Resources.Limits.Name(ResourceHugePages2Mi, resource.BinarySI)
-			if hugepages2Mi.String() != "<nil>" && hugepages2Mi.CmpInt64(0) != 0 {
-				limits[ResourceHugePages2Mi] = hugepages2Mi
-			}
+		hugepages2Mi := *deploymentConfig.Resources.Limits.Name(ResourceHugePages2Mi, resource.BinarySI)
+		if hugepages2Mi.String() != "<nil>" && hugepages2Mi.CmpInt64(0) != 0 {
+			limits[ResourceHugePages2Mi] = hugepages2Mi
 		}
 
-		if deploymentConfig.Resources.Limits.Name(ResourceHugePages1Gi, resource.BinarySI) != nil {
-			hugepages1Gi := *deploymentConfig.Resources.Limits.Name(ResourceHugePages1Gi, resource.BinarySI)
-			if hugepages1Gi.String() != "<nil>" && hugepages1Gi.CmpInt64(0) != 0 {
-				limits[ResourceHugePages1Gi] = hugepages1Gi
-			}
+		hugepages1Gi := *deploymentConfig.Resources.Limits.Name(ResourceHugePages1Gi, resource.BinarySI)
+		if hugepages1Gi.String() != "<nil>" && hugepages1Gi.CmpInt64(0) != 0 {
+			limits[ResourceHugePages1Gi] = hugepages1Gi
 		}
 	} else {
 		// Use default memory limit
