@@ -22,11 +22,8 @@ spec:
           protocol: TCP
           name: https
         resources:
-          limits:
-            cpu: 200m
-            memory: 1Gi
           requests:
-            cpu: 100m
+            cpu: 10m
             memory: 256Mi
       - name: manager
         args:
@@ -34,9 +31,6 @@ spec:
         - "--metrics-bind-address=127.0.0.1:8080"
         - "--leader-elect"
         resources:
-          limits:
-            cpu: 200m
-            memory: 6Gi
           requests:
-            cpu: 50m
+            cpu: 10m
             memory: 256Mi

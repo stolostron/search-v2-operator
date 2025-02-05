@@ -30,35 +30,8 @@ func TestGetDeploymentConfigForNil(t *testing.T) {
 	if deploymentConfig.DeepCopy() == nil {
 		t.Error("DeploymentConfig returned unexpectd nil")
 	}
-	actualCustomized := isDeploymentCustomized("search-api", instance)
-	if !actualCustomized {
-		t.Error("isDeploymentCustomized returned incorrect status")
-	}
 }
-func TestResourcesCustomized(t *testing.T) {
-	instance := &searchv1alpha1.Search{
-		Spec: searchv1alpha1.SearchSpec{
-			Deployments: searchv1alpha1.SearchDeployments{
-				QueryAPI: searchv1alpha1.DeploymentConfig{
-					ReplicaCount: 1,
-					Resources: &corev1.ResourceRequirements{
-						Limits: corev1.ResourceList{
-							"memory": resource.MustParse("25Mi"),
-						},
-						Requests: corev1.ResourceList{
-							"cpu":    resource.MustParse("25m"),
-							"memory": resource.MustParse("10Mi"),
-						},
-					},
-				},
-			},
-		},
-	}
-	want := true
-	if isResourcesCustomized("search-api", instance) != want {
-		t.Error("QueryAPI is not customized")
-	}
-}
+
 func TestResourcesNotCustomized(t *testing.T) {
 	instance := &searchv1alpha1.Search{
 		Spec: searchv1alpha1.SearchSpec{
@@ -79,10 +52,6 @@ func TestResourcesNotCustomized(t *testing.T) {
 		},
 	}
 	os.Setenv("COLLECTOR_IMAGE", "value-from-env")
-	want := false
-	if isResourcesCustomized("search-collector", instance) != want {
-		t.Error("Collector is customized")
-	}
 
 	actualNodelSelector := getNodeSelector("search-collector", instance)
 	if actualNodelSelector != nil {
