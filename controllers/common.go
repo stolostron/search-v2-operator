@@ -237,10 +237,10 @@ func getRequests(deployment string, instance *searchv1alpha1.Search) corev1.Reso
 	resources := getDeploymentConfig(deployment, instance).Resources
 
 	// Set default requests. These will get overwritten if we find custom requests later.
-	if cpu, exists := defaultResoureMap[deployment]["CPURequest"]; exists {
+	if cpu, exists := defaultResourceMap[deployment]["CPURequest"]; exists {
 		requests[corev1.ResourceCPU] = resource.MustParse(cpu)
 	}
-	if memory, exists := defaultResoureMap[deployment]["MemoryRequest"]; exists {
+	if memory, exists := defaultResourceMap[deployment]["MemoryRequest"]; exists {
 		requests[corev1.ResourceMemory] = resource.MustParse(memory)
 	}
 
@@ -275,7 +275,7 @@ func getLimits(deployment string, instance *searchv1alpha1.Search) corev1.Resour
 	resources := getDeploymentConfig(deployment, instance).Resources
 
 	// Set default memory limit. It will get overwritten if we find custom limits later.
-	if memory, exists := defaultResoureMap[deployment]["MemoryLimit"]; exists {
+	if memory, exists := defaultResourceMap[deployment]["MemoryLimit"]; exists {
 		limits[corev1.ResourceMemory] = resource.MustParse(memory)
 	}
 
