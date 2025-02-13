@@ -1,0 +1,29 @@
+---
+{{- if .Values.prometheus.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "controller.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ include "controller.fullname" . }}
+    chart: {{ include "controller.chart" . }}
+    release: {{ .Release.Name }}
+    search-monitor: {{ include "controller.fullname" . }}
+    heritage: {{ .Release.Service }}
+    addon.open-cluster-management.io/hosted-manifest-location: hosting
+  annotations:
+    service.alpha.openshift.io/serving-cert-secret-name: {{ include "controller.fullname" . }}
+    service.beta.openshift.io/serving-cert-secret-name: {{ include "controller.fullname" . }}
+spec:
+  ports:
+    - name: metrics
+      protocol: TCP
+      port: 5010
+      targetPort: 5010
+  selector:
+    app: {{ include "controller.fullname" . }}
+    release: {{ .Release.Name }}
+  sessionAffinity: None
+  type: ClusterIP
+{{- end }}

@@ -168,34 +168,38 @@ func (r *SearchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	}
 	result, err = r.createRoleBinding(ctx, r.ClusterRoleBinding(instance))
 	if result != nil {
-		log.Error(err, "ClusterRoleBinding  setup failed")
+		log.Error(err, "ClusterRoleBinding setup failed")
 		return *result, err
 	}
 	result, err = r.createSecret(ctx, r.PGSecret(instance))
 	if result != nil {
-		log.Error(err, "Postgres Secret  setup failed")
+		log.Error(err, "Postgres Secret setup failed")
 		return *result, err
 	}
 	result, err = r.createService(ctx, r.PGService(instance))
 	if result != nil {
-		log.Error(err, "Postgres Service  setup failed")
+		log.Error(err, "Postgres Service setup failed")
 		return *result, err
 	}
 	result, err = r.createOrUpdateDeployment(ctx, r.PGDeployment(instance))
 	if result != nil {
-		log.Error(err, "Postgres Deployment  setup failed")
+		log.Error(err, "Postgres Deployment setup failed")
 		return *result, err
 	}
 
 	result, err = r.createService(ctx, r.IndexerService(instance))
 	if result != nil {
-		log.Error(err, "Indexer Service  setup failed")
+		log.Error(err, "Indexer Service setup failed")
 		return *result, err
 	}
 	result, err = r.createService(ctx, r.APIService(instance))
 	if result != nil {
-		log.Error(err, "API Service  setup failed")
+		log.Error(err, "API Service setup failed")
 		return *result, err
+	}
+	result, err = r.createService(ctx, r.CollectorService(instance))
+	if result != nil {
+		log.Error(err, "Collector Service setup failed")
 	}
 	result, err = r.createServiceMonitor(ctx, r.ServiceMonitor(instance, "search-indexer", instance.Namespace))
 	if result != nil {
@@ -205,6 +209,11 @@ func (r *SearchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	result, err = r.createServiceMonitor(ctx, r.ServiceMonitor(instance, "search-api", instance.Namespace))
 	if result != nil {
 		log.Error(err, "ServiceMonitor setup failed for search-api")
+		return *result, err
+	}
+	result, err = r.createServiceMonitor(ctx, r.CollectorServiceMonitor(instance, "search-collector", instance.Namespace))
+	if result != nil {
+		log.Error(err, "ServiceMonitor setup failed for search-collector")
 		return *result, err
 	}
 
