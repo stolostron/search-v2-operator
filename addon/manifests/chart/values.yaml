@@ -23,6 +23,14 @@ logLevel: null
 
 tolerations: []
 
+# This will expose metrics
+prometheus:
+  # This will be automatically enabled if it's an OpenShift cluster
+  enabled: false
+  serviceMonitor:
+    # This will be automatically set to controller's namespace
+    namespace: null
+
 global: 
   imagePullPolicy: IfNotPresent
   imagePullSecret: open-cluster-management-image-pull-credentials
