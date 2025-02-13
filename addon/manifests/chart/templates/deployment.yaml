@@ -84,8 +84,16 @@ spec:
           limits:
             memory: 1024Mi
           {{- end }}
-        livenessProbe: null
-        readinessProbe: null
+        livenessProbe:
+          httpGet:
+            path: /liveness
+            port: 5010
+            initialDelaySeconds: 20
+        readinessProbe:
+          httpGet:
+            path: /readiness
+            port: 5010
+            initialDelaySeconds: 15
         volumeMounts:
         - name: hub-config
           mountPath: /hubconfig
