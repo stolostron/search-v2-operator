@@ -1,20 +1,17 @@
 ---
-{{- if .Values.prometheus.enabled }}
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "controller.fullname" . }}
+  name: {{ template "search.fullname" . }}
   namespace: {{ .Release.Namespace }}
   labels:
-    app: {{ include "controller.fullname" . }}
-    chart: {{ include "controller.chart" . }}
+    app: {{ template "search.fullname" . }}
+    chart: {{ template "search.chart" . }}
     release: {{ .Release.Name }}
-    search-monitor: {{ include "controller.fullname" . }}
+    search-monitor: {{ template "search.fullname" . }}
     heritage: {{ .Release.Service }}
     addon.open-cluster-management.io/hosted-manifest-location: hosting
-  annotations:
-    service.alpha.openshift.io/serving-cert-secret-name: {{ include "controller.fullname" . }}
-    service.beta.openshift.io/serving-cert-secret-name: {{ include "controller.fullname" . }}
+    component: search
 spec:
   ports:
     - name: metrics
@@ -22,8 +19,7 @@ spec:
       port: 5010
       targetPort: 5010
   selector:
-    app: {{ include "controller.fullname" . }}
+    app: {{ template "search.fullname" . }}
     release: {{ .Release.Name }}
   sessionAffinity: None
   type: ClusterIP
-{{- end }}

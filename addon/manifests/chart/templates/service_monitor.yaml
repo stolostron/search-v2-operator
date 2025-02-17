@@ -1,13 +1,11 @@
 ---
-{{- if .Values.prometheus.enabled }}
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
-  name: {{ include "controller.fullname" . }}-metrics
-  namespace: {{ .Values.prometheus.serviceMonitor.namespace | default .Release.Namespace }}
+  name: {{ template "search.fullname" . }}-monitor
+  namespace: {{ .Release.Namespace }}
   labels:
-    app: {{ include "controller.fullname" . }}
-    chart: {{ include "controller.chart" . }}
+    app: {{ template "search.fullname" . }}
     release: {{ .Release.Name }}
     heritage: {{ .Release.Service }}
     addon.open-cluster-management.io/hosted-manifest-location: hosting
@@ -22,6 +20,5 @@ spec:
       - {{ .Release.Namespace }}
   selector:
     matchLabels:
-      app: {{ include "controller.fullname" . }}
+      app: {{ template "search.fullname" . }}
       release: {{ .Release.Name }}
-{{- end }}
