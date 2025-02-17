@@ -6,6 +6,7 @@ metadata:
   namespace: {{ .Release.Namespace }}
   labels:
     component: "search"
+    test: "test"
 spec:
   replicas: 1
   selector:
