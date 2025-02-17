@@ -4,12 +4,14 @@ import (
 	"context"
 	"embed"
 	"fmt"
+	"k8s.io/apimachinery/pkg/runtime"
 	"os"
 	"reflect"
 	"regexp"
 	"strconv"
 
 	"github.com/cloudflare/cfssl/log"
+	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	searchv1alpha1 "github.com/stolostron/search-v2-operator/api/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -42,6 +44,8 @@ const (
 //go:embed manifests/chart
 //go:embed manifests/chart/templates/_helpers.tpl
 var ChartFS embed.FS
+
+var Scheme = runtime.NewScheme()
 
 const ChartDir = "manifests/chart"
 const resourceRegex = "^(\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))))?$"
@@ -198,6 +202,10 @@ func newRoleBindingForClusterRole(name, clusterRoleName, clusterName, addonName 
 func NewAddonManager(kubeConfig *rest.Config) (addonmanager.AddonManager, error) {
 	if SearchCollectorImage == "" {
 		return nil, fmt.Errorf("the search-collector pod image is empty")
+	}
+	err := prometheusv1.AddToScheme(Scheme)
+	if err != nil {
+		klog.Errorf("failed to add Prometheus scheme to scheme: %v", err)
 	}
 	addonMgr, err := addonmanager.New(kubeConfig)
 	if err != nil {
