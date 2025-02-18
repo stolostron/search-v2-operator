@@ -1,4 +1,5 @@
 ---
+{{- if .Values.prometheus.enabled }}
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
@@ -21,3 +22,4 @@ spec:
   selector:
     matchLabels:
       component: "search"
+{{- end }}
