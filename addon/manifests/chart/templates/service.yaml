@@ -2,13 +2,13 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ template "search.fullname" . }}
+  name: {{ template "controller.fullname" . }}
   namespace: {{ .Release.Namespace }}
   labels:
-    app: {{ template "search.fullname" . }}
+    app: {{ template "controller.fullname" . }}
     chart: {{ template "search.chart" . }}
     release: {{ .Release.Name }}
-    search-monitor: {{ template "search.fullname" . }}
+    search-monitor: {{ template "controller.fullname" . }}
     heritage: {{ .Release.Service }}
     addon.open-cluster-management.io/hosted-manifest-location: hosting
     component: search

@@ -2,14 +2,14 @@
 kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
-  name: {{ .Values.org }}:{{ template "search.fullname" . }}
+  name: {{ .Values.org }}:{{ template "controller.fullname" . }}
   labels:
     component: "search"
 subjects:
 - kind: ServiceAccount
-  name: {{ template "search.fullname" . }}
+  name: {{ template "controller.fullname" . }}
   namespace: {{ .Release.Namespace }}
 roleRef:
   kind: ClusterRole
-  name: {{ .Values.org }}:{{ template "search.fullname" . }}
+  name: {{ .Values.org }}:{{ template "controller.fullname" . }}
   apiGroup: rbac.authorization.k8s.io

@@ -2,10 +2,10 @@
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
-  name: {{ template "search.fullname" . }}-monitor
+  name: {{ template "controller.fullname" . }}-monitor
   namespace: {{ .Release.Namespace }}
   labels:
-    app: {{ template "search.fullname" . }}
+    app: {{ template "controller.fullname" . }}
     release: {{ .Release.Name }}
     heritage: {{ .Release.Service }}
     addon.open-cluster-management.io/hosted-manifest-location: hosting
