@@ -84,6 +84,7 @@ spec:
           limits:
             memory: 1024Mi
           {{- end }}
+        {{- if .Values.prometheus.enabled }}
         livenessProbe:
           httpGet:
             path: /liveness
@@ -94,6 +95,10 @@ spec:
             path: /readiness
             port: 5010
             initialDelaySeconds: 15
+        {{- else }}
+        livenessProbe: null
+        readinessProbe: null
+        {{- end }}
         volumeMounts:
         - name: hub-config
           mountPath: /hubconfig

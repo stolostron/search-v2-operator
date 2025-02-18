@@ -71,8 +71,10 @@ type UserArgs struct {
 }
 
 type Values struct {
-	GlobalValues GlobalValues `json:"global,"`
-	UserArgs     UserArgs     `json:"userargs,"`
+	GlobalValues           GlobalValues           `json:"global,"`
+	KubernetesDistribution string                 `json:"kubernetesDistribution"`
+	Prometheus             map[string]interface{} `json:"prometheus"`
+	UserArgs               UserArgs               `json:"userargs,"`
 }
 
 func getValue(cluster *clusterv1.ManagedCluster,
@@ -91,7 +93,17 @@ func getValue(cluster *clusterv1.ManagedCluster,
 				"NO_PROXY":    "",
 			},
 		},
+		Prometheus: map[string]interface{}{},
 	}
+	for _, cc := range cluster.Status.ClusterClaims {
+		if cc.Name == "product.open-cluster-management.io" {
+			addonValues.KubernetesDistribution = cc.Value
+			break
+		}
+	}
+	// enable prometheus if on OpenShift
+	addonValues.Prometheus["enabled"] = addonValues.KubernetesDistribution == "OpenShift"
+
 	if val, ok := addon.GetAnnotations()["addon.open-cluster-management.io/search_memory_limit"]; ok {
 		match, err := regexp.MatchString(resourceRegex, val)
 		if err != nil {
