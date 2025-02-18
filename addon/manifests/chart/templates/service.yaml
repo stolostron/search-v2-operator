@@ -19,7 +19,6 @@ spec:
       port: 5010
       targetPort: 5010
   selector:
-    app: {{ template "search.fullname" . }}
-    release: {{ .Release.Name }}
+    component: "search"
   sessionAffinity: None
   type: ClusterIP
