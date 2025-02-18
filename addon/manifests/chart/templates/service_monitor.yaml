@@ -19,4 +19,5 @@ spec:
     matchNames:
       - {{ .Release.Namespace }}
   selector:
-    component: "search"
+    matchLabels:
+      component: "search"
