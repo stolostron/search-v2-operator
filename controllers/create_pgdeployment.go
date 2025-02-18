@@ -159,7 +159,7 @@ func (r *SearchReconciler) PGDeployment(instance *searchv1alpha1.Search) *appsv1
 	deployment.Spec.Template.Spec.ServiceAccountName = getServiceAccountName()
 
 	// Increase the termination grace period to allow connections to finish.
-	terminationGracePeriodSeconds := int64(305) // 5 minutes and 5 seconds
+	terminationGracePeriodSeconds := int64(300) // 5 minutes
 	deployment.Spec.Template.Spec.TerminationGracePeriodSeconds = &terminationGracePeriodSeconds
 
 	if getNodeSelector(deploymentName, instance) != nil {
