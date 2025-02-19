@@ -5,6 +5,7 @@ import (
 	searchv1alpha1 "github.com/stolostron/search-v2-operator/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
@@ -33,8 +34,10 @@ func (r *SearchReconciler) CollectorDeployment(instance *searchv1alpha1.Search) 
 			InitialDelaySeconds: 15,
 			TimeoutSeconds:      1,
 			ProbeHandler: corev1.ProbeHandler{
-				Exec: &corev1.ExecAction{
-					Command: []string{"ls"},
+				HTTPGet: &corev1.HTTPGetAction{
+					Port:   intstr.FromInt(5010),
+					Path:   "/readiness",
+					Scheme: "HTTP",
 				},
 			},
 		},
@@ -42,8 +45,10 @@ func (r *SearchReconciler) CollectorDeployment(instance *searchv1alpha1.Search) 
 			InitialDelaySeconds: 20,
 			TimeoutSeconds:      1,
 			ProbeHandler: corev1.ProbeHandler{
-				Exec: &corev1.ExecAction{
-					Command: []string{"ls"},
+				HTTPGet: &corev1.HTTPGetAction{
+					Port:   intstr.FromInt(5010),
+					Path:   "/liveness",
+					Scheme: "HTTP",
 				},
 			},
 		},

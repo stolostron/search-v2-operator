@@ -1,0 +1,26 @@
+---
+{{- if .Values.prometheus.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ template "controller.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ template "controller.fullname" . }}
+    chart: {{ template "controller.chart" . }}
+    release: {{ .Release.Name }}
+    search-monitor: {{ template "controller.fullname" . }}
+    heritage: {{ .Release.Service }}
+    addon.open-cluster-management.io/hosted-manifest-location: hosting
+    component: search
+spec:
+  ports:
+    - name: metrics
+      protocol: TCP
+      port: 5010
+      targetPort: 5010
+  selector:
+    component: "search"
+  sessionAffinity: None
+  type: ClusterIP
+{{- end}}

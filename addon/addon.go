@@ -4,12 +4,14 @@ import (
 	"context"
 	"embed"
 	"fmt"
+	"k8s.io/apimachinery/pkg/runtime"
 	"os"
 	"reflect"
 	"regexp"
 	"strconv"
 
 	"github.com/cloudflare/cfssl/log"
+	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	searchv1alpha1 "github.com/stolostron/search-v2-operator/api/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -43,6 +45,8 @@ const (
 //go:embed manifests/chart/templates/_helpers.tpl
 var ChartFS embed.FS
 
+var Scheme = runtime.NewScheme()
+
 const ChartDir = "manifests/chart"
 const resourceRegex = "^(\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))))?$"
 
@@ -67,8 +71,10 @@ type UserArgs struct {
 }
 
 type Values struct {
-	GlobalValues GlobalValues `json:"global,"`
-	UserArgs     UserArgs     `json:"userargs,"`
+	GlobalValues           GlobalValues           `json:"global,"`
+	KubernetesDistribution string                 `json:"kubernetesDistribution"`
+	Prometheus             map[string]interface{} `json:"prometheus"`
+	UserArgs               UserArgs               `json:"userargs,"`
 }
 
 func getValue(cluster *clusterv1.ManagedCluster,
@@ -87,7 +93,17 @@ func getValue(cluster *clusterv1.ManagedCluster,
 				"NO_PROXY":    "",
 			},
 		},
+		Prometheus: map[string]interface{}{},
 	}
+	for _, cc := range cluster.Status.ClusterClaims {
+		if cc.Name == "product.open-cluster-management.io" {
+			addonValues.KubernetesDistribution = cc.Value
+			break
+		}
+	}
+	// enable prometheus if on OpenShift
+	addonValues.Prometheus["enabled"] = addonValues.KubernetesDistribution == "OpenShift"
+
 	if val, ok := addon.GetAnnotations()["addon.open-cluster-management.io/search_memory_limit"]; ok {
 		match, err := regexp.MatchString(resourceRegex, val)
 		if err != nil {
@@ -199,6 +215,10 @@ func NewAddonManager(kubeConfig *rest.Config) (addonmanager.AddonManager, error)
 	if SearchCollectorImage == "" {
 		return nil, fmt.Errorf("the search-collector pod image is empty")
 	}
+	err := prometheusv1.AddToScheme(Scheme)
+	if err != nil {
+		klog.Errorf("failed to add Prometheus scheme to scheme: %v", err)
+	}
 	addonMgr, err := addonmanager.New(kubeConfig)
 	if err != nil {
 		klog.Errorf("unable to setup addon manager: %v", err)
@@ -215,6 +235,7 @@ func NewAddonManager(kubeConfig *rest.Config) (addonmanager.AddonManager, error)
 		return nil, err
 	}
 	agentAddon, err := addonfactory.NewAgentAddonFactory(SearchAddonName, ChartFS, ChartDir).
+		WithScheme(Scheme).
 		WithConfigGVRs(
 			utils.AddOnDeploymentConfigGVR,
 		).WithGetValuesFuncs(
