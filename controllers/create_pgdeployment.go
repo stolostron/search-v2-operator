@@ -157,6 +157,16 @@ func (r *SearchReconciler) PGDeployment(instance *searchv1alpha1.Search) *appsv1
 	deployment.Spec.Template.Spec.Containers = []corev1.Container{postgresContainer}
 	deployment.Spec.Template.Spec.Volumes = volumes
 	deployment.Spec.Template.Spec.ServiceAccountName = getServiceAccountName()
+
+	// Use a recreate strategy to reduce the possibility of data corruption.
+	// With the recreate strategy the existing postgres pod will be terminated before the new one starts.
+	deployment.Spec.Strategy = appsv1.DeploymentStrategy{
+		Type: appsv1.RecreateDeploymentStrategyType,
+	}
+	// Increase the termination grace period to allow connections to finish.
+	terminationGracePeriodSeconds := int64(300) // 5 minutes
+	deployment.Spec.Template.Spec.TerminationGracePeriodSeconds = &terminationGracePeriodSeconds
+
 	if getNodeSelector(deploymentName, instance) != nil {
 		deployment.Spec.Template.Spec.NodeSelector = getNodeSelector(deploymentName, instance)
 	}
