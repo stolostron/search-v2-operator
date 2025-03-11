@@ -1,6 +1,6 @@
 module github.com/stolostron/search-v2-operator
 
-go 1.21
+go 1.22
 
 require (
 	github.com/cloudflare/cfssl v1.6.5
