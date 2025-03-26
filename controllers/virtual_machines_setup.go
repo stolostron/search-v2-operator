@@ -18,7 +18,7 @@ import (
 const (
 	CONDITION_VM_ACTIONS  = "VirtualMachineActionsReady"
 	clusterPermissionName = "virtual-machine-actions"
-	managedSAName         = "virtual-machine-actor"
+	managedSAName         = "vm-actor"
 )
 
 var (
