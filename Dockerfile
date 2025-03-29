@@ -18,7 +18,7 @@ COPY addon/ addon/
 
 # Build
 RUN CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -a -o manager main.go
-FROM registry.access.redhat.com/ubi8/ubi-minimal:latest
+FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
 
 ARG VCS_REF
 ARG VCS_URL
