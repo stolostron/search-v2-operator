@@ -54,12 +54,8 @@ LABEL org.label-schema.vendor="Red Hat" \
 ENV USER_UID=1001 \
     USER_NAME=search-v2-operator
 
-RUN microdnf update -y && microdnf clean all
-
-
 # install operator binary
 COPY --from=builder /workspace/manager .
 USER ${USER_UID}
 
 ENTRYPOINT ["/manager"]
-
