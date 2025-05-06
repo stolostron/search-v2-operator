@@ -217,7 +217,7 @@ func (r *SearchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return *result, err
 	}
 
-	result, err = r.createOrUpdateDeployment(ctx, r.CollectorDeployment(instance))
+	result, err = r.createOrUpdateDeployment(ctx, r.CollectorDeployment(ctx, instance))
 	if result != nil {
 		log.Error(err, "Collector Deployment  setup failed")
 		return *result, err

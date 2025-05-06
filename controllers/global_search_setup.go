@@ -161,7 +161,7 @@ func (r *SearchReconciler) validateGlobalSearchDependencies(ctx context.Context)
 		log.Error(err, "Failed to validate dependency MulticlusterGlobalHub operator.")
 		return fmt.Errorf("failed to validate dependency MulticlusterGlobalHub operator")
 	} else if len(multiclusterGlobalHub.Items) > 0 {
-		log.V(5).Info("Found MulticlusterGlobalHub intance.")
+		log.V(5).Info("Found MulticlusterGlobalHub instance.")
 	}
 
 	// Verify that MulticlusterEngine is installed and has the ManagedServiceAccount and ClusterProxy add-ons enabled.
