@@ -252,6 +252,13 @@ func (r *SearchReconciler) createVMClusterPermission(ctx context.Context, cluste
 							},
 							"verbs": []interface{}{"create", "delete"},
 						},
+						map[string]interface{}{
+							"apiGroups": []interface{}{"snapshot.kubevirt.io"},
+							"resources": []interface{}{
+								"virtualmachinerestores",
+							},
+							"verbs": []interface{}{"create", "delete"},
+						},
 					},
 				},
 				"clusterRoleBinding": map[string]interface{}{
