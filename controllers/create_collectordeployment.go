@@ -118,7 +118,7 @@ func (r *SearchReconciler) getClusterNameFromMCH(ctx context.Context) string {
 	// verify that MulticlusterHub operator is installed and configured.
 	mchs, err := r.DynamicClient.Resource(mch).List(ctx, metav1.ListOptions{})
 	if err != nil || len(mchs.Items) == 0 {
-		log.Error(err, "Failed to validate dependency MulticlusterHub operator.")
+		log.Error(err, "Failed to validate dependency MulticlusterHub operator. Using the default hubClusterName local-cluster.")
 		return clusterName
 	} else {
 		log.V(5).Info("Found MulticlusterHub instance.")
@@ -128,7 +128,7 @@ func (r *SearchReconciler) getClusterNameFromMCH(ctx context.Context) string {
 	if spec, ok := mchs.Items[0].Object["spec"].(map[string]interface{}); ok {
 		if name, ok := spec["localClusterName"].(string); ok && name != "" {
 			clusterName = name
-			log.V(5).Info("Found localClusterName: " + clusterName)
+			log.V(1).Info("Using MulticlusterHub localClusterName: " + clusterName)
 		}
 	}
 
