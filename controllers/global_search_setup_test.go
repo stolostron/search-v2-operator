@@ -47,6 +47,7 @@ func defaultMockState() (map[schema.GroupVersionResource]string, []runtime.Objec
 	}
 	return map[schema.GroupVersionResource]string{
 			{Group: "operator.open-cluster-management.io", Version: "v1alpha4", Resource: "multiclusterglobalhubs"}: "MulticlusterGlobalHubList",
+			{Group: "operator.open-cluster-management.io", Version: "v1", Resource: "multiclusterhubs"}:             "MulticlusterHubList",
 			{Group: "cluster.open-cluster-management.io", Version: "v1", Resource: "managedclusters"}:               "ManagedClusterList",
 			{Group: "multicluster.openshift.io", Version: "v1", Resource: "multiclusterengines"}:                    "MultiClusterEngineList",
 			{Group: "work.open-cluster-management.io", Version: "v1", Resource: "manifestworks"}:                    "ManifestworkList",
