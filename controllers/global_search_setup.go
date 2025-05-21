@@ -469,7 +469,7 @@ func (r *SearchReconciler) updateConsoleConfig(ctx context.Context, enabled bool
 // Returns true if it doesn't need an update and false if it does.
 func searchAPIEnvVar(instance *searchv1alpha1.Search, inputEnv corev1.EnvVar) bool {
 	klog.V(2).Infof("Searching for envVar %s with value %s in Search CR", inputEnv.Name, inputEnv.Value)
-	enabled := env.Value != "" // If value is empty, remove the Env from the config.
+	enabled := inputEnv.Value != "" // If value is empty, remove the Env from the config.
 	existingEnv := corev1.EnvVar{}
 	existingIndex := -1
 	for i, env := range instance.Spec.Deployments.QueryAPI.Env {
