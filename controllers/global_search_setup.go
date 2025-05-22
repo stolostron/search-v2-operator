@@ -233,8 +233,7 @@ func (r *SearchReconciler) enableGlobalSearch(ctx context.Context, instance *sea
 	logAndTrackError(&errList, err, "Failed to set globalSearchFeatureFlag=true in console-config.")
 
 	// 2. Enable federated search feature in the search-api deployment.
-	err = r.updateSearchApiDeployment(ctx, true, instance,
-		corev1.EnvVar{Name: "FEATURE_FEDERATED_SEARCH", Value: "true"})
+	err = r.updateSearchApiDeployment(ctx, instance, corev1.EnvVar{Name: "FEATURE_FEDERATED_SEARCH", Value: "true"})
 	logAndTrackError(&errList, err, "Failed to set env FEDERATED_GLOBAL_SEARCH on search-api deployment.")
 
 	// Create configuration resources for each Managed Hub.
@@ -397,7 +396,7 @@ func (r *SearchReconciler) disableGlobalSearch(ctx context.Context, instance *se
 	logAndTrackError(&errList, err, "Failed to remove the globalSearchFeatureFlag in configmap console-config.")
 
 	// 2. Disable federated search feature in the search-api.
-	err = r.updateSearchApiDeployment(ctx, false, instance, corev1.EnvVar{Name: "FEATURE_FEDERATED_SEARCH", Value: "true"})
+	err = r.updateSearchApiDeployment(ctx, instance, corev1.EnvVar{Name: "FEATURE_FEDERATED_SEARCH", Value: ""})
 	logAndTrackError(&errList, err, "Failed to remove env FEATURE_FEDERATED_SEARCH from the search api deployment.")
 
 	// 3. Delete configuration resources for each Managed Hub.
@@ -468,8 +467,9 @@ func (r *SearchReconciler) updateConsoleConfig(ctx context.Context, enabled bool
 
 // Check if the search api deployment is configured with the input envVar or needs an update.
 // Returns true if it doesn't need an update and false if it does.
-func searchAPIEnvVar(instance *searchv1alpha1.Search, enabled bool, inputEnv corev1.EnvVar) bool {
+func searchAPIEnvVar(instance *searchv1alpha1.Search, inputEnv corev1.EnvVar) bool {
 	klog.V(2).Infof("Searching for envVar %s with value %s in Search CR", inputEnv.Name, inputEnv.Value)
+	enabled := inputEnv.Value != "" // If value is empty, remove the Env from the config.
 	existingEnv := corev1.EnvVar{}
 	existingIndex := -1
 	for i, env := range instance.Spec.Deployments.QueryAPI.Env {
@@ -512,10 +512,10 @@ func searchAPIEnvVar(instance *searchv1alpha1.Search, enabled bool, inputEnv cor
 //
 //	oc patch search search-v2-operator -n open-cluster-management --type='merge'
 //	    -p '{"spec":{"deployments":{"queryapi":{"envVar":[{"name":"FEATURE_FEDERATED_SEARCH", "value":"true"}]}}}}'
-func (r *SearchReconciler) updateSearchApiDeployment(ctx context.Context, enabled bool,
+func (r *SearchReconciler) updateSearchApiDeployment(ctx context.Context,
 	instance *searchv1alpha1.Search, env corev1.EnvVar) error {
 	// Find the env var FEATURE_FEDERATED_SEARCH.
-	needNoUpdate := searchAPIEnvVar(instance, enabled, env)
+	needNoUpdate := searchAPIEnvVar(instance, env)
 	if needNoUpdate {
 		klog.V(2).Info("Update to Search API deployment envVar not required ", "envVar ", env.Name)
 		return nil

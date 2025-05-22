@@ -259,6 +259,12 @@ func (r *SearchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return *result, err
 	}
 
+	result, err = r.reconcileFineGrainedRBACConfiguration(ctx, instance)
+	if err != nil {
+		log.Error(err, "Fine-grained RBAC setup failed")
+		return *result, err
+	}
+
 	result, err = r.reconcileVirtualMachineConfiguration(ctx, instance)
 	if err != nil {
 		log.Error(err, "Virtual Machine setup failed")
