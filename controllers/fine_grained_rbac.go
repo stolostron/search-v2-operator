@@ -25,7 +25,7 @@ func (r *SearchReconciler) reconcileFineGrainedRBACConfiguration(ctx context.Con
 			corev1.EnvVar{Name: "FEATURE_FINE_GRAINED_RBAC", Value: "true"})
 		if err != nil {
 			log.Error(err, "Failed to configure fine-grained RBAC.")
-			r.updateVMStatus(ctx, instance, metav1.Condition{
+			r.updateStatusCondition(ctx, instance, metav1.Condition{
 				Type:               CONDITION_FINE_GRAINED_RBAC,
 				Status:             metav1.ConditionFalse,
 				Reason:             "ConfigurationError",
@@ -35,7 +35,7 @@ func (r *SearchReconciler) reconcileFineGrainedRBACConfiguration(ctx context.Con
 			return &reconcile.Result{}, err
 		}
 
-		r.updateVMStatus(ctx, instance, metav1.Condition{
+		r.updateStatusCondition(ctx, instance, metav1.Condition{
 			Type:               CONDITION_FINE_GRAINED_RBAC,
 			Status:             metav1.ConditionTrue,
 			Reason:             "None",

@@ -56,7 +56,7 @@ func (r *SearchReconciler) reconcileVirtualMachineConfiguration(ctx context.Cont
 		err = r.configureVirtualMachineActions(ctx)
 		if err != nil {
 			log.Error(err, "Failed to configure virtual machine actions.")
-			r.updateVMStatus(ctx, instance, metav1.Condition{
+			r.updateStatusCondition(ctx, instance, metav1.Condition{
 				Type:               CONDITION_VM_ACTIONS,
 				Status:             metav1.ConditionFalse,
 				Reason:             "ConfigurationError",
@@ -66,7 +66,7 @@ func (r *SearchReconciler) reconcileVirtualMachineConfiguration(ctx context.Cont
 			return &reconcile.Result{}, err
 		}
 
-		r.updateVMStatus(ctx, instance, metav1.Condition{
+		r.updateStatusCondition(ctx, instance, metav1.Condition{
 			Type:               CONDITION_VM_ACTIONS,
 			Status:             metav1.ConditionTrue,
 			Reason:             "None",
@@ -90,7 +90,7 @@ func (r *SearchReconciler) reconcileVirtualMachineConfiguration(ctx context.Cont
 			err := r.disableVirtualMachineActions(ctx)
 			if err != nil {
 				log.Error(err, "Failed to disable virtual machine actions.")
-				r.updateVMStatus(ctx, instance, metav1.Condition{
+				r.updateStatusCondition(ctx, instance, metav1.Condition{
 					Type:               CONDITION_VM_ACTIONS,
 					Status:             metav1.ConditionFalse,
 					Reason:             "ConfigurationError",
@@ -364,7 +364,7 @@ func (r *SearchReconciler) updateConsoleConfigVM(ctx context.Context, enabled bo
 	return err
 }
 
-func (r *SearchReconciler) updateVMStatus(ctx context.Context, instance *searchv1alpha1.Search,
+func (r *SearchReconciler) updateStatusCondition(ctx context.Context, instance *searchv1alpha1.Search,
 	status metav1.Condition) {
 	// Find existing status condition.
 	existingConditionIndex := -1
@@ -391,9 +391,9 @@ func (r *SearchReconciler) updateVMStatus(ctx context.Context, instance *searchv
 	// write instance with the new status.
 	err := r.commitSearchCRInstanceState(ctx, instance)
 	if err != nil {
-		log.Error(err, "Failed to update status condition VirtualMachineActionsReady in search instance.")
+		log.Error(err, "Failed to update status condition in search instance.", "type", status.Type)
 		return
 	}
 
-	log.Info("Successfully updated status condition VirtualMachineActionsReady in search instance.")
+	log.Info("Successfully updated status condition in search instance.", "type", status.Type)
 }
