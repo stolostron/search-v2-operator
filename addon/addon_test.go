@@ -9,6 +9,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	fakekube "k8s.io/client-go/kubernetes/fake"
@@ -65,6 +66,7 @@ func newAgentAddon(t *testing.T, objects []runtime.Object) agent.AgentAddon {
 			addonfactory.GetAddOnDeploymentConfigValues(
 				utils.NewAddOnDeploymentConfigGetter(fakeAddonClient),
 				addonfactory.ToAddOnNodePlacementValues,
+				addonfactory.ToAddOnResourceRequirementsValues,
 			)).
 		WithAgentRegistrationOption(registrationOption).
 		BuildHelmAgentAddon()
@@ -429,6 +431,21 @@ func TestManifestAddonAgent(t *testing.T) {
 							Tolerations:  tolerations,
 							NodeSelector: nodeSelector,
 						},
+						ResourceRequirements: []addonapiv1alpha1.ContainerResourceRequirements{
+							{
+								ContainerID: "deployments:klusterlet-addon-search:collector",
+								Resources: corev1.ResourceRequirements{
+									Limits: corev1.ResourceList{
+										corev1.ResourceCPU:    resource.MustParse("100m"),
+										corev1.ResourceMemory: resource.MustParse("2000Mi"),
+									},
+									Requests: corev1.ResourceList{
+										corev1.ResourceCPU:    resource.MustParse("10m"),
+										corev1.ResourceMemory: resource.MustParse("1000Mi"),
+									},
+								},
+							},
+						},
 					},
 				},
 			},
@@ -456,6 +473,22 @@ func TestManifestAddonAgent(t *testing.T) {
 
 				if !equality.Semantic.DeepEqual(deployment.Spec.Template.Spec.Tolerations, tolerations) {
 					t.Errorf("unexpected tolerations %v", deployment.Spec.Template.Spec.Tolerations)
+				}
+
+				if deployment.Spec.Template.Spec.Containers[0].Resources.Requests.Cpu().Cmp(resource.MustParse("10m")) != 0 {
+					t.Errorf("unexpected memory request: %s", deployment.Spec.Template.Spec.Containers[0].Resources.Requests.Memory().String())
+				}
+
+				if deployment.Spec.Template.Spec.Containers[0].Resources.Limits.Cpu().Cmp(resource.MustParse("100m")) != 0 {
+					t.Errorf("unexpected memory request: %s", deployment.Spec.Template.Spec.Containers[0].Resources.Requests.Memory().String())
+				}
+
+				if deployment.Spec.Template.Spec.Containers[0].Resources.Requests.Memory().Cmp(resource.MustParse("1000Mi")) != 0 {
+					t.Errorf("unexpected memory request: %s", deployment.Spec.Template.Spec.Containers[0].Resources.Requests.Memory().String())
+				}
+
+				if deployment.Spec.Template.Spec.Containers[0].Resources.Limits.Memory().Cmp(resource.MustParse("2000Mi")) != 0 {
+					t.Errorf("unexpected memory limit: %s", deployment.Spec.Template.Spec.Containers[0].Resources.Limits.Memory().String())
 				}
 			},
 		},
