@@ -70,20 +70,41 @@ spec:
           value: {{ .Values.global.proxyConfig.NO_PROXY }}
         {{- end }}
         resources:
-          {{- if .Values.userargs.requestMemory }}
-          requests:
-            memory: {{ .Values.userargs.requestMemory }}
-          {{- else }}
-          requests:
-            memory: 128Mi
+          {{- $memLimit := .Values.userargs.limitMemory }}
+          {{- $memRequest := .Values.userargs.requestMemory }}
+          {{- $rrs := .Values.global.resourceRequirements | default list }}
+          {{- $match := dict }}
+          {{- range $rrs }}
+            {{- if regexMatch .containerIDRegex "deployments:klusterlet-addon-search:collector" }}
+              {{- $match = .resources }}
+            {{- end }}
           {{- end }}
-          {{- if .Values.userargs.limitMemory }}
+          requests:
+            memory:
+              {{- if $memRequest }}
+              {{ $memRequest }}
+              {{- else if $match.requests.memory }}
+              {{ $match.requests.memory }}
+              {{- else}}
+              128Mi
+              {{- end }}
+            {{- if $match.requests.cpu }}
+            cpu:
+              {{ $match.requests.cpu }}
+            {{- end}}
           limits:
-            memory: {{ .Values.userargs.limitMemory }}
-          {{- else }}
-          limits:
-            memory: 1024Mi
-          {{- end }}
+            memory:
+              {{- if $memLimit }}
+              {{ $memLimit }}
+              {{- else if $match.limits.memory }}
+              {{ $match.limits.memory }}
+              {{- else}}
+              1024Mi
+              {{- end }}
+            {{- if $match.limits.cpu }}
+            cpu:
+              {{ $match.limits.cpu }}
+            {{- end}}
         livenessProbe:
           httpGet:
             path: /liveness

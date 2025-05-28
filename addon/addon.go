@@ -243,7 +243,8 @@ func NewAddonManager(kubeConfig *rest.Config) (addonmanager.AddonManager, error)
 		addonfactory.GetValuesFromAddonAnnotation,
 		addonfactory.GetAddOnDeploymentConfigValues(
 			utils.NewAddOnDeploymentConfigGetter(addonClient),
-			addonfactory.ToAddOnNodePlacementValues),
+			addonfactory.ToAddOnNodePlacementValues,
+			addonfactory.ToAddOnResourceRequirementsValues),
 	).WithAgentRegistrationOption(newRegistrationOption(kubeClient, SearchAddonName)).
 		BuildHelmAgentAddon()
 	if err != nil {

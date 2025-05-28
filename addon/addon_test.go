@@ -9,6 +9,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	fakekube "k8s.io/client-go/kubernetes/fake"
@@ -65,6 +66,7 @@ func newAgentAddon(t *testing.T, objects []runtime.Object) agent.AgentAddon {
 			addonfactory.GetAddOnDeploymentConfigValues(
 				utils.NewAddOnDeploymentConfigGetter(fakeAddonClient),
 				addonfactory.ToAddOnNodePlacementValues,
+				addonfactory.ToAddOnResourceRequirementsValues,
 			)).
 		WithAgentRegistrationOption(registrationOption).
 		BuildHelmAgentAddon()
@@ -429,6 +431,21 @@ func TestManifestAddonAgent(t *testing.T) {
 							Tolerations:  tolerations,
 							NodeSelector: nodeSelector,
 						},
+						ResourceRequirements: []addonapiv1alpha1.ContainerResourceRequirements{
+							{
+								ContainerID: "deployments:klusterlet-addon-search:collector",
+								Resources: corev1.ResourceRequirements{
+									Limits: corev1.ResourceList{
+										corev1.ResourceCPU:    resource.MustParse("100m"),
+										corev1.ResourceMemory: resource.MustParse("2000Mi"),
+									},
+									Requests: corev1.ResourceList{
+										corev1.ResourceCPU:    resource.MustParse("10m"),
+										corev1.ResourceMemory: resource.MustParse("1000Mi"),
+									},
+								},
+							},
+						},
 					},
 				},
 			},
@@ -456,6 +473,120 @@ func TestManifestAddonAgent(t *testing.T) {
 
 				if !equality.Semantic.DeepEqual(deployment.Spec.Template.Spec.Tolerations, tolerations) {
 					t.Errorf("unexpected tolerations %v", deployment.Spec.Template.Spec.Tolerations)
+				}
+
+				if deployment.Spec.Template.Spec.Containers[0].Resources.Requests.Cpu().Cmp(resource.MustParse("10m")) != 0 {
+					t.Errorf("unexpected CPU request: %s", deployment.Spec.Template.Spec.Containers[0].Resources.Requests.Memory().String())
+				}
+
+				if deployment.Spec.Template.Spec.Containers[0].Resources.Limits.Cpu().Cmp(resource.MustParse("100m")) != 0 {
+					t.Errorf("unexpected CPU limit: %s", deployment.Spec.Template.Spec.Containers[0].Resources.Limits.Cpu().String())
+				}
+
+				if deployment.Spec.Template.Spec.Containers[0].Resources.Requests.Memory().Cmp(resource.MustParse("1000Mi")) != 0 {
+					t.Errorf("unexpected memory request: %s", deployment.Spec.Template.Spec.Containers[0].Resources.Requests.Memory().String())
+				}
+
+				if deployment.Spec.Template.Spec.Containers[0].Resources.Limits.Memory().Cmp(resource.MustParse("2000Mi")) != 0 {
+					t.Errorf("unexpected memory limit: %s", deployment.Spec.Template.Spec.Containers[0].Resources.Limits.Memory().String())
+				}
+			},
+		},
+		{
+			// with a memory limit annotation, a resourcerequirement with a memory limit, and no resourcerequirement memory request
+			// we will see the memory limit annotation be applied, the cpu from the resourcerequirements set, and the memory request set to default
+			// as there's no annotation nor resourcerequirement for it
+			name:           "addondeploymentconfig with resources and annotation of resources",
+			managedCluster: newCluster("cluster1"),
+			managedClusterAddOn: func() *addonapiv1alpha1.ManagedClusterAddOn {
+				addon := newAddon(SearchAddonName, "cluster1", "", nil)
+				addon.SetAnnotations(map[string]string{"addon.open-cluster-management.io/values": "",
+					"addon.open-cluster-management.io/search_memory_limit": "2000Mi"})
+				addon.Status.ConfigReferences = []addonapiv1alpha1.ConfigReference{
+					{
+						ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+							Group:    "addon.open-cluster-management.io",
+							Resource: "addondeploymentconfigs",
+						},
+						DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
+							SpecHash: "asdf",
+							ConfigReferent: addonapiv1alpha1.ConfigReferent{
+								Namespace: "cluster1",
+								Name:      "deploy-config",
+							},
+						},
+					},
+				}
+				return addon
+			}(),
+			addOnDeploymentConfigs: []runtime.Object{
+				&addonapiv1alpha1.AddOnDeploymentConfig{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "deploy-config",
+						Namespace: "cluster1",
+					},
+					Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
+						NodePlacement: &addonapiv1alpha1.NodePlacement{
+							Tolerations:  tolerations,
+							NodeSelector: nodeSelector,
+						},
+						ResourceRequirements: []addonapiv1alpha1.ContainerResourceRequirements{
+							{
+								ContainerID: "deployments:klusterlet-addon-search:collector",
+								Resources: corev1.ResourceRequirements{
+									Limits: corev1.ResourceList{
+										corev1.ResourceCPU:    resource.MustParse("100m"),
+										corev1.ResourceMemory: resource.MustParse("3000Mi"), // annotation takes priority
+									},
+									Requests: corev1.ResourceList{
+										corev1.ResourceCPU: resource.MustParse("10m"), // lack of memory request in annotation leads to default of 128Mi
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			verifyDeployment: func(t *testing.T, objs []runtime.Object) {
+				deployment := findSearchDeployment(objs)
+				if deployment == nil {
+					t.Fatalf("expected deployment, but failed")
+				}
+
+				if deployment.Name != "klusterlet-addon-search" {
+					t.Errorf("unexpected deployment name  %s", deployment.Name)
+				}
+
+				if deployment.Namespace != addonfactory.AddonDefaultInstallNamespace {
+					t.Errorf("unexpected deployment namespace  %s", deployment.Namespace)
+				}
+
+				if deployment.Spec.Template.Spec.Containers[0].Image != "quay.io/stolostron/search_collector:2.7.0" {
+					t.Errorf("unexpected image  %s", deployment.Spec.Template.Spec.Containers[0].Image)
+				}
+
+				if !equality.Semantic.DeepEqual(deployment.Spec.Template.Spec.NodeSelector, nodeSelector) {
+					t.Errorf("unexpected nodeSeletor %v", deployment.Spec.Template.Spec.NodeSelector)
+				}
+
+				if !equality.Semantic.DeepEqual(deployment.Spec.Template.Spec.Tolerations, tolerations) {
+					t.Errorf("unexpected tolerations %v", deployment.Spec.Template.Spec.Tolerations)
+				}
+
+				if deployment.Spec.Template.Spec.Containers[0].Resources.Requests.Cpu().Cmp(resource.MustParse("10m")) != 0 {
+					t.Errorf("unexpected CPU request: %s", deployment.Spec.Template.Spec.Containers[0].Resources.Requests.Memory().String())
+				}
+
+				if deployment.Spec.Template.Spec.Containers[0].Resources.Limits.Cpu().Cmp(resource.MustParse("100m")) != 0 {
+					t.Errorf("unexpected CPU limit: %s", deployment.Spec.Template.Spec.Containers[0].Resources.Limits.Cpu().String())
+				}
+
+				if deployment.Spec.Template.Spec.Containers[0].Resources.Requests.Memory().Cmp(resource.MustParse("128Mi")) != 0 {
+					t.Errorf("unexpected memory request: %s", deployment.Spec.Template.Spec.Containers[0].Resources.Requests.Memory().String())
+				}
+
+				if deployment.Spec.Template.Spec.Containers[0].Resources.Limits.Memory().Cmp(resource.MustParse("2000Mi")) != 0 {
+					t.Errorf("unexpected memory limit: %s", deployment.Spec.Template.Spec.Containers[0].Resources.Limits.Memory().String())
 				}
 			},
 		},
