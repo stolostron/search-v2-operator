@@ -476,11 +476,11 @@ func TestManifestAddonAgent(t *testing.T) {
 				}
 
 				if deployment.Spec.Template.Spec.Containers[0].Resources.Requests.Cpu().Cmp(resource.MustParse("10m")) != 0 {
-					t.Errorf("unexpected memory request: %s", deployment.Spec.Template.Spec.Containers[0].Resources.Requests.Memory().String())
+					t.Errorf("unexpected CPU request: %s", deployment.Spec.Template.Spec.Containers[0].Resources.Requests.Memory().String())
 				}
 
 				if deployment.Spec.Template.Spec.Containers[0].Resources.Limits.Cpu().Cmp(resource.MustParse("100m")) != 0 {
-					t.Errorf("unexpected memory request: %s", deployment.Spec.Template.Spec.Containers[0].Resources.Requests.Memory().String())
+					t.Errorf("unexpected CPU limit: %s", deployment.Spec.Template.Spec.Containers[0].Resources.Limits.Cpu().String())
 				}
 
 				if deployment.Spec.Template.Spec.Containers[0].Resources.Requests.Memory().Cmp(resource.MustParse("1000Mi")) != 0 {
