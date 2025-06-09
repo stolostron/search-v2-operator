@@ -118,13 +118,7 @@ func (r *SearchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		err := r.updateStatus(ctx, instance, podName)
 		return ctrl.Result{}, err
 	}
-	// Do not reconcile objects if this instance of search is labeled "paused"
-	if IsPaused(instance.GetAnnotations()) {
-		log.Info("Reconciliation is paused because the annotation 'search-pause: true' was found.")
-		return ctrl.Result{}, nil
-	}
-
-	// Setup finalizers
+	// Setup finalizers and permit search deletion irrespective of search-pause annotation - ACM-15203
 	deleted, err := r.setFinalizer(ctx, instance)
 	if err != nil || deleted {
 		if deleted {
@@ -133,6 +127,11 @@ func (r *SearchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 			log.V(2).Info("Error setting Finalizer, requeue request ", "error", err.Error())
 		}
 		return ctrl.Result{}, err
+	}
+	// Do not reconcile objects if this instance of search is labeled "paused"
+	if IsPaused(instance.GetAnnotations()) {
+		log.Info("Reconciliation is paused because the annotation 'search-pause: true' was found.")
+		return ctrl.Result{}, nil
 	}
 
 	if instance.Spec.DBStorage.StorageClassName != "" && !r.isPVCPresent(ctx, instance) {
