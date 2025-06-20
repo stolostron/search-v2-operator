@@ -13,6 +13,8 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/klog/v2"
+	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
@@ -314,6 +316,22 @@ func (r *SearchReconciler) createManagedServiceAccount(ctx context.Context, clus
 //  1. ClusterRole global-search-user.
 //  2. ClusterRoleBinding search-global-binding.
 func (r *SearchReconciler) createManifestWork(ctx context.Context, cluster string, namespace string) error {
+	// Get the managed-serviceaccount install namespace.
+	// In hosted mode, the install namespace is not open-cluster-management-agent-addon
+	// Should get the namespace from the managed-serviceaccount managedclusteraddon
+	msa := addonapiv1alpha1.ManagedClusterAddOn{ObjectMeta: metav1.ObjectMeta{
+		Name:      "managed-serviceaccount",
+		Namespace: cluster,
+	}}
+	err := r.Client.Get(ctx, client.ObjectKeyFromObject(&msa), &msa)
+	if err != nil {
+		return fmt.Errorf("failed to get the managedserviceaccount %s/%s: %v", msa.Namespace, msa.Name, err)
+	}
+	if msa.Status.Namespace == "" {
+		return fmt.Errorf("the status.namespace of managedserviceaccount %s/%s is not ready", msa.Namespace, msa.Name)
+	}
+	msaInstallNamespace := msa.Status.Namespace
+
 	manifestWork := &unstructured.Unstructured{
 		Object: map[string]interface{}{
 			"apiVersion": "work.open-cluster-management.io/v1",
@@ -341,7 +359,7 @@ func (r *SearchReconciler) createManifestWork(ctx context.Context, cluster strin
 								map[string]interface{}{
 									"kind":      "ServiceAccount",
 									"name":      SEARCH_GLOBAL,
-									"namespace": "open-cluster-management-agent-addon",
+									"namespace": msaInstallNamespace,
 								},
 							},
 						},
@@ -362,7 +380,7 @@ func (r *SearchReconciler) createManifestWork(ctx context.Context, cluster strin
 			},
 		},
 	}
-	_, err := r.DynamicClient.Resource(manifestWorkGvr).Namespace(cluster).
+	_, err = r.DynamicClient.Resource(manifestWorkGvr).Namespace(cluster).
 		Create(ctx, manifestWork, metav1.CreateOptions{})
 
 	if err != nil && errors.IsAlreadyExists(err) {
