@@ -15,6 +15,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	fakeDyn "k8s.io/client-go/dynamic/fake"
 	"k8s.io/client-go/kubernetes/scheme"
+	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
@@ -268,4 +270,62 @@ func Test_disableGlobalSearch(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Empty(t, searchInst.Status.Conditions)
 	assert.Empty(t, searchInst.Spec.Deployments.QueryAPI.Env)
+}
+
+func Test_createManifestWork(t *testing.T) {
+	// Create a fake client to mock API calls.
+	searchInst := &searchv1alpha1.Search{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "search-operator",
+			Namespace: "open-cluster-management",
+			Annotations: map[string]string{
+				"global-search-preview": "true",
+			},
+		},
+		Spec: searchv1alpha1.SearchSpec{},
+	}
+
+	err := searchv1alpha1.SchemeBuilder.AddToScheme(scheme.Scheme)
+	if err != nil {
+		t.Errorf("error adding search scheme: (%v)", err)
+	}
+
+	r := &SearchReconciler{
+		Client:        fake.NewClientBuilder().WithStatusSubresource(searchInst).WithRuntimeObjects(searchInst).Build(),
+		DynamicClient: fakeDynClient(),
+		Scheme:        scheme.Scheme,
+	}
+
+	// expect error since no msa
+	assert.NotNil(t, r.createManifestWork(context.TODO(), "cluster1", "ocm"))
+
+	err = addonapiv1alpha1.AddToScheme(scheme.Scheme)
+	if err != nil {
+		t.Errorf("error adding addon scheme: (%v)", err)
+	}
+	// create msa
+	msaAddon := addonapiv1alpha1.ManagedClusterAddOn{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "managed-serviceaccount",
+			Namespace: "cluster1",
+		},
+	}
+	assert.Nil(t, r.Client.Create(context.TODO(), &msaAddon, &client.CreateOptions{}))
+	// expect error since the msa is not ready
+	assert.NotNil(t, r.createManifestWork(context.TODO(), "cluster1", "ocm"))
+
+	// patch the msa with namespace
+	msaAddon.Status.Namespace = "open-cluster-management-global-hub-agent-addon"
+	assert.Nil(t, r.Client.Update(context.TODO(), &msaAddon, &client.UpdateOptions{}))
+
+	// expect no error since the msa is ready
+	assert.Nil(t, r.createManifestWork(context.TODO(), "cluster1", "ocm"))
+
+	// check the manifestwork is created
+	// manifestwork, err := r.DynamicClient.Resource(manifestWorkGvr).Namespace("ocm").Get(context.TODO(),
+	// 	SEARCH_GLOBAL_CONFIG, metav1.GetOptions{})
+	// assert.Nil(t, err)
+	// workload := manifestwork.Object["spec"].(map[string]any)["workload"]
+	// clusterrolebinding := workload.(map[string]any)["manifests"].([]interface{})[0]
+	// assert.Equal(t, clusterrolebinding.(map[string]interface{})["subjects"].(map[string]interface{})["namespace"], msaAddon.Status.Namespace)
 }
