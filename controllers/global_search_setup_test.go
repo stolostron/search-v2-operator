@@ -51,7 +51,8 @@ func defaultMockState() (map[schema.GroupVersionResource]string, []runtime.Objec
 			{Group: "cluster.open-cluster-management.io", Version: "v1", Resource: "managedclusters"}:               "ManagedClusterList",
 			{Group: "multicluster.openshift.io", Version: "v1", Resource: "multiclusterengines"}:                    "MultiClusterEngineList",
 			{Group: "work.open-cluster-management.io", Version: "v1", Resource: "manifestworks"}:                    "ManifestworkList",
-			{Group: "authentication.open-cluster-management.io", Version: "v1", Resource: "managedserviceacounts"}:  "ManagedServiceAccountList",
+			{Group: "authentication.open-cluster-management.io", Version: "v1", Resource: "managedserviceaccounts"}: "ManagedServiceAccountList",
+			{Group: "addon.open-cluster-management.io", Version: "v1alpha1", Resource: "managedclusteraddons"}:      "ManagedClusterAddonList",
 		},
 		[]runtime.Object{
 			&unstructured.UnstructuredList{
@@ -127,6 +128,22 @@ func defaultMockState() (map[schema.GroupVersionResource]string, []runtime.Objec
 				Items: []unstructured.Unstructured{
 					*newUnstructured("authentication.open-cluster-management.io/v1", "ManagedServiceAccount", "cluster-1", "search-global", nil),
 					*newUnstructured("authentication.open-cluster-management.io/v1", "ManagedServiceAccount", "cluster-2", "search-global", nil),
+				},
+			},
+			&unstructured.UnstructuredList{
+				Object: buildObject("addon.open-cluster-management.io/v1alpha1", "ManagedClusterAddon"),
+				Items: []unstructured.Unstructured{
+					*newUnstructured("addon.open-cluster-management.io/v1alpha1", "ManagedClusterAddon", "cluster-1", "managed-serviceaccount", map[string]interface{}{
+						"status": map[string]interface{}{
+							"namespace": "open-cluster-management-agent-addon",
+						},
+					}),
+					*newUnstructured("addon.open-cluster-management.io/v1alpha1", "ManagedClusterAddon", "cluster-2", "managed-serviceaccount", map[string]interface{}{
+						"status": map[string]interface{}{
+							"namespace": "open-cluster-management-global-hub-agent-addon",
+						},
+					}),
+					*newUnstructured("addon.open-cluster-management.io/v1alpha1", "ManagedClusterAddon", "cluster-3", "managed-serviceaccount", nil),
 				},
 			},
 			newUnstructured("v1", "ConfigMap", "multicluster-engine", "console-mce-config",
@@ -268,4 +285,60 @@ func Test_disableGlobalSearch(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Empty(t, searchInst.Status.Conditions)
 	assert.Empty(t, searchInst.Spec.Deployments.QueryAPI.Env)
+}
+
+func Test_createManifestWork(t *testing.T) {
+	// Create a fake client to mock API calls.
+	searchInst := &searchv1alpha1.Search{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "search-operator",
+			Namespace: "open-cluster-management",
+			Annotations: map[string]string{
+				"global-search-preview": "true",
+			},
+		},
+		Spec: searchv1alpha1.SearchSpec{},
+	}
+
+	err := searchv1alpha1.SchemeBuilder.AddToScheme(scheme.Scheme)
+	if err != nil {
+		t.Errorf("error adding search scheme: (%v)", err)
+	}
+
+	r := &SearchReconciler{
+		Client:        fake.NewClientBuilder().WithStatusSubresource(searchInst).WithRuntimeObjects(searchInst).Build(),
+		DynamicClient: fakeDynClient(),
+		Scheme:        scheme.Scheme,
+	}
+
+	// expect error since the msa is not ready
+	assert.NotNil(t, r.createManifestWork(context.TODO(), "cluster-3", "ocm"))
+
+	// patch the msa with namespace
+	// msaAddon.Status.Namespace = "open-cluster-management-global-hub-agent-addon"
+	_, err = r.DynamicClient.Resource(managedClustrAddonGvr).Namespace("cluster-3").
+		Update(context.TODO(), &unstructured.Unstructured{
+			Object: map[string]interface{}{
+				"apiVersion": "addon.open-cluster-management.io/v1alpha1",
+				"kind":       "ManagedClusterAddOn",
+				"metadata": map[string]interface{}{
+					"name": MANAGED_SERVICE_ACCOUNT_ADDON_NAME,
+				},
+				"status": map[string]interface{}{
+					"namespace": "open-cluster-management-global-hub-agent-addon",
+				},
+			},
+		}, metav1.UpdateOptions{})
+	assert.Nil(t, err)
+
+	// expect no error since the msa is ready
+	assert.Nil(t, r.createManifestWork(context.TODO(), "cluster-3", "ocm"))
+
+	// check the manifestwork is created
+	// manifestwork, err := r.DynamicClient.Resource(manifestWorkGvr).Namespace("ocm").Get(context.TODO(),
+	// 	SEARCH_GLOBAL_CONFIG, metav1.GetOptions{})
+	// assert.Nil(t, err)
+	// workload := manifestwork.Object["spec"].(map[string]any)["workload"]
+	// clusterrolebinding := workload.(map[string]any)["manifests"].([]interface{})[0]
+	// assert.Equal(t, clusterrolebinding.(map[string]interface{})["subjects"].(map[string]interface{})["namespace"], msaAddon.Status.Namespace)
 }
