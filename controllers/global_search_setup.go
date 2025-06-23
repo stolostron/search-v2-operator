@@ -17,9 +17,10 @@ import (
 )
 
 const (
-	SEARCH_GLOBAL           = "search-global"
-	SEARCH_GLOBAL_CONFIG    = "search-global-config"
-	CONDITION_GLOBAL_SEARCH = "GlobalSearchReady"
+	SEARCH_GLOBAL                      = "search-global"
+	SEARCH_GLOBAL_CONFIG               = "search-global-config"
+	CONDITION_GLOBAL_SEARCH            = "GlobalSearchReady"
+	MANAGED_SERVICE_ACCOUNT_ADDON_NAME = "managed-serviceaccount"
 )
 
 var (
@@ -51,6 +52,11 @@ var (
 		Group:    "work.open-cluster-management.io",
 		Version:  "v1",
 		Resource: "manifestworks",
+	}
+	managedClustrAddonGvr = schema.GroupVersionResource{
+		Group:    "addon.open-cluster-management.io",
+		Version:  "v1alpha1",
+		Resource: "managedclusteraddons",
 	}
 )
 
@@ -314,6 +320,21 @@ func (r *SearchReconciler) createManagedServiceAccount(ctx context.Context, clus
 //  1. ClusterRole global-search-user.
 //  2. ClusterRoleBinding search-global-binding.
 func (r *SearchReconciler) createManifestWork(ctx context.Context, cluster string, namespace string) error {
+	// Get the managed-serviceaccount install namespace.
+	// In hosted mode, the install namespace is not open-cluster-management-agent-addon
+	// Should get the namespace from the managed-serviceaccount managedclusteraddon
+	msa, err := r.DynamicClient.Resource(managedClustrAddonGvr).Namespace(cluster).
+		Get(ctx, MANAGED_SERVICE_ACCOUNT_ADDON_NAME, metav1.GetOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to get the managedserviceaccount %s/%s: %v", cluster,
+			MANAGED_SERVICE_ACCOUNT_ADDON_NAME, err)
+	}
+	if msa.Object["status"] == nil || msa.Object["status"].(map[string]interface{})["namespace"] == nil {
+		return fmt.Errorf("the status.namespace of managedserviceaccount %s/%s is not set",
+			cluster, MANAGED_SERVICE_ACCOUNT_ADDON_NAME)
+	}
+	msaInstallNamespace := msa.Object["status"].(map[string]interface{})["namespace"]
+
 	manifestWork := &unstructured.Unstructured{
 		Object: map[string]interface{}{
 			"apiVersion": "work.open-cluster-management.io/v1",
@@ -341,7 +362,7 @@ func (r *SearchReconciler) createManifestWork(ctx context.Context, cluster strin
 								map[string]interface{}{
 									"kind":      "ServiceAccount",
 									"name":      SEARCH_GLOBAL,
-									"namespace": "open-cluster-management-agent-addon",
+									"namespace": msaInstallNamespace,
 								},
 							},
 						},
@@ -362,7 +383,7 @@ func (r *SearchReconciler) createManifestWork(ctx context.Context, cluster strin
 			},
 		},
 	}
-	_, err := r.DynamicClient.Resource(manifestWorkGvr).Namespace(cluster).
+	_, err = r.DynamicClient.Resource(manifestWorkGvr).Namespace(cluster).
 		Create(ctx, manifestWork, metav1.CreateOptions{})
 
 	if err != nil && errors.IsAlreadyExists(err) {
