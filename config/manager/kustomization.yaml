@@ -13,4 +13,4 @@ kind: Kustomization
 images:
 - name: controller
   newName: quay.io/stolostron/search-v2-operator
-  newTag: provide-tag
+  newTag: placeholder-image-tag

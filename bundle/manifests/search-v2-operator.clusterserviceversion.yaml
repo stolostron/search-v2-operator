@@ -14,7 +14,7 @@ metadata:
         }
       ]
     capabilities: Basic Install
-    createdAt: "2025-07-23T20:18:45Z"
+    createdAt: "2025-07-23T20:24:38Z"
     operators.operatorframework.io/builder: operator-sdk-v1.34.1
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
   name: search-v2-operator.v0.0.1
@@ -321,14 +321,14 @@ spec:
                     fieldRef:
                       fieldPath: metadata.annotations['olm.targetNamespaces']
                 - name: POSTGRES_IMAGE
-                  value: registry.redhat.io/rhel9/postgresql-16:9.6
+                  value: registry.redhat.io/rhel9/postgresql-16:placeholder-image-tag
                 - name: INDEXER_IMAGE
-                  value: quay.io/stolostron/search-indexer:provide-tag
+                  value: quay.io/stolostron/search-indexer:placeholder-image-tag
                 - name: COLLECTOR_IMAGE
-                  value: quay.io/stolostron/search-collector:provide-tag
+                  value: quay.io/stolostron/search-collector:placeholder-image-tag
                 - name: API_IMAGE
-                  value: quay.io/stolostron/search-v2-api:provide-tag
-                image: quay.io/stolostron/search-v2-operator:provide-tag
+                  value: quay.io/stolostron/search-v2-api:placeholder-image-tag
+                image: quay.io/stolostron/search-v2-operator:placeholder-image-tag
                 livenessProbe:
                   httpGet:
                     path: /healthz
