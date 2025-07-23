@@ -35,13 +35,13 @@ spec:
             fieldRef:
               fieldPath: metadata.namespace
         - name: POSTGRES_IMAGE
-          value: registry.redhat.io/rhel9/postgresql-16:9.6
+          value: registry.redhat.io/rhel9/postgresql-16:placeholder-image-tag
         - name: INDEXER_IMAGE
-          value: quay.io/stolostron/search-indexer:provide-tag
+          value: quay.io/stolostron/search-indexer:placeholder-image-tag
         - name: COLLECTOR_IMAGE
-          value: quay.io/stolostron/search-collector:provide-tag
+          value: quay.io/stolostron/search-collector:placeholder-image-tag
         - name: API_IMAGE
-          value: quay.io/stolostron/search-v2-api:provide-tag
+          value: quay.io/stolostron/search-v2-api:placeholder-image-tag
         args:
         - --leader-elect
         image: controller:latest
