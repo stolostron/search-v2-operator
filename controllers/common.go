@@ -395,7 +395,7 @@ func (r *SearchReconciler) createConfigMap(ctx context.Context, cm *corev1.Confi
 
 		if found.Data[startScript] != cm.Data[startScript] ||
 			found.Data["postgresql.conf"] != mergedPostgresConfig {
-			
+
 			log.Info("Updating ConfigMap", "Found: ", found.Data, "\nNew: ", cm.Data)
 
 			// Preserve user-defined data [additional-postgresql.conf]
@@ -406,7 +406,7 @@ func (r *SearchReconciler) createConfigMap(ctx context.Context, cm *corev1.Confi
 				return &reconcile.Result{}, err
 			}
 		}
-
+	}
 
 	log.V(2).Info("Created configmap ", "name", cm.Name)
 	return nil, nil
