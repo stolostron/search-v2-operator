@@ -385,17 +385,28 @@ func (r *SearchReconciler) createConfigMap(ctx context.Context, cm *corev1.Confi
 		}
 
 	} else {
+		// Check if key postgresql-start.sh needs to be updated
 		startScript := "postgresql-start.sh"
-		log.V(3).Info("Found DB Config ", "startScript", found.Data[startScript])
-		log.V(3).Info("New DB Config ", "startScript", cm.Data[startScript])
-		if found.Data[startScript] != cm.Data[startScript] {
+
+		// Check if key postgres.conf needs to be updated
+		postgresConf := found.Data["postgresql.conf"]
+		additionalPostgresConfig := found.Data["additional-postgresql.conf"]
+		mergedPostgresConfig := postgresConf + "\n" + additionalPostgresConfig
+
+		if found.Data[startScript] != cm.Data[startScript] ||
+			found.Data["postgresql.conf"] != mergedPostgresConfig {
+			
+			log.Info("Updating ConfigMap", "Found: ", found.Data, "\nNew: ", cm.Data)
+
+			// Preserve user-defined data [additional-postgresql.conf]
+			cm.Data["additional-postgresql.conf"] = additionalPostgresConfig
 			err = r.Update(ctx, cm)
 			if err != nil {
 				log.Error(err, "Could not update configmap")
 				return &reconcile.Result{}, err
 			}
 		}
-	}
+
 
 	log.V(2).Info("Created configmap ", "name", cm.Name)
 	return nil, nil
