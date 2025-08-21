@@ -24,6 +24,7 @@ func (r *SearchReconciler) PostgresConfigmap(instance *searchv1alpha1.Search) *c
 	data := map[string]string{}
 	data["custom-postgresql.conf"] = `# Customizations appended to postgresql.conf.
 `
+
 	data["postgresql.conf"] = `ssl = 'on'
 ssl_cert_file = '/sslcert/tls.crt'
 ssl_key_file = '/sslcert/tls.key'

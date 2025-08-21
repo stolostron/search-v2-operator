@@ -417,12 +417,14 @@ func (r *SearchReconciler) createOrUpdateConfigMap(ctx context.Context, cm *core
 		// Special case for postgres configmap.
 		if cm.Name == postgresConfigmapName {
 			// Merge custom-postgresql.conf into postgresql.conf
-			if !strings.Contains(found.Data["postgresql.conf"], found.Data["custom-postgresql.conf"]) {
-				cm.Data["postgresql.conf"] = cm.Data["postgresql.conf"] + "\n" + found.Data["custom-postgresql.conf"]
+			defaultPostgresConfig := found.Data["postgresql.conf"]
+			customPostgresConfig := found.Data["custom-postgresql.conf"]
+			if !strings.Contains(defaultPostgresConfig, customPostgresConfig) {
+				cm.Data["postgresql.conf"] = defaultPostgresConfig + "\n" + customPostgresConfig
 			}
 			// Preserve user-defined data [custom-postgresql.conf]
-			if found.Data["custom-postgresql.conf"] != "" {
-				cm.Data["custom-postgresql.conf"] = found.Data["custom-postgresql.conf"]
+			if customPostgresConfig != "" {
+				cm.Data["custom-postgresql.conf"] = customPostgresConfig
 			}
 		}
 		err = r.Update(ctx, cm)
