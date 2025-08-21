@@ -229,3 +229,5 @@ oc annotate search search-v2-operator -n open-cluster-management 'global-search-
 ```
 
 Version: 0.0.2 06/11/2024
+
+Image Rebuild: 08/21/2025
