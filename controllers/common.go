@@ -385,26 +385,53 @@ func (r *SearchReconciler) createConfigMap(ctx context.Context, cm *corev1.Confi
 		}
 
 	} else {
-		log.Info("Updating configmap.", "Found: ", found.Data, "\nNew: ", cm.Data)
-		// Check if key postgresql-start.sh needs to be updated
 		startScript := "postgresql-start.sh"
-
-		// Check if key postgres.conf needs to be updated
-		postgresConf := found.Data["postgresql.conf"]
-		additionalPostgresConfig := found.Data["additional-postgresql.conf"]
-		mergedPostgresConfig := postgresConf + "\n" + additionalPostgresConfig
-
-		if found.Data[startScript] != cm.Data[startScript] ||
-			found.Data["postgresql.conf"] != mergedPostgresConfig {
-
-			// Preserve user-defined data [additional-postgresql.conf]
-			cm.Data["additional-postgresql.conf"] = additionalPostgresConfig
+		log.V(3).Info("Found DB Config ", "startScript", found.Data[startScript])
+		log.V(3).Info("New DB Config ", "startScript", cm.Data[startScript])
+		if found.Data[startScript] != cm.Data[startScript] {
 			err = r.Update(ctx, cm)
 			if err != nil {
 				log.Error(err, "Could not update configmap")
 				return &reconcile.Result{}, err
 			}
 		}
+	}
+
+	log.V(2).Info("Created configmap ", "name", cm.Name)
+	return nil, nil
+}
+
+func (r *SearchReconciler) createOrUpdateConfigMap(ctx context.Context, cm *corev1.ConfigMap) (*reconcile.Result, error) {
+	found := &corev1.ConfigMap{}
+	err := r.Get(ctx, types.NamespacedName{
+		Name:      cm.Name,
+		Namespace: cm.Namespace,
+	}, found)
+	if err != nil && errors.IsNotFound(err) {
+		err = r.Create(ctx, cm)
+		if err != nil {
+			log.Error(err, "Could not create configmap")
+			return &reconcile.Result{}, err
+		}
+	} else {
+		// Special case for postgres configmap.
+		if cm.Name == postgresConfigmapName {
+			// Merge custom-postgresql.conf into postgresql.conf
+			if !strings.Contains(found.Data["postgresql.conf"], "found.Data[\"custom-postgresql.conf\"]") {
+				cm.Data["postgresql.conf"] = cm.Data["postgresql.conf"] + "\n" + found.Data["custom-postgresql.conf"]
+			}
+			// Preserve user-defined data [custom-postgresql.conf]
+			if found.Data["custom-postgresql.conf"] != "" {
+				cm.Data["custom-postgresql.conf"] = found.Data["custom-postgresql.conf"]
+			}
+		}
+		err = r.Update(ctx, cm)
+		if err != nil {
+			log.Error(err, "Could not update configmap")
+			return &reconcile.Result{}, err
+		}
+		log.V(2).Info("Updated configmap ", "name", cm.Name)
+		return nil, nil
 	}
 
 	log.V(2).Info("Created configmap ", "name", cm.Name)

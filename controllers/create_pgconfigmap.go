@@ -22,14 +22,14 @@ func (r *SearchReconciler) PostgresConfigmap(instance *searchv1alpha1.Search) *c
 	}
 	work_mem := r.GetDBConfigFromSearchCR(context.TODO(), instance, "WORK_MEM")
 	data := map[string]string{}
+	data["custom-postgresql.conf"] = `# Customizations appended to postgresql.conf.
+`
 	data["postgresql.conf"] = `ssl = 'on'
 ssl_cert_file = '/sslcert/tls.crt'
 ssl_key_file = '/sslcert/tls.key'
 ssl_ciphers = 'HIGH:!aNULL'
 max_parallel_workers_per_gather = '8'
-statement_timeout = '30000'`
-
-	data["additional-postgresql.conf"] = `# Additional Postgres customizations appended to postgresql.conf.`
+statement_timeout = '60000'`
 
 	data[startScript] = `psql -d search -U searchuser -c "CREATE SCHEMA IF NOT EXISTS search"
 psql -d search -U searchuser -c "CREATE TABLE IF NOT EXISTS search.resources (uid TEXT PRIMARY KEY, cluster TEXT, data JSONB)"
