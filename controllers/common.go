@@ -383,6 +383,7 @@ func (r *SearchReconciler) createConfigMap(ctx context.Context, cm *corev1.Confi
 			log.Error(err, "Could not create configmap")
 			return &reconcile.Result{}, err
 		}
+		log.V(2).Info("Created configmap ", "name", cm.Name)
 
 	} else {
 		startScript := "postgresql-start.sh"
@@ -413,11 +414,12 @@ func (r *SearchReconciler) createOrUpdateConfigMap(ctx context.Context, cm *core
 			log.Error(err, "Could not create configmap")
 			return &reconcile.Result{}, err
 		}
+		log.Info("Created configmap ", "name", cm.Name)
 	} else {
 		// Special case for postgres configmap.
 		if cm.Name == postgresConfigmapName {
 			// Merge custom-postgresql.conf into postgresql.conf
-			defaultPostgresConfig := found.Data["postgresql.conf"]
+			defaultPostgresConfig := cm.Data["postgresql.conf"]
 			customPostgresConfig := found.Data["custom-postgresql.conf"]
 			if !strings.Contains(defaultPostgresConfig, customPostgresConfig) {
 				cm.Data["postgresql.conf"] = defaultPostgresConfig + "\n" + customPostgresConfig
@@ -426,17 +428,21 @@ func (r *SearchReconciler) createOrUpdateConfigMap(ctx context.Context, cm *core
 			if customPostgresConfig != "" {
 				cm.Data["custom-postgresql.conf"] = customPostgresConfig
 			}
-		}
-		err = r.Update(ctx, cm)
-		if err != nil {
-			log.Error(err, "Could not update configmap")
-			return &reconcile.Result{}, err
-		}
-		log.V(2).Info("Updated configmap ", "name", cm.Name)
-		return nil, nil
-	}
 
-	log.V(2).Info("Created configmap ", "name", cm.Name)
+			// Check if update is needed
+			if !equality.Semantic.DeepEqual(found.Data, cm.Data) {
+				log.Info("Update is needed for configmap ", "name", cm.Name)
+
+				err = r.Update(ctx, cm)
+				if err != nil {
+					log.Error(err, "Could not update configmap")
+					return &reconcile.Result{}, err
+				}
+				log.Info("Updated configmap ", "name", cm.Name)
+				return nil, nil
+			}
+		}
+	}
 	return nil, nil
 }
 
