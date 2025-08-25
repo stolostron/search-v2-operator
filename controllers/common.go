@@ -401,6 +401,45 @@ func (r *SearchReconciler) createConfigMap(ctx context.Context, cm *corev1.Confi
 	return nil, nil
 }
 
+func (r *SearchReconciler) createOrUpdateConfigMap(ctx context.Context, cm *corev1.ConfigMap) (*reconcile.Result, error) {
+	found := &corev1.ConfigMap{}
+	err := r.Get(ctx, types.NamespacedName{
+		Name:      cm.Name,
+		Namespace: cm.Namespace,
+	}, found)
+	if err != nil && errors.IsNotFound(err) {
+		err = r.Create(ctx, cm)
+		if err != nil {
+			log.Error(err, "Could not create configmap")
+			return &reconcile.Result{}, err
+		}
+	} else {
+		// Special case for postgres configmap.
+		if cm.Name == postgresConfigmapName {
+			// Merge custom-postgresql.conf into postgresql.conf
+			defaultPostgresConfig := found.Data["postgresql.conf"]
+			customPostgresConfig := found.Data["custom-postgresql.conf"]
+			if !strings.Contains(defaultPostgresConfig, customPostgresConfig) {
+				cm.Data["postgresql.conf"] = defaultPostgresConfig + "\n" + customPostgresConfig
+			}
+			// Preserve user-defined data [custom-postgresql.conf]
+			if customPostgresConfig != "" {
+				cm.Data["custom-postgresql.conf"] = customPostgresConfig
+			}
+		}
+		err = r.Update(ctx, cm)
+		if err != nil {
+			log.Error(err, "Could not update configmap")
+			return &reconcile.Result{}, err
+		}
+		log.V(2).Info("Updated configmap ", "name", cm.Name)
+		return nil, nil
+	}
+
+	log.V(2).Info("Created configmap ", "name", cm.Name)
+	return nil, nil
+}
+
 func (r *SearchReconciler) getDBConfigData(ctx context.Context, instance *searchv1alpha1.Search) map[string]string {
 	var result map[string]string
 	if instance.Spec.DBConfig == "" {
