@@ -3,6 +3,7 @@ package controllers
 
 import (
 	"context"
+	"strings"
 
 	searchv1alpha1 "github.com/stolostron/search-v2-operator/api/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
@@ -109,4 +110,31 @@ CREATE TRIGGER resources_delete AFTER DELETE ON search.resources FOR EACH ROW WH
 		log.V(2).Info("Could not set control for search-postgres configmap")
 	}
 	return cm
+}
+
+func UpdatePostgresConfigmap(existing, new *corev1.ConfigMap) {
+	currentPostgresConfig := existing.Data["postgresql.conf"]
+	customPostgresConfig := existing.Data["custom-postgresql.conf"]
+	defaultPostgresConfig := new.Data["postgresql.conf"]
+
+	// Check if migration is needed custom-postgres.conf was added in ACM 2.15.
+	if customPostgresConfig == "" && currentPostgresConfig != defaultPostgresConfig {
+		newCustomPostgresConfig := "# Customizations appended to postgresql.conf"
+		for _, line := range strings.Split(currentPostgresConfig, "\n") {
+			if !strings.Contains(defaultPostgresConfig, line) {
+				newCustomPostgresConfig += "\n" + line
+			}
+		}
+		new.Data["custom-postgresql.conf"] = newCustomPostgresConfig
+		log.Info("Migrated ConfigMap search-postgres. Moved custom changes to custom-postgresql.conf")
+	} else {
+		// Merge custom-postgresql.conf into postgresql.conf
+		if !strings.Contains(defaultPostgresConfig, customPostgresConfig) {
+			new.Data["postgresql.conf"] = defaultPostgresConfig + "\n" + customPostgresConfig
+		}
+		// Preserve user-defined data in [custom-postgresql.conf]
+		if customPostgresConfig != "" {
+			new.Data["custom-postgresql.conf"] = customPostgresConfig
+		}
+	}
 }
