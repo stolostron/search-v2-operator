@@ -33,8 +33,11 @@ import (
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
+	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -70,11 +73,11 @@ func main() {
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:                 scheme,
-		MetricsBindAddress:     metricsAddr,
-		Port:                   9443,
+		Metrics:                server.Options{BindAddress: metricsAddr},       // https://github.com/kubernetes-sigs/controller-runtime/blob/release-0.16/pkg/manager/manager.go#L226
+		WebhookServer:          webhook.NewServer(webhook.Options{Port: 9443}), // https://github.com/kubernetes-sigs/controller-runtime/blob/release-0.15/pkg/manager/manager.go#L286
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
-		Namespace:              os.Getenv("WATCH_NAMESPACE"),
+		Cache:                  cache.Options{DefaultNamespaces: map[string]cache.Config{os.Getenv("WATCH_NAMESPACE"): {}}}, // https://github.com/kubernetes-sigs/controller-runtime/blob/release-0.15/pkg/manager/manager.go#L257
 		LeaderElectionID:       "b648e39a.open-cluster-management.io",
 	})
 
