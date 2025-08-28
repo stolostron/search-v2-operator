@@ -14,6 +14,7 @@ import (
 	clienttesting "k8s.io/client-go/testing"
 	"open-cluster-management.io/addon-framework/pkg/addonfactory"
 	"open-cluster-management.io/addon-framework/pkg/agent"
+	"open-cluster-management.io/addon-framework/pkg/utils"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	fakeaddon "open-cluster-management.io/api/client/addon/clientset/versioned/fake"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
@@ -59,12 +60,11 @@ func newAgentAddon(t *testing.T, objects []runtime.Object) agent.AgentAddon {
 	agentAddon, err := addonfactory.NewAgentAddonFactory(SearchAddonName, ChartFS, ChartDir).
 		WithScheme(scheme).
 		WithGetValuesFuncs(getValuesFunc, addonfactory.GetValuesFromAddonAnnotation,
-			addonfactory.GetAddOnDeloymentConfigValues(
-				addonfactory.NewAddOnDeloymentConfigGetter(fakeAddonClient),
+			addonfactory.GetAddOnDeploymentConfigValues(
+				utils.NewAddOnDeploymentConfigGetter(fakeAddonClient),
 				addonfactory.ToAddOnNodePlacementValues,
 			)).
 		WithAgentRegistrationOption(registrationOption).
-		WithInstallStrategy(agent.InstallAllStrategy("open-cluster-management-agent-addon")).
 		BuildHelmAgentAddon()
 	if err != nil {
 		t.Fatalf("failed to build agent %v", err)
@@ -340,9 +340,12 @@ func TestManifestAddonAgent(t *testing.T) {
 							Group:    "addon.open-cluster-management.io",
 							Resource: "addondeploymentconfigs",
 						},
-						ConfigReferent: addonapiv1alpha1.ConfigReferent{
-							Namespace: "cluster1",
-							Name:      "deploy-config",
+						DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
+							SpecHash: "asdf",
+							ConfigReferent: addonapiv1alpha1.ConfigReferent{
+								Namespace: "cluster1",
+								Name:      "deploy-config",
+							},
 						},
 					},
 				}
@@ -402,9 +405,12 @@ func TestManifestAddonAgent(t *testing.T) {
 							Group:    "addon.open-cluster-management.io",
 							Resource: "addondeploymentconfigs",
 						},
-						ConfigReferent: addonapiv1alpha1.ConfigReferent{
-							Namespace: "cluster1",
-							Name:      "deploy-config",
+						DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
+							SpecHash: "asdf",
+							ConfigReferent: addonapiv1alpha1.ConfigReferent{
+								Namespace: "cluster1",
+								Name:      "deploy-config",
+							},
 						},
 					},
 				}
