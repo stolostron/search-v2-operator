@@ -280,7 +280,7 @@ func (r *SearchReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		},
 	}
 	// Trigger on create or update.
-	triggerOnCreateOrUpdatePred := predicate.Funcs{
+	triggerOnUpdatePred := predicate.Funcs{
 		CreateFunc: func(e event.CreateEvent) bool {
 			return false
 		},
@@ -295,7 +295,7 @@ func (r *SearchReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Watches(&corev1.Secret{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(),
 			&searchv1alpha1.Search{}, handler.OnlyControllerOwner()), builder.WithPredicates(pred)).
 		Watches(&corev1.ConfigMap{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(),
-			&searchv1alpha1.Search{}, handler.OnlyControllerOwner()), builder.WithPredicates(triggerOnCreateOrUpdatePred)).
+			&searchv1alpha1.Search{}, handler.OnlyControllerOwner()), builder.WithPredicates(triggerOnUpdatePred)).
 		Watches(&corev1.Pod{}, handler.EnqueueRequestsFromMapFunc(
 			func(ctx context.Context, a client.Object) []reconcile.Request {
 				// Trigger reconcile if search pod
