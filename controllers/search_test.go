@@ -173,6 +173,7 @@ func TestSearch_controller(t *testing.T) {
 
 	verifyConfigmapDataContent(t, configmap3, "postgresql.conf", "ssl = 'on'")
 	verifyConfigmapDataContent(t, configmap3, "postgresql-start.sh", "CREATE SCHEMA IF NOT EXISTS search")
+	verifyConfigmapDataContent(t, configmap3, "custom-postgresql.conf", "# Customizations appended to postgresql.conf")
 
 	//check for Service Account
 	serviceaccount := &corev1.ServiceAccount{}
