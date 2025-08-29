@@ -8,10 +8,12 @@ import (
 	"testing"
 
 	searchv1alpha1 "github.com/stolostron/search-v2-operator/api/v1alpha1"
+	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
@@ -684,4 +686,308 @@ func TestPGDeployment(t *testing.T) {
 	if !sharedMemoryVolume.VolumeSource.EmptyDir.SizeLimit.Equal(resource.MustParse("1Gi")) {
 		t.Errorf("Expected shared volume SizeLimit to be 1Gi, but got: %+v ", sharedMemoryVolume.VolumeSource.EmptyDir.SizeLimit)
 	}
+}
+
+// Tests for createOrUpdateConfigMap function
+func TestCreateOrUpdateConfigMap_CreateNew(t *testing.T) {
+	// Test case: ConfigMap doesn't exist, should create it
+	search := &searchv1alpha1.Search{
+		TypeMeta:   metav1.TypeMeta{Kind: "Search"},
+		ObjectMeta: metav1.ObjectMeta{Name: "search-v2-operator", Namespace: "test-namespace"},
+		Spec:       searchv1alpha1.SearchSpec{},
+	}
+
+	s := scheme.Scheme
+	err := searchv1alpha1.SchemeBuilder.AddToScheme(s)
+	assert.NoError(t, err)
+
+	objs := []runtime.Object{search}
+	cl := fake.NewClientBuilder().WithRuntimeObjects(objs...).Build()
+	r := &SearchReconciler{Client: cl, Scheme: s}
+
+	// Create a new ConfigMap
+	newConfigMap := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-configmap",
+			Namespace: "test-namespace",
+		},
+		Data: map[string]string{
+			"key1": "value1",
+			"key2": "value2",
+		},
+	}
+
+	// Call createOrUpdateConfigMap
+	result, err := r.createOrUpdateConfigMap(context.Background(), newConfigMap)
+
+	// Verify no error occurred
+	assert.Nil(t, result)
+	assert.Nil(t, err)
+
+	// Verify ConfigMap was created
+	created := &corev1.ConfigMap{}
+	err = cl.Get(context.Background(), types.NamespacedName{
+		Name:      "test-configmap",
+		Namespace: "test-namespace",
+	}, created)
+	assert.Nil(t, err)
+
+	// Verify data matches
+	assert.Equal(t, "value1", created.Data["key1"])
+	assert.Equal(t, "value2", created.Data["key2"])
+}
+
+func TestCreateOrUpdateConfigMap_UpdateExisting(t *testing.T) {
+	// Test case: Regular ConfigMap exists and needs update
+	search := &searchv1alpha1.Search{
+		TypeMeta:   metav1.TypeMeta{Kind: "Search"},
+		ObjectMeta: metav1.ObjectMeta{Name: "search-v2-operator", Namespace: "test-namespace"},
+		Spec:       searchv1alpha1.SearchSpec{},
+	}
+
+	// Create existing ConfigMap
+	existingConfigMap := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-configmap",
+			Namespace: "test-namespace",
+		},
+		Data: map[string]string{
+			"key1": "old-value1",
+			"key2": "old-value2",
+		},
+	}
+
+	s := scheme.Scheme
+	err := searchv1alpha1.SchemeBuilder.AddToScheme(s)
+
+	assert.NoError(t, err)
+
+	objs := []runtime.Object{search, existingConfigMap}
+	cl := fake.NewClientBuilder().WithRuntimeObjects(objs...).Build()
+	r := &SearchReconciler{Client: cl, Scheme: s}
+
+	// Create updated ConfigMap
+	updatedConfigMap := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-configmap",
+			Namespace: "test-namespace",
+		},
+		Data: map[string]string{
+			"key1": "new-value1",
+			"key2": "new-value2",
+			"key3": "new-value3",
+		},
+	}
+
+	// Call createOrUpdateConfigMap
+	result, err := r.createOrUpdateConfigMap(context.Background(), updatedConfigMap)
+
+	// Verify no error occurred
+	assert.Nil(t, result)
+	assert.Nil(t, err)
+
+	// Verify ConfigMap was updated
+	updated := &corev1.ConfigMap{}
+	err = cl.Get(context.Background(), types.NamespacedName{
+		Name:      "test-configmap",
+		Namespace: "test-namespace",
+	}, updated)
+	assert.Nil(t, err)
+
+	// Verify data was updated
+	assert.Equal(t, "new-value1", updated.Data["key1"])
+	assert.Equal(t, "new-value2", updated.Data["key2"])
+	assert.Equal(t, "new-value3", updated.Data["key3"])
+}
+
+func TestCreateOrUpdateConfigMap_PostgresSpecialCase(t *testing.T) {
+	// Test case: Postgres ConfigMap with custom configuration
+	search := &searchv1alpha1.Search{
+		TypeMeta:   metav1.TypeMeta{Kind: "Search"},
+		ObjectMeta: metav1.ObjectMeta{Name: "search-v2-operator", Namespace: "test-namespace"},
+		Spec:       searchv1alpha1.SearchSpec{},
+	}
+
+	// Create existing postgres ConfigMap with custom config
+	existingConfigMap := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      postgresConfigmapName, // "search-postgres"
+			Namespace: "test-namespace",
+		},
+		Data: map[string]string{
+			"postgresql.conf":        "ssl = 'on'\nssl_cert_file = '/sslcert/tls.crt'",
+			"custom-postgresql.conf": "# My custom settings\nmax_connections = 200",
+		},
+	}
+
+	s := scheme.Scheme
+	err := searchv1alpha1.SchemeBuilder.AddToScheme(s)
+
+	assert.NoError(t, err)
+
+	objs := []runtime.Object{search, existingConfigMap}
+	cl := fake.NewClientBuilder().WithRuntimeObjects(objs...).Build()
+	r := &SearchReconciler{Client: cl, Scheme: s}
+
+	// Create new postgres ConfigMap (simulating operator update)
+	newConfigMap := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      postgresConfigmapName,
+			Namespace: "test-namespace",
+		},
+		Data: map[string]string{
+			"postgresql.conf":        "ssl = 'on'\nssl_cert_file = '/sslcert/tls.crt'\nstatement_timeout = '60000'",
+			"custom-postgresql.conf": "# Customizations appended to postgresql.conf.\n",
+		},
+	}
+
+	// Call createOrUpdateConfigMap
+	result, err := r.createOrUpdateConfigMap(context.Background(), newConfigMap)
+
+	// Verify no error occurred
+	assert.Nil(t, result)
+	assert.Nil(t, err)
+
+	// Verify ConfigMap was updated
+	updated := &corev1.ConfigMap{}
+	err = cl.Get(context.Background(), types.NamespacedName{
+		Name:      postgresConfigmapName,
+		Namespace: "test-namespace",
+	}, updated)
+
+	assert.Nil(t, err)
+
+	// Verify custom config was preserved
+	expectedCustomConf := "# My custom settings\nmax_connections = 200"
+	assert.Equal(t, expectedCustomConf, updated.Data["custom-postgresql.conf"])
+
+	// Verify postgresql.conf was merged with custom config
+	expectedConf := "ssl = 'on'\nssl_cert_file = '/sslcert/tls.crt'\nstatement_timeout = '60000'\n# My custom settings\nmax_connections = 200"
+	assert.Equal(t, expectedConf, updated.Data["postgresql.conf"])
+}
+
+func TestCreateOrUpdateConfigMap_NoUpdateNeeded(t *testing.T) {
+	// Test case: ConfigMap exists and is already up to date
+	search := &searchv1alpha1.Search{
+		TypeMeta:   metav1.TypeMeta{Kind: "Search"},
+		ObjectMeta: metav1.ObjectMeta{Name: "search-v2-operator", Namespace: "test-namespace"},
+		Spec:       searchv1alpha1.SearchSpec{},
+	}
+
+	// Create existing ConfigMap that matches what we'll try to update
+	existingConfigMap := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-configmap",
+			Namespace: "test-namespace",
+		},
+		Data: map[string]string{
+			"key1": "value1",
+			"key2": "value2",
+		},
+	}
+
+	s := scheme.Scheme
+	err := searchv1alpha1.SchemeBuilder.AddToScheme(s)
+
+	assert.NoError(t, err)
+
+	objs := []runtime.Object{search, existingConfigMap}
+	cl := fake.NewClientBuilder().WithRuntimeObjects(objs...).Build()
+	r := &SearchReconciler{Client: cl, Scheme: s}
+
+	// Create identical ConfigMap (no changes needed)
+	sameConfigMap := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-configmap",
+			Namespace: "test-namespace",
+		},
+		Data: map[string]string{
+			"key1": "value1",
+			"key2": "value2",
+		},
+	}
+
+	// Call createOrUpdateConfigMap
+	result, err := r.createOrUpdateConfigMap(context.Background(), sameConfigMap)
+
+	// Verify no error occurred
+	assert.Nil(t, result)
+	assert.Nil(t, err)
+
+	// Verify ConfigMap still exists and unchanged
+	found := &corev1.ConfigMap{}
+	err = cl.Get(context.Background(), types.NamespacedName{
+		Name:      "test-configmap",
+		Namespace: "test-namespace",
+	}, found)
+
+	assert.NoError(t, err)
+
+	// Verify data remained the same
+	assert.Equal(t, "value1", found.Data["key1"])
+	assert.Equal(t, "value2", found.Data["key2"])
+}
+
+func TestCreateOrUpdateConfigMap_PostgresNoCustomConfig(t *testing.T) {
+	// Test case: Postgres ConfigMap without custom configuration
+	search := &searchv1alpha1.Search{
+		TypeMeta:   metav1.TypeMeta{Kind: "Search"},
+		ObjectMeta: metav1.ObjectMeta{Name: "search-v2-operator", Namespace: "test-namespace"},
+		Spec:       searchv1alpha1.SearchSpec{},
+	}
+
+	// Create existing postgres ConfigMap without custom config
+	existingConfigMap := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      postgresConfigmapName,
+			Namespace: "test-namespace",
+		},
+		Data: map[string]string{
+			"postgresql.conf":        "ssl = 'on'\nssl_cert_file = '/sslcert/tls.crt'",
+			"custom-postgresql.conf": "",
+		},
+	}
+
+	s := scheme.Scheme
+	err := searchv1alpha1.SchemeBuilder.AddToScheme(s)
+	assert.NoError(t, err)
+
+	objs := []runtime.Object{search, existingConfigMap}
+	cl := fake.NewClientBuilder().WithRuntimeObjects(objs...).Build()
+	r := &SearchReconciler{Client: cl, Scheme: s}
+
+	// Create new postgres ConfigMap
+	newConfigMap := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      postgresConfigmapName,
+			Namespace: "test-namespace",
+		},
+		Data: map[string]string{
+			"postgresql.conf":        "ssl = 'on'\nssl_cert_file = '/sslcert/tls.crt'\nstatement_timeout = '60000'",
+			"custom-postgresql.conf": "# Customizations appended to postgresql.conf",
+		},
+	}
+
+	// Call createOrUpdateConfigMap
+	result, err := r.createOrUpdateConfigMap(context.Background(), newConfigMap)
+
+	// Verify no error occurred
+	assert.Nil(t, result)
+	assert.Nil(t, err)
+
+	// Verify ConfigMap was updated
+	updated := &corev1.ConfigMap{}
+	err = cl.Get(context.Background(), types.NamespacedName{
+		Name:      postgresConfigmapName,
+		Namespace: "test-namespace",
+	}, updated)
+	assert.NoError(t, err)
+
+	// Verify postgresql.conf was updated (no custom config to merge)
+	expectedConf := "ssl = 'on'\nssl_cert_file = '/sslcert/tls.crt'\nstatement_timeout = '60000'"
+	assert.Equal(t, expectedConf, updated.Data["postgresql.conf"])
+
+	// Verify custom-postgresql.conf was set to new value (UpdatePostgresConfigmap preserves new value when existing is empty)
+	expectedCustomConf := "# Customizations appended to postgresql.conf"
+	assert.Equal(t, expectedCustomConf, updated.Data["custom-postgresql.conf"])
 }
