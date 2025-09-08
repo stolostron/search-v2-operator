@@ -48,7 +48,8 @@ func (r *SearchReconciler) PGDeployment(instance *searchv1alpha1.Search) *appsv1
 			},
 			{
 				Name:      "postgresql-pre-start",
-				MountPath: "/opt/app-root/src/postgresql-pre-start",
+				MountPath: "/opt/app-root/src/postgresql-pre-start/postgresql-pre-start",
+				SubPath:   "postgresql-pre-start.sh",
 			},
 			{
 				Name:      "postgresql-start",
