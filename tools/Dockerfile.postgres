@@ -1,7 +1,0 @@
-FROM quay.io/stolostron/postgresql-16:9.5-1732622748
-
-COPY --chmod=755 before-start.sh /usr/local/bin/before-start.sh
-
-ENTRYPOINT ["/usr/local/bin/before-start.sh"]
-
-CMD ["postgres"]

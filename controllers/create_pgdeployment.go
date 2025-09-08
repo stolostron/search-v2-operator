@@ -47,6 +47,10 @@ func (r *SearchReconciler) PGDeployment(instance *searchv1alpha1.Search) *appsv1
 				MountPath: "/opt/app-root/src/postgresql-cfg",
 			},
 			{
+				Name:      "postgresql-pre-start",
+				MountPath: "/opt/app-root/src/postgresql-pre-start",
+			},
+			{
 				Name:      "postgresql-start",
 				MountPath: "/opt/app-root/src/postgresql-start",
 			},
@@ -107,6 +111,16 @@ func (r *SearchReconciler) PGDeployment(instance *searchv1alpha1.Search) *appsv1
 				ConfigMap: &corev1.ConfigMapVolumeSource{
 					LocalObjectReference: corev1.LocalObjectReference{
 						Name: postgresConfigmapName,
+					},
+				},
+			},
+		},
+		{
+			Name: "postgresql-pre-start",
+			VolumeSource: corev1.VolumeSource{
+				ConfigMap: &corev1.ConfigMapVolumeSource{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: "search-postgres-pre-start",
 					},
 				},
 			},
