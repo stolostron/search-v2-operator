@@ -56,6 +56,7 @@ if [[ "$CURRENT_VERSION" != "" && "$CURRENT_VERSION" != "$INSTALL_VERSION" ]]; t
    # Ensure ownership first
    chown -R "$USER":"$USER" "$DATA_DIR"
    # Remove all files including hidden ones
+   # It's okay to delete this data because it will repopulate with fresh data from the collectors.
    rm -rf "$DATA_DIR"/* "$DATA_DIR"/.[!.]*
 else
    echo "[INFO] PG_VERSION is up-to-date or no previous data. Keeping existing data."
