@@ -33,7 +33,8 @@ ENTRYPOINT ["/manager"]
 LABEL com.redhat.component="acm-search-operator-container" \
       description="Search operator service" \
       maintainer="acm-contact@redhat.com" \
-      name="search-operator" \
+      name="rhacm2/acm-search-v2-rhel9" \
+      cpe="cpe:/a:redhat:acm:2.14::el9" \
       org.label-schema.license="Red Hat Advanced Cluster Management for Kubernetes EULA" \
       org.label-schema.schema-version="1.0" \
       summary="Search operator service" \
