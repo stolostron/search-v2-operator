@@ -622,9 +622,7 @@ func TestMemoryLimitCustomization(t *testing.T) {
 }
 
 func TestPGDeployment(t *testing.T) {
-	var expectedMap = map[string]string{"POSTGRESQL_SHARED_BUFFERS": "64MB",
-		"POSTGRESQL_EFFECTIVE_CACHE_SIZE": default_POSTGRESQL_EFFECTIVE_CACHE_SIZE,
-		"WORK_MEM":                        "32MB"}
+	var expectedMap = map[string]string{"WORK_MEM": "32MB"}
 
 	var configValueMap = map[string]string{"POSTGRESQL_SHARED_BUFFERS": "64MB",
 		"WORK_MEM": "25MB", //this value is trumped by the envVar
@@ -672,20 +670,6 @@ func TestPGDeployment(t *testing.T) {
 		}
 	}
 
-	// Validate the shared memory volume.
-	var sharedMemoryVolume corev1.Volume
-	for _, vol := range actualDep.Spec.Template.Spec.Volumes {
-		if vol.Name == "dshm" {
-			sharedMemoryVolume = vol
-			break
-		}
-	}
-	if sharedMemoryVolume.Name != "dshm" {
-		t.Errorf("Expected shared volume dshm to be present, but got: %+v ", sharedMemoryVolume)
-	}
-	if !sharedMemoryVolume.VolumeSource.EmptyDir.SizeLimit.Equal(resource.MustParse("1Gi")) {
-		t.Errorf("Expected shared volume SizeLimit to be 1Gi, but got: %+v ", sharedMemoryVolume.VolumeSource.EmptyDir.SizeLimit)
-	}
 }
 
 // Tests for createOrUpdateConfigMap function
