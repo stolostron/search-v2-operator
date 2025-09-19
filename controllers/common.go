@@ -39,9 +39,7 @@ var (
 	certDefaultMode       = int32(416)
 	AnnotationSearchPause = "search-pause"
 	dbDefaultMap          = map[string]string{
-		"POSTGRESQL_EFFECTIVE_CACHE_SIZE": default_POSTGRESQL_EFFECTIVE_CACHE_SIZE,
-		"POSTGRESQL_SHARED_BUFFERS":       default_POSTGRESQL_SHARED_BUFFERS,
-		"WORK_MEM":                        default_WORK_MEM,
+		"WORK_MEM": default_WORK_MEM,
 	}
 )
 
