@@ -36,7 +36,6 @@ statement_timeout = '60000'`
 	data["postgresql-pre-start.sh"] = `#!/bin/bash
 set -euo pipefail
 DATA_DIR="/var/lib/pgsql/data"
-USER="postgres"
 echo "[INFO] Running before-start.sh pre-check..."
 # Check if PG_VERSION exists
 PG_VERSION_FILE="$DATA_DIR/userdata/PG_VERSION"
@@ -53,8 +52,6 @@ echo "[INFO] Container PostgreSQL version: $INSTALL_VERSION"
 # Only clear data if versions mismatch
 if [[ "$CURRENT_VERSION" != "" && "$CURRENT_VERSION" != "$INSTALL_VERSION" ]]; then
    echo "[INFO] PG_VERSION mismatch ($CURRENT_VERSION vs $INSTALL_VERSION). Clearing data directory..."
-   # Ensure ownership first
-   chown -R "$USER":"$USER" "$DATA_DIR"
    # Remove all files including hidden ones
    # It's okay to delete this data because it will repopulate with fresh data from the collectors.
    rm -rf "$DATA_DIR"/* "$DATA_DIR"/.[!.]*
