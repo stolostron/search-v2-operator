@@ -33,6 +33,34 @@ ssl_ciphers = 'HIGH:!aNULL'
 max_parallel_workers_per_gather = '8'
 statement_timeout = '60000'`
 
+	data["postgresql-pre-start.sh"] = `#!/bin/bash
+set -euo pipefail
+DATA_DIR="/var/lib/pgsql/data"
+echo "[INFO] Running before-start.sh pre-check..."
+# Check if PG_VERSION exists
+PG_VERSION_FILE="$DATA_DIR/userdata/PG_VERSION"
+if [[ -f "$PG_VERSION_FILE" ]]; then
+   CURRENT_VERSION=$(cat "$PG_VERSION_FILE")
+   echo "[INFO] Detected existing PostgreSQL version: $CURRENT_VERSION"
+else
+   echo "[INFO] No existing PG_VERSION file found. Assuming fresh install."
+   CURRENT_VERSION=""
+fi
+# Determine version of Postgres in this container
+INSTALL_VERSION=$(postgres -V | awk '{print $3}' | cut -d. -f1)
+echo "[INFO] Container PostgreSQL version: $INSTALL_VERSION"
+# Only clear data if versions mismatch
+if [[ "$CURRENT_VERSION" != "" && "$CURRENT_VERSION" != "$INSTALL_VERSION" ]]; then
+   echo "[INFO] PG_VERSION mismatch ($CURRENT_VERSION vs $INSTALL_VERSION). Clearing data directory..."
+   # Remove all files including hidden ones
+   # It's okay to delete this data because it will repopulate with fresh data from the collectors.
+   rm -rf "$DATA_DIR"/* "$DATA_DIR"/.[!.]*
+else
+   echo "[INFO] PG_VERSION is up-to-date or no previous data. Keeping existing data."
+fi
+echo "[INFO] Pre-check complete. Handing off to Postgres..."
+`
+
 	data[startScript] = `psql -d search -U searchuser -c "CREATE SCHEMA IF NOT EXISTS search"
 psql -d search -U searchuser -c "CREATE TABLE IF NOT EXISTS search.resources (uid TEXT PRIMARY KEY, cluster TEXT, data JSONB)"
 psql -d search -U searchuser -c "CREATE TABLE IF NOT EXISTS search.edges (sourceId TEXT, sourceKind TEXT,destId TEXT,destKind TEXT,edgeType TEXT,cluster TEXT, PRIMARY KEY(sourceId, destId, edgeType))"
