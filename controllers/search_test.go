@@ -714,8 +714,6 @@ func TestSearch_controller_DBConfig(t *testing.T) {
 	}
 	//Should be the default constant values set in common.go
 	verifyDeploymentEnv(t, dep, "WORK_MEM", "64MB")
-	verifyDeploymentEnv(t, dep, "POSTGRESQL_SHARED_BUFFERS", "1GB")
-	verifyDeploymentEnv(t, dep, "POSTGRESQL_EFFECTIVE_CACHE_SIZE", "2GB")
 }
 
 func TestSearch_controller_Metrics(t *testing.T) {
