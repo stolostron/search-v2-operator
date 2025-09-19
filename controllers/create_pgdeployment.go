@@ -5,7 +5,6 @@ import (
 	searchv1alpha1 "github.com/stolostron/search-v2-operator/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
@@ -14,12 +13,8 @@ func (r *SearchReconciler) PGDeployment(instance *searchv1alpha1.Search) *appsv1
 	image_sha := getImageSha(deploymentName, instance)
 	log.V(2).Info("Using postgres image ", "name", image_sha)
 	deployment := getDeployment(deploymentName, instance)
-	postgresqlSharedBuffers := r.GetDBConfigFromSearchCR(r.context, instance, "POSTGRESQL_SHARED_BUFFERS")
-	postgresqlEffectiveCacheSize := r.GetDBConfigFromSearchCR(r.context, instance, "POSTGRESQL_EFFECTIVE_CACHE_SIZE")
 	postgresqlWorkMem := r.GetDBConfigFromSearchCR(r.context, instance, "WORK_MEM")
 	postgresDefaultEnvVars := []corev1.EnvVar{
-		newEnvVar("POSTGRESQL_SHARED_BUFFERS", postgresqlSharedBuffers),
-		newEnvVar("POSTGRESQL_EFFECTIVE_CACHE_SIZE", postgresqlEffectiveCacheSize),
 		newEnvVar("WORK_MEM", postgresqlWorkMem),
 	}
 	postgresContainer := corev1.Container{
@@ -53,10 +48,6 @@ func (r *SearchReconciler) PGDeployment(instance *searchv1alpha1.Search) *appsv1
 			{
 				Name:      "search-postgres-certs",
 				MountPath: "/sslcert",
-			},
-			{
-				Name:      "dshm",
-				MountPath: "/dev/shm",
 			},
 		},
 		ReadinessProbe: &corev1.Probe{
@@ -99,7 +90,6 @@ func (r *SearchReconciler) PGDeployment(instance *searchv1alpha1.Search) *appsv1
 	}
 	postgresContainer.Env = append(postgresContainer.Env, env...)
 	postgresContainer.Resources = getResourceRequirements(deploymentName, instance)
-	shmSizeLimit := resource.MustParse(default_Postgres_SharedMemory)
 	volumes := []corev1.Volume{
 		{
 			Name: "postgresql-cfg",
@@ -127,15 +117,6 @@ func (r *SearchReconciler) PGDeployment(instance *searchv1alpha1.Search) *appsv1
 				Secret: &corev1.SecretVolumeSource{
 					DefaultMode: &certDefaultMode,
 					SecretName:  postgresSecretName,
-				},
-			},
-		},
-		{
-			Name: "dshm",
-			VolumeSource: corev1.VolumeSource{
-				EmptyDir: &corev1.EmptyDirVolumeSource{
-					Medium:    corev1.StorageMediumMemory,
-					SizeLimit: &shmSizeLimit,
 				},
 			},
 		},
