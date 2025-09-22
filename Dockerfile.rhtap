@@ -31,6 +31,7 @@ USER ${USER_UID}
 ENTRYPOINT ["/manager"]
 
 LABEL com.redhat.component="acm-search-operator-container" \
+      url="https://github.com/stolostron/search-v2-operator" \
       description="Search operator service" \
       maintainer="acm-contact@redhat.com" \
       name="search-operator" \
