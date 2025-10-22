@@ -67,6 +67,7 @@ var cleanOnce sync.Once
 //+kubebuilder:rbac:groups=authentication.k8s.io;authorization.k8s.io,resources=uids;userextras/authentication.kubernetes.io/credential-id;userextras/authentication.kubernetes.io/node-name;userextras/authentication.kubernetes.io/node-uid;userextras/authentication.kubernetes.io/pod-uid;userextras/authentication.kubernetes.io/pod-name,verbs=impersonate
 //+kubebuilder:rbac:groups=coordination.k8s.io,resources=leases,verbs=get;list;create;update;patch;watch
 //+kubebuilder:rbac:groups=monitoring.coreos.com,resources=servicemonitors,verbs=create;delete;get;list
+//+kubebuilder:rbac:groups=monitoring.coreos.com,resources=prometheusrules,verbs=create;get;update
 //+kubebuilder:rbac:groups=authentication.k8s.io,resources=tokenreviews,verbs=create
 //+kubebuilder:rbac:groups=authorization.k8s.io,resources=subjectaccessreviews,verbs=get;create
 //+kubebuilder:rbac:groups=certificates.k8s.io,resources=certificatesigningrequests;certificatesigningrequests/approval,verbs=get;list;watch;create;update
@@ -263,6 +264,12 @@ func (r *SearchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	result, err = r.reconcileVirtualMachineConfiguration(ctx, instance)
 	if err != nil {
 		log.Error(err, "Virtual Machine setup failed")
+		return *result, err
+	}
+
+	result, err = r.createOrUpdatePrometheusRule(ctx, r.SearchPVCPrometheusRule(instance))
+	if result != nil {
+		log.Error(err, "Search PVC prometheus rule setup failed")
 		return *result, err
 	}
 
