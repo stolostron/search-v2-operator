@@ -43,8 +43,8 @@ func (r *SearchReconciler) SearchPVCPrometheusRule(instance *searchv1alpha1.Sear
 							},
 							Annotations: map[string]string{
 								"summary":     "Search Persistent Volume Claim is not present",
-								"description": "Search PVC is not present in namespace " + instance.GetNamespace() + ". You should configure persistent storage for Search in production environments. See docs.redhat.com for more information about Search with persistent storage.",
-								"message":     "Search is currently running without persistent storage. Consider configuring a PVC by setting spec.dbStorage.storageClassName in the Search CR for better performance.",
+								"description": "Search PVC is not present in namespace " + instance.GetNamespace() + ". You should configure persistent storage for RHACM Search in production environments. See docs.redhat.com for more information about RHACM Search with persistent storage.",
+								"message":     "Search is currently running without persistent storage. Consider configuring a PVC by setting spec.dbStorage.storageClassName in the RHACM Search CR for better performance.",
 							},
 						},
 					},
