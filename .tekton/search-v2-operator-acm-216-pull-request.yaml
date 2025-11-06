@@ -49,7 +49,6 @@ spec:
         value: main
       - name: pathInRepo
         value: pipelines/common.yaml
-    taskRunTemplate:
   taskRunTemplate:
     serviceAccountName: build-pipeline-search-v2-operator-acm-216
   workspaces:
