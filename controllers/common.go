@@ -408,7 +408,8 @@ func (r *SearchReconciler) createOrUpdateConfigMap(ctx context.Context, cm *core
 			UpdatePostgresConfigmap(found, cm)
 		}
 
-		if !equality.Semantic.DeepEqual(found.Data, cm.Data) {
+		_, backupLabelPresent := found.Labels["cluster.open-cluster-management.io/backup"]
+		if !equality.Semantic.DeepEqual(found.Data, cm.Data) || !backupLabelPresent {
 			err = r.Update(ctx, cm)
 			if err != nil {
 				log.Error(err, "Could not update configmap")
