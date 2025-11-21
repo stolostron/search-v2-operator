@@ -34,7 +34,8 @@ ssl_cert_file = '/sslcert/tls.crt'
 ssl_key_file = '/sslcert/tls.key'
 ssl_ciphers = 'HIGH:!aNULL'
 max_parallel_workers_per_gather = '8'
-statement_timeout = '60000'`
+statement_timeout = '60000'
+logging_collector = 'false'`
 
 	data["postgresql-pre-start.sh"] = `#!/bin/bash
 set -euo pipefail
