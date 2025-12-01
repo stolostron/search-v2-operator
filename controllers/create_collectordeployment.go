@@ -2,8 +2,9 @@
 package controllers
 
 import (
+	"context"
+
 	searchv1alpha1 "github.com/stolostron/search-v2-operator/api/v1alpha1"
-	"golang.org/x/net/context"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
