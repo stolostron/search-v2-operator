@@ -53,7 +53,7 @@ func TestResourcesNotCustomized(t *testing.T) {
 			},
 		},
 	}
-	os.Setenv("COLLECTOR_IMAGE", "value-from-env")
+	_ = os.Setenv("COLLECTOR_IMAGE", "value-from-env")
 
 	actualNodelSelector := getNodeSelector("search-collector", instance)
 	if actualNodelSelector != nil {
@@ -414,7 +414,7 @@ func TestPostgresCustomization(t *testing.T) {
 	}
 
 	actual_volume := getPostgresVolume(instance)
-	if actual_volume.VolumeSource.EmptyDir == nil {
+	if actual_volume.VolumeSource.EmptyDir == nil { //nolint:staticcheck // "could remove embedded field 'VolumeSource' from selector
 		t.Error("Incorrect Volume created")
 	}
 	envVars := getContainerEnvVar(testFor, instance)
@@ -458,7 +458,7 @@ func TestPostgresCustomizationPVC(t *testing.T) {
 		},
 	}
 	actual_volume := getPostgresVolume(instance)
-	if actual_volume.VolumeSource.PersistentVolumeClaim.ClaimName != "test-search" {
+	if actual_volume.VolumeSource.PersistentVolumeClaim.ClaimName != "test-search" { //nolint:staticcheck // "could remove embedded field 'VolumeSource' from selector
 		t.Error("Incorrect Volume created")
 	}
 }
