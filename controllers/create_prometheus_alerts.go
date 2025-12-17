@@ -3,6 +3,8 @@ package controllers
 
 import (
 	"context"
+	"fmt"
+
 	"k8s.io/apimachinery/pkg/api/equality"
 
 	monitorv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
@@ -15,10 +17,49 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
-const SearchPVCAlertRuleName = "search-pvc-info-alert"
+const (
+	SearchPVCAlertRuleName = "search-pvc-info-alert"
+
+	maxAppsCount            = 100
+	maxManagedClustersCount = 10
+	maxIndexerCountOver30m  = 100
+)
 
 // SearchPVCPrometheusRule creates a PrometheusRule for PVC info alert
 func (r *SearchReconciler) SearchPVCPrometheusRule(instance *searchv1alpha1.Search) *monitorv1.PrometheusRule {
+	pvcAbsentExpr := fmt.Sprintf(`absent(kube_persistentvolumeclaim_info{namespace="%s", persistentvolumeclaim=~".*-search"}) == 1`, instance.GetNamespace())
+
+	manyManagedClustersExpr := fmt.Sprintf(`acm_managed_cluster_count > %d`, maxManagedClustersCount)
+
+	manyAppsExpr := fmt.Sprintf(`( max(apiserver_storage_objects{resource="subscriptions.apps.open-cluster-management.io"}) +
+		max(apiserver_storage_objects{resource="applicationsets.argoproj.io"}) ) > %d`, maxAppsCount)
+
+	searchPostgresOOMExpr := fmt.Sprintf(`
+		kube_pod_container_status_terminated_reason{
+			namespace="%s",
+			pod=~"search-postgres.*",
+			reason="OOMKilled"
+		} == 1
+	`, instance.GetNamespace())
+
+	searchIndexerOOMExpr := fmt.Sprintf(`
+		kube_pod_container_status_terminated_reason{
+			namespace="%s",
+			pod=~"search-indexer.*",
+			reason="OOMKilled"
+		} == 1
+	`, instance.GetNamespace())
+
+	searchIndexerRequestSizeExpr := fmt.Sprintf(`increase(search_indexer_request_size_count[30m]) > %d`, maxIndexerCountOver30m)
+
+	searchPVCCriticalExpr := fmt.Sprintf(`
+		( %s )
+		and on()
+		(
+			(%s) or (%s) or (%s) or (%s) or (%s)
+		)
+	`, pvcAbsentExpr, manyManagedClustersExpr, manyAppsExpr, searchPostgresOOMExpr, searchIndexerOOMExpr, searchIndexerRequestSizeExpr)
+
 	rule := &monitorv1.PrometheusRule{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "PrometheusRule",
@@ -35,7 +76,7 @@ func (r *SearchReconciler) SearchPVCPrometheusRule(instance *searchv1alpha1.Sear
 					Rules: []monitorv1.Rule{
 						{
 							Alert: "SearchPVCNotPresent",
-							Expr:  intstr.FromString("absent(kube_persistentvolumeclaim_info{namespace=\"" + instance.GetNamespace() + "\", persistentvolumeclaim=~\".*-search\"}) == 1"),
+							Expr:  intstr.FromString(pvcAbsentExpr),
 							For:   monitorv1.Duration("5m"),
 							Labels: map[string]string{
 								"severity":  "info",
@@ -45,6 +86,20 @@ func (r *SearchReconciler) SearchPVCPrometheusRule(instance *searchv1alpha1.Sear
 								"summary":     "Search Persistent Volume Claim is not present",
 								"description": "Search PVC is not present in namespace " + instance.GetNamespace() + ". You should configure persistent storage for RHACM Search in production environments. See docs.redhat.com for more information about RHACM Search with persistent storage.",
 								"message":     "Search is currently running without persistent storage. Consider configuring a PVC by setting spec.dbStorage.storageClassName in the RHACM Search CR for better performance.",
+							},
+						},
+						{
+							Alert: "SearchPVCNotPresentCritical",
+							Expr:  intstr.FromString(searchPVCCriticalExpr),
+							For:   monitorv1.Duration("5m"),
+							Labels: map[string]string{
+								"severity":  "critical",
+								"component": "search",
+							},
+							Annotations: map[string]string{
+								"summary":     "Search Persistent Volume Claim is not present and critical conditions are met",
+								"description": "Search PVC is not present in namespace " + instance.GetNamespace() + ". You should configure persistent storage for RHACM Search in production environments. See docs.redhat.com for more information about RHACM Search with persistent storage.",
+								"message":     "Search is currently running without persistent storage. System usage is high enough that persistent storage is needed to avoid performance issues. Consider configuring a PVC by setting spec.dbStorage.storageClassName in the RHACM Search CR for better performance.",
 							},
 						},
 					},
