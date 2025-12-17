@@ -18,7 +18,7 @@ const CONDITION_FINE_GRAINED_RBAC = "FineGrainedRBACReady"
 func (r *SearchReconciler) reconcileFineGrainedRBACConfiguration(ctx context.Context,
 	instance *searchv1alpha1.Search) (*reconcile.Result, error) {
 
-	if instance.ObjectMeta.Annotations["fine-grained-rbac-preview"] == "true" {
+	if instance.ObjectMeta.Annotations["fine-grained-rbac-preview"] == "true" { //nolint:staticcheck // "could remove embedded field 'ObjectMeta' from selector
 		log.Info("The annotation fine-grained-rbac-preview=true is present. Updating configuration.")
 
 		err := r.updateSearchApiDeployment(ctx, instance,
