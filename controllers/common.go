@@ -33,6 +33,11 @@ const (
 
 	ResourceHugePages2Mi corev1.ResourceName = "hugepages-2Mi"
 	ResourceHugePages1Gi corev1.ResourceName = "hugepages-1Gi"
+
+	// Prometheus Search PVC alert variable default values
+	defaultPrometheusAlertMaxAppsCount            = "100"
+	defaultPrometheusAlertMaxManagedClustersCount = "10"
+	defaultPrometheusAlertMaxIndexerCountOver30m  = "100"
 )
 
 var (
@@ -344,6 +349,30 @@ func getImageSha(deploymentName string, instance *searchv1alpha1.Search) string 
 	}
 	log.V(2).Info("Unknown deployment ", "name", deploymentName)
 	return ""
+}
+
+func getPrometheusAlertMaxAppsCount() string {
+	maxAppsCount := os.Getenv("PROMETHEUS_ALERT_MAX_APPS_COUNT")
+	if maxAppsCount == "" {
+		maxAppsCount = defaultPrometheusAlertMaxAppsCount
+	}
+	return maxAppsCount
+}
+
+func getPrometheusAlertMaxManagedClustersCount() string {
+	maxManagedClustersCount := os.Getenv("PROMETHEUS_ALERT_MAX_MANAGED_CLUSTERS_COUNT")
+	if maxManagedClustersCount == "" {
+		maxManagedClustersCount = defaultPrometheusAlertMaxManagedClustersCount
+	}
+	return maxManagedClustersCount
+}
+
+func getPrometheusAlertMaxIndexerCountOver30m() string {
+	maxIndexerCountOver30m := os.Getenv("PROMETHEUS_ALERT_MAX_INDEXER_COUNT_OVER_30M")
+	if maxIndexerCountOver30m == "" {
+		maxIndexerCountOver30m = defaultPrometheusAlertMaxIndexerCountOver30m
+	}
+	return maxIndexerCountOver30m
 }
 
 func (r *SearchReconciler) addEnvToSearchAPI(ctx context.Context,

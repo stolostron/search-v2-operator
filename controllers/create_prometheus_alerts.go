@@ -17,22 +17,16 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
-const (
-	SearchPVCAlertRuleName = "search-pvc-info-alert"
-
-	maxAppsCount            = 100
-	maxManagedClustersCount = 10
-	maxIndexerCountOver30m  = 100
-)
+const SearchPVCAlertRuleName = "search-pvc-info-alert"
 
 // SearchPVCPrometheusRule creates a PrometheusRule for PVC info alert
 func (r *SearchReconciler) SearchPVCPrometheusRule(instance *searchv1alpha1.Search) *monitorv1.PrometheusRule {
 	pvcAbsentExpr := fmt.Sprintf(`absent(kube_persistentvolumeclaim_info{namespace="%s", persistentvolumeclaim=~".*-search"}) == 1`, instance.GetNamespace())
 
-	manyManagedClustersExpr := fmt.Sprintf(`acm_managed_cluster_count > %d`, maxManagedClustersCount)
+	manyManagedClustersExpr := fmt.Sprintf(`acm_managed_cluster_count > %s`, getPrometheusAlertMaxManagedClustersCount())
 
 	manyAppsExpr := fmt.Sprintf(`( max(apiserver_storage_objects{resource="subscriptions.apps.open-cluster-management.io"}) +
-		max(apiserver_storage_objects{resource="applicationsets.argoproj.io"}) ) > %d`, maxAppsCount)
+		max(apiserver_storage_objects{resource="applicationsets.argoproj.io"}) ) > %s`, getPrometheusAlertMaxAppsCount())
 
 	searchPostgresOOMExpr := fmt.Sprintf(`
 		kube_pod_container_status_terminated_reason{
@@ -50,7 +44,8 @@ func (r *SearchReconciler) SearchPVCPrometheusRule(instance *searchv1alpha1.Sear
 		} == 1
 	`, instance.GetNamespace())
 
-	searchIndexerRequestSizeExpr := fmt.Sprintf(`increase(search_indexer_request_size_count[30m]) > %d`, maxIndexerCountOver30m)
+	searchIndexerRequestSizeExpr := fmt.Sprintf(`increase(search_indexer_request_size_count[30m]) > %s`,
+		getPrometheusAlertMaxIndexerCountOver30m())
 
 	searchPVCCriticalExpr := fmt.Sprintf(`
 		( %s )
