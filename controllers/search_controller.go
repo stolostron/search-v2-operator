@@ -94,7 +94,7 @@ func (r *SearchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	log.V(2).Info("Reconciling from search-v2-operator for ", req.Name, req.Namespace)
 	r.context = ctx
 	instance := &searchv1alpha1.Search{}
-	err := r.Client.Get(ctx, types.NamespacedName{Name: "search-v2-operator", Namespace: req.Namespace}, instance)
+	err := r.Client.Get(ctx, types.NamespacedName{Name: "search-v2-operator", Namespace: req.Namespace}, instance) //nolint:staticcheck // "could remove embedded field 'Client' from selector
 	if err != nil {
 		if errors.IsNotFound(err) {
 			return ctrl.Result{}, nil
@@ -337,7 +337,7 @@ func (r *SearchReconciler) updateStatus(ctx context.Context, instance *searchv1a
 	opts := []client.ListOption{client.MatchingLabels{"app": "search", "name": deploymentName}}
 	// fetch the pods
 	podList := &corev1.PodList{}
-	err := r.Client.List(ctx, podList, opts...)
+	err := r.Client.List(ctx, podList, opts...) //nolint:staticcheck // "could remove embedded field 'Client' from selector
 	if err != nil {
 		log.Error(err, "Error listing pods for component", deploymentName)
 		return err
