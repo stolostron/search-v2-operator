@@ -712,7 +712,7 @@ func TestPGDeployment(t *testing.T) {
 	if sharedMemoryVolume.Name != "dshm" {
 		t.Errorf("Expected shared volume dshm to be present, but got: %+v ", sharedMemoryVolume)
 	}
-	if !sharedMemoryVolume.VolumeSource.EmptyDir.SizeLimit.Equal(resource.MustParse("1Gi")) {
-		t.Errorf("Expected shared volume SizeLimit to be 1Gi, but got: %+v ", sharedMemoryVolume.VolumeSource.EmptyDir.SizeLimit)
+	if !sharedMemoryVolume.VolumeSource.EmptyDir.SizeLimit.Equal(resource.MustParse("1Gi")) { // nolint:staticcheck // "could remove embedded field 'VolumeSource' from selector"
+		t.Errorf("Expected shared volume SizeLimit to be 1Gi, but got: %+v ", sharedMemoryVolume.VolumeSource.EmptyDir.SizeLimit) // nolint:staticcheck // "could remove embedded field 'VolumeSource' from selector"
 	}
 }
