@@ -44,7 +44,7 @@ var (
 func (r *SearchReconciler) reconcileVirtualMachineConfiguration(ctx context.Context,
 	instance *searchv1alpha1.Search) (*reconcile.Result, error) {
 
-	if instance.ObjectMeta.Annotations["virtual-machine-preview"] == "true" {
+	if instance.ObjectMeta.Annotations["virtual-machine-preview"] == "true" { //nolint:staticcheck // "could remove embedded field 'ObjectMeta' from selector
 		log.V(1).Info("The virtual-machine-preview=true annotation is present. Updating configuration.")
 
 		err := r.validateVirtualMachineDependencies(ctx)
@@ -146,10 +146,10 @@ func (r *SearchReconciler) validateVirtualMachineDependencies(ctx context.Contex
 		}
 	}
 	if !managedServiceAccountEnabled {
-		return fmt.Errorf("The Managed Service Account add-on is not enabled in MulticlusterEngine.")
+		return fmt.Errorf("the Managed Service Account add-on is not enabled in MulticlusterEngine")
 	}
 	if !clusterProxyEnabled {
-		return fmt.Errorf("The Cluster Proxy add-on is not enabled in MulticlusterEngine.")
+		return fmt.Errorf("the Cluster Proxy add-on is not enabled in MulticlusterEngine")
 	}
 	log.V(2).Info("Validated dependencies for virtual machine actions.")
 	return nil
@@ -187,7 +187,7 @@ func (r *SearchReconciler) configureVirtualMachineActions(ctx context.Context) e
 
 	// Combine all errors.
 	if len(errList) > 0 {
-		err = fmt.Errorf("Failed to configure virtual machine actions. Errors: %v", errList)
+		err = fmt.Errorf("failed to configure virtual machine actions. Errors: %v", errList)
 		return err
 	}
 
@@ -318,7 +318,7 @@ func (r *SearchReconciler) disableVirtualMachineActions(ctx context.Context) err
 
 	// Combine all errors.
 	if len(errList) > 0 {
-		err = fmt.Errorf("Failed to disable virtual machine actions. Errors: %v", errList)
+		err = fmt.Errorf("failed to disable virtual machine actions. Errors: %v", errList)
 		return err
 	}
 
@@ -341,7 +341,7 @@ func (r *SearchReconciler) updateConsoleConfigVM(ctx context.Context, enabled bo
 		Namespace(namespace).Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
 		log.Error(err, "Error getting console configmap", "name", name, "namespace", namespace)
-		return fmt.Errorf("Error getting configmap %s in namespace %s", name, namespace)
+		return fmt.Errorf("error getting configmap %s in namespace %s", name, namespace)
 	}
 	existingValue := consoleConfig.Object["data"].(map[string]interface{})[key]
 
