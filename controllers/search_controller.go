@@ -301,10 +301,15 @@ func (r *SearchReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	}
 	mcPred := predicate.Funcs{
 		CreateFunc: func(e event.CreateEvent) bool {
-			return true
+			return false
 		},
 		UpdateFunc: func(e event.UpdateEvent) bool {
-			return false
+			// Only trigger reconcile for managedHub clusters
+			mc, ok := e.ObjectNew.(*clusterv1.ManagedCluster)
+			if !ok {
+				return false
+			}
+			return isManagedHub(mc)
 		},
 		DeleteFunc: func(e event.DeleteEvent) bool {
 			return false
@@ -447,6 +452,19 @@ func (r *SearchReconciler) finalizeSearch(instance *searchv1alpha1.Search) error
 	}
 	log.Info("Successfully finalized search")
 	return nil
+}
+
+// isManagedHub checks if a ManagedCluster is a managedHub by inspecting its clusterClaims
+func isManagedHub(mc *clusterv1.ManagedCluster) bool {
+	if mc == nil {
+		return false
+	}
+	for _, claim := range mc.Status.ClusterClaims {
+		if claim.Name == "hub.open-cluster-management.io" && claim.Value != "NotInstalled" {
+			return true
+		}
+	}
+	return false
 }
 
 func (r *SearchReconciler) setFinalizer(ctx context.Context, instance *searchv1alpha1.Search) (bool, error) {
