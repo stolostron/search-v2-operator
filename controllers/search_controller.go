@@ -325,6 +325,24 @@ func (r *SearchReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			&searchv1alpha1.Search{}, handler.OnlyControllerOwner()), builder.WithPredicates(pred)).
 		Watches(&corev1.Secret{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(),
 			&searchv1alpha1.Search{}, handler.OnlyControllerOwner()), builder.WithPredicates(pred)).
+		Watches(&corev1.ConfigMap{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(),
+			&searchv1alpha1.Search{}, handler.OnlyControllerOwner()), builder.WithPredicates(triggerOnUpdatePred)).
+		Watches(&corev1.ConfigMap{}, handler.EnqueueRequestsFromMapFunc(
+			func(ctx context.Context, a client.Object) []reconcile.Request {
+				// Trigger reconcile if SEARCH_GLOBAL_CONFIG configmap
+				if a.GetName() == SEARCH_GLOBAL_CONFIG && a.GetNamespace() == os.Getenv("WATCH_NAMESPACE") {
+					return []reconcile.Request{
+						{
+							NamespacedName: types.NamespacedName{
+								Name:      "search-v2-operator",
+								Namespace: a.GetNamespace(),
+							},
+						},
+					}
+				}
+				return nil
+			}),
+		).
 		Watches(&corev1.Pod{}, handler.EnqueueRequestsFromMapFunc(
 			func(ctx context.Context, a client.Object) []reconcile.Request {
 				// Trigger reconcile if search pod
