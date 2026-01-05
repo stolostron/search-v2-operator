@@ -40,13 +40,13 @@ spec:
               apiVersion: v1
               fieldPath: metadata.namespace
         - name: POSTGRES_IMAGE
-          value: registry.redhat.io/rhel8/postgresql-13:1-56
+          value: registry.redhat.io/rhel9/postgresql-16:placeholder-image-tag
         - name: INDEXER_IMAGE
-          value: quay.io/stolostron/search-indexer:2.7.0-4c1b1f4f692d5f8be9fca699ea26573227250f39
+          value: quay.io/stolostron/search-indexer:placeholder-image-tag
         - name: COLLECTOR_IMAGE
-          value: quay.io/stolostron/search-collector:2.7.0-de589fdba4effc06198db8250c1ae3118125d685
+          value: quay.io/stolostron/search-collector:placeholder-image-tag
         - name: API_IMAGE
-          value: quay.io/stolostron/search-v2-api:2.7.0-69590634c2de51ceec786af47ca5fb00f42a631a
+          value: quay.io/stolostron/search-v2-api:placeholder-image-tag
         args:
         - --leader-elect
         image: controller:latest

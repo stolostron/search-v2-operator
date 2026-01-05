@@ -73,7 +73,7 @@ var (
 func (r *SearchReconciler) reconcileGlobalSearch(ctx context.Context,
 	instance *searchv1alpha1.Search) (*reconcile.Result, error) {
 
-	if instance.ObjectMeta.Annotations["global-search-preview"] == "true" {
+	if instance.ObjectMeta.Annotations["global-search-preview"] == "true" { //nolint:staticcheck // "could remove embedded field 'ObjectMeta' from selector
 		log.V(1).Info("The global-search-preview annotation is present. Setting up global search...")
 
 		// Validate global search dependencies.
@@ -287,7 +287,7 @@ func (r *SearchReconciler) enableGlobalSearch(ctx context.Context, instance *sea
 
 	// Combine all errors.
 	if len(errList) > 0 {
-		err = fmt.Errorf("Failed to enable global search. Errors: %v", errList)
+		err = fmt.Errorf("failed to enable global search. Errors: %v", errList)
 		log.Error(err, "Failed to enable global search.")
 		return err
 	}
@@ -453,7 +453,7 @@ func (r *SearchReconciler) disableGlobalSearch(ctx context.Context, instance *se
 
 	// Combine all errors.
 	if len(errList) > 0 {
-		err = fmt.Errorf("Failed to disable global search. Errors: %v", errList)
+		err = fmt.Errorf("failed to disable global search. Errors: %v", errList)
 		log.Error(err, "Failed to disable global search.")
 		return err
 	}
@@ -469,7 +469,7 @@ func (r *SearchReconciler) updateConsoleConfig(ctx context.Context, enabled bool
 		Namespace(namespace).Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
 		log.Error(err, "Error getting console configmap", "name", name, "namespace", namespace)
-		return fmt.Errorf("Error getting configmap %s in namespace %s", name, namespace)
+		return fmt.Errorf("error getting configmap %s in namespace %s", name, namespace)
 	}
 	existingValue := consoleConfig.Object["data"].(map[string]interface{})["globalSearchFeatureFlag"]
 
@@ -550,7 +550,7 @@ func (r *SearchReconciler) updateSearchApiDeployment(ctx context.Context,
 	klog.V(2).Info("Updating envVar for Search API deployment")
 
 	// Write the updated instance.
-	err := r.Client.Update(ctx, instance)
+	err := r.Client.Update(ctx, instance) //nolint:staticcheck // "could remove embedded field 'Client' from selector
 	if err != nil {
 		log.Error(err, "Failed to update Search API env in the Search instance.")
 	}

@@ -68,6 +68,7 @@ var cleanOnce sync.Once
 //+kubebuilder:rbac:groups=authentication.k8s.io;authorization.k8s.io,resources=uids;userextras/authentication.kubernetes.io/credential-id;userextras/authentication.kubernetes.io/node-name;userextras/authentication.kubernetes.io/node-uid;userextras/authentication.kubernetes.io/pod-uid;userextras/authentication.kubernetes.io/pod-name,verbs=impersonate
 //+kubebuilder:rbac:groups=coordination.k8s.io,resources=leases,verbs=get;list;create;update;patch;watch
 //+kubebuilder:rbac:groups=monitoring.coreos.com,resources=servicemonitors,verbs=create;delete;get;list
+//+kubebuilder:rbac:groups=monitoring.coreos.com,resources=prometheusrules,verbs=create;get;update
 //+kubebuilder:rbac:groups=authentication.k8s.io,resources=tokenreviews,verbs=create
 //+kubebuilder:rbac:groups=authorization.k8s.io,resources=subjectaccessreviews,verbs=get;create
 //+kubebuilder:rbac:groups=certificates.k8s.io,resources=certificatesigningrequests;certificatesigningrequests/approval,verbs=get;list;watch;create;update
@@ -88,10 +89,6 @@ var cleanOnce sync.Once
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
-// TODO(user): Modify the Reconcile function to compare the state specified by
-// the Search object against the actual cluster state, and then
-// perform operations to make the cluster state reflect the state specified by
-// the user.
 //
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.10.0/pkg/reconcile
@@ -99,7 +96,7 @@ func (r *SearchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	log.V(2).Info("Reconciling from search-v2-operator for ", req.Name, req.Namespace)
 	r.context = ctx
 	instance := &searchv1alpha1.Search{}
-	err := r.Client.Get(ctx, types.NamespacedName{Name: "search-v2-operator", Namespace: req.Namespace}, instance)
+	err := r.Client.Get(ctx, types.NamespacedName{Name: "search-v2-operator", Namespace: req.Namespace}, instance) //nolint:staticcheck // "could remove embedded field 'Client' from selector
 	if err != nil {
 		if errors.IsNotFound(err) {
 			return ctrl.Result{}, nil
@@ -237,7 +234,7 @@ func (r *SearchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		log.Error(err, "Indexer configmap  setup failed")
 		return *result, err
 	}
-	result, err = r.createConfigMap(ctx, r.PostgresConfigmap(instance))
+	result, err = r.createOrUpdateConfigMap(ctx, r.PostgresConfigmap(instance))
 	if result != nil {
 		log.Error(err, "Postgres configmap setup failed")
 		return *result, err
@@ -268,6 +265,12 @@ func (r *SearchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	result, err = r.reconcileVirtualMachineConfiguration(ctx, instance)
 	if err != nil {
 		log.Error(err, "Virtual Machine setup failed")
+		return *result, err
+	}
+
+	result, err = r.createOrUpdatePrometheusRule(ctx, r.SearchPVCPrometheusRule(instance))
+	if result != nil {
+		log.Error(err, "Search PVC prometheus rule setup failed")
 		return *result, err
 	}
 
@@ -408,7 +411,7 @@ func (r *SearchReconciler) updateStatus(ctx context.Context, instance *searchv1a
 	opts := []client.ListOption{client.MatchingLabels{"app": "search", "name": deploymentName}}
 	// fetch the pods
 	podList := &corev1.PodList{}
-	err := r.Client.List(ctx, podList, opts...)
+	err := r.Client.List(ctx, podList, opts...) //nolint:staticcheck // "could remove embedded field 'Client' from selector
 	if err != nil {
 		log.Error(err, "Error listing pods for component", deploymentName)
 		return err

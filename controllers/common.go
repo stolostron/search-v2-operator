@@ -39,9 +39,7 @@ var (
 	certDefaultMode       = int32(416)
 	AnnotationSearchPause = "search-pause"
 	dbDefaultMap          = map[string]string{
-		"POSTGRESQL_EFFECTIVE_CACHE_SIZE": default_POSTGRESQL_EFFECTIVE_CACHE_SIZE,
-		"POSTGRESQL_SHARED_BUFFERS":       default_POSTGRESQL_SHARED_BUFFERS,
-		"WORK_MEM":                        default_WORK_MEM,
+		"WORK_MEM": default_WORK_MEM,
 	}
 )
 
@@ -383,21 +381,46 @@ func (r *SearchReconciler) createConfigMap(ctx context.Context, cm *corev1.Confi
 			log.Error(err, "Could not create configmap")
 			return &reconcile.Result{}, err
 		}
+		log.V(2).Info("Created configmap ", "name", cm.Name)
 
+	}
+
+	log.V(2).Info("Found configmap, did not update it. ", "name", cm.Name)
+	return nil, nil
+}
+
+func (r *SearchReconciler) createOrUpdateConfigMap(ctx context.Context, cm *corev1.ConfigMap) (*reconcile.Result, error) {
+	found := &corev1.ConfigMap{}
+	err := r.Get(ctx, types.NamespacedName{
+		Name:      cm.Name,
+		Namespace: cm.Namespace,
+	}, found)
+	if err != nil && errors.IsNotFound(err) {
+		err = r.Create(ctx, cm)
+		if err != nil {
+			log.Error(err, "Could not create configmap")
+			return &reconcile.Result{}, err
+		}
+		log.V(2).Info("Created configmap ", "name", cm.Name)
 	} else {
-		startScript := "postgresql-start.sh"
-		log.V(3).Info("Found DB Config ", "startScript", found.Data[startScript])
-		log.V(3).Info("New DB Config ", "startScript", cm.Data[startScript])
-		if found.Data[startScript] != cm.Data[startScript] {
+		// Special case for search-postgres configmap.
+		if cm.Name == postgresConfigmapName {
+			UpdatePostgresConfigmap(found, cm)
+		}
+
+		_, backupLabelPresent := found.Labels["cluster.open-cluster-management.io/backup"]
+		if !equality.Semantic.DeepEqual(found.Data, cm.Data) || !backupLabelPresent {
 			err = r.Update(ctx, cm)
 			if err != nil {
 				log.Error(err, "Could not update configmap")
 				return &reconcile.Result{}, err
 			}
+			log.V(2).Info("Updated configmap ", "name", cm.Name)
+			if cm.Name == postgresConfigmapName {
+				log.Info("Postgres must be restarted for changes to take effect.")
+			}
 		}
 	}
-
-	log.V(2).Info("Created configmap ", "name", cm.Name)
 	return nil, nil
 }
 

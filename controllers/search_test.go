@@ -173,6 +173,7 @@ func TestSearch_controller(t *testing.T) {
 
 	verifyConfigmapDataContent(t, configmap3, "postgresql.conf", "ssl = 'on'")
 	verifyConfigmapDataContent(t, configmap3, "postgresql-start.sh", "CREATE SCHEMA IF NOT EXISTS search")
+	verifyConfigmapDataContent(t, configmap3, "custom-postgresql.conf", "# Customizations appended to postgresql.conf")
 
 	//check for Service Account
 	serviceaccount := &corev1.ServiceAccount{}
@@ -713,8 +714,6 @@ func TestSearch_controller_DBConfig(t *testing.T) {
 	}
 	//Should be the default constant values set in common.go
 	verifyDeploymentEnv(t, dep, "WORK_MEM", "64MB")
-	verifyDeploymentEnv(t, dep, "POSTGRESQL_SHARED_BUFFERS", "1GB")
-	verifyDeploymentEnv(t, dep, "POSTGRESQL_EFFECTIVE_CACHE_SIZE", "2GB")
 }
 
 func TestSearch_controller_Metrics(t *testing.T) {

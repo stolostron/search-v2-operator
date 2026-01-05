@@ -3,6 +3,7 @@ package controllers
 
 import (
 	"context"
+	"strings"
 
 	searchv1alpha1 "github.com/stolostron/search-v2-operator/api/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
@@ -16,17 +17,53 @@ func (r *SearchReconciler) PostgresConfigmap(instance *searchv1alpha1.Search) *c
 	ns := instance.GetNamespace()
 	cm := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
+			Labels: map[string]string{
+				"cluster.open-cluster-management.io/backup": "",
+			},
 			Name:      postgresConfigmapName,
 			Namespace: ns,
 		},
 	}
 	work_mem := r.GetDBConfigFromSearchCR(context.TODO(), instance, "WORK_MEM")
 	data := map[string]string{}
+	data["custom-postgresql.conf"] = `# Customizations appended to postgresql.conf.
+`
+
 	data["postgresql.conf"] = `ssl = 'on'
 ssl_cert_file = '/sslcert/tls.crt'
 ssl_key_file = '/sslcert/tls.key'
 ssl_ciphers = 'HIGH:!aNULL'
-max_parallel_workers_per_gather = '8'`
+max_parallel_workers_per_gather = '8'
+statement_timeout = '60000'
+logging_collector = 'false'`
+
+	data["postgresql-pre-start.sh"] = `#!/bin/bash
+set -euo pipefail
+DATA_DIR="/var/lib/pgsql/data"
+echo "[INFO] Running before-start.sh pre-check..."
+# Check if PG_VERSION exists
+PG_VERSION_FILE="$DATA_DIR/userdata/PG_VERSION"
+if [[ -f "$PG_VERSION_FILE" ]]; then
+   CURRENT_VERSION=$(cat "$PG_VERSION_FILE")
+   echo "[INFO] Detected existing PostgreSQL version: $CURRENT_VERSION"
+else
+   echo "[INFO] No existing PG_VERSION file found. Assuming fresh install."
+   CURRENT_VERSION=""
+fi
+# Determine version of Postgres in this container
+INSTALL_VERSION=$(postgres -V | awk '{print $3}' | cut -d. -f1)
+echo "[INFO] Container PostgreSQL version: $INSTALL_VERSION"
+# Only clear data if versions mismatch
+if [[ "$CURRENT_VERSION" != "" && "$CURRENT_VERSION" != "$INSTALL_VERSION" ]]; then
+   echo "[INFO] PG_VERSION mismatch ($CURRENT_VERSION vs $INSTALL_VERSION). Clearing data directory..."
+   # Remove all files including hidden ones
+   # It's okay to delete this data because it will repopulate with fresh data from the collectors.
+   rm -rf "$DATA_DIR"/* "$DATA_DIR"/.[!.]*
+else
+   echo "[INFO] PG_VERSION is up-to-date or no previous data. Keeping existing data."
+fi
+echo "[INFO] Pre-check complete. Handing off to Postgres..."
+`
 
 	data[startScript] = `psql -d search -U searchuser -c "CREATE SCHEMA IF NOT EXISTS search"
 psql -d search -U searchuser -c "CREATE TABLE IF NOT EXISTS search.resources (uid TEXT PRIMARY KEY, cluster TEXT, data JSONB)"
@@ -105,4 +142,31 @@ CREATE TRIGGER resources_delete AFTER DELETE ON search.resources FOR EACH ROW WH
 		log.V(2).Info("Could not set control for search-postgres configmap")
 	}
 	return cm
+}
+
+func UpdatePostgresConfigmap(existing, new *corev1.ConfigMap) {
+	currentPostgresConfig := existing.Data["postgresql.conf"]
+	customPostgresConfig := existing.Data["custom-postgresql.conf"]
+	defaultPostgresConfig := new.Data["postgresql.conf"]
+
+	// Check if migration is needed custom-postgres.conf was added in ACM 2.15.
+	if customPostgresConfig == "" && currentPostgresConfig != defaultPostgresConfig {
+		newCustomPostgresConfig := "# Customizations appended to postgresql.conf"
+		for _, line := range strings.Split(currentPostgresConfig, "\n") {
+			if !strings.Contains(defaultPostgresConfig, line) {
+				newCustomPostgresConfig += "\n" + line
+			}
+		}
+		new.Data["custom-postgresql.conf"] = newCustomPostgresConfig
+		log.Info("Migrated ConfigMap search-postgres. Moved custom changes to custom-postgresql.conf")
+	} else {
+		// Merge custom-postgresql.conf into postgresql.conf
+		if !strings.Contains(defaultPostgresConfig, customPostgresConfig) {
+			new.Data["postgresql.conf"] = defaultPostgresConfig + "\n" + customPostgresConfig
+		}
+		// Preserve user-defined data in [custom-postgresql.conf]
+		if customPostgresConfig != "" {
+			new.Data["custom-postgresql.conf"] = customPostgresConfig
+		}
+	}
 }
