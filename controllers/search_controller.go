@@ -299,29 +299,16 @@ func (r *SearchReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			return false
 		},
 	}
-	mcPred := predicate.Funcs{
+	// Trigger on create and update for ConfigMaps
+	configMapPred := predicate.Funcs{
 		CreateFunc: func(e event.CreateEvent) bool {
-			return false
-		},
-		UpdateFunc: func(e event.UpdateEvent) bool {
-			// Only trigger reconcile for managedHub clusters
-			mc, ok := e.ObjectNew.(*clusterv1.ManagedCluster)
-			if !ok {
-				return false
-			}
-			return isManagedHub(mc)
-		},
-		DeleteFunc: func(e event.DeleteEvent) bool {
-			return false
-		},
-	}
-	// Trigger on create or update.
-	triggerOnUpdatePred := predicate.Funcs{
-		CreateFunc: func(e event.CreateEvent) bool {
-			return false
+			return true
 		},
 		UpdateFunc: func(e event.UpdateEvent) bool {
 			return true
+		},
+		DeleteFunc: func(e event.DeleteEvent) bool {
+			return false
 		},
 	}
 	return ctrl.NewControllerManagedBy(mgr).
@@ -330,12 +317,10 @@ func (r *SearchReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			&searchv1alpha1.Search{}, handler.OnlyControllerOwner()), builder.WithPredicates(pred)).
 		Watches(&corev1.Secret{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(),
 			&searchv1alpha1.Search{}, handler.OnlyControllerOwner()), builder.WithPredicates(pred)).
-		Watches(&corev1.ConfigMap{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(),
-			&searchv1alpha1.Search{}, handler.OnlyControllerOwner()), builder.WithPredicates(triggerOnUpdatePred)).
 		Watches(&corev1.ConfigMap{}, handler.EnqueueRequestsFromMapFunc(
 			func(ctx context.Context, a client.Object) []reconcile.Request {
 				// Trigger reconcile if SEARCH_GLOBAL_CONFIG configmap
-				if a.GetName() == SEARCH_GLOBAL_CONFIG && a.GetNamespace() == os.Getenv("WATCH_NAMESPACE") {
+				if a.GetName() == SEARCH_GLOBAL_CONFIG && a.GetNamespace() == os.Getenv("POD_NAMESPACE") {
 					return []reconcile.Request{
 						{
 							NamespacedName: types.NamespacedName{
@@ -345,9 +330,23 @@ func (r *SearchReconciler) SetupWithManager(mgr ctrl.Manager) error {
 						},
 					}
 				}
+				// Trigger reconcile for owned ConfigMaps
+				if metav1.IsControlledBy(a, &searchv1alpha1.Search{}) {
+					for _, ref := range a.GetOwnerReferences() {
+						if ref.Controller != nil && *ref.Controller {
+							return []reconcile.Request{
+								{
+									NamespacedName: types.NamespacedName{
+										Name:      ref.Name,
+										Namespace: a.GetNamespace(),
+									},
+								},
+							}
+						}
+					}
+				}
 				return nil
-			}),
-		).
+			}), builder.WithPredicates(configMapPred)).
 		Watches(&corev1.Pod{}, handler.EnqueueRequestsFromMapFunc(
 			func(ctx context.Context, a client.Object) []reconcile.Request {
 				// Trigger reconcile if search pod
@@ -381,7 +380,26 @@ func (r *SearchReconciler) SetupWithManager(mgr ctrl.Manager) error {
 				return nil
 			}),
 		).
-		Watches(&clusterv1.ManagedCluster{}, &handler.EnqueueRequestForObject{}, builder.WithPredicates(mcPred)).
+		Watches(&clusterv1.ManagedCluster{}, handler.EnqueueRequestsFromMapFunc(
+			func(ctx context.Context, a client.Object) []reconcile.Request {
+				// Only trigger reconcile for managedHub clusters
+				mc, ok := a.(*clusterv1.ManagedCluster)
+				if !ok {
+					return nil
+				}
+				if isManagedHub(mc) {
+					return []reconcile.Request{
+						{
+							NamespacedName: types.NamespacedName{
+								Name:      "search-v2-operator",
+								Namespace: os.Getenv("POD_NAMESPACE"),
+							},
+						},
+					}
+				}
+				return nil
+			}),
+		).
 		Complete(r)
 }
 
