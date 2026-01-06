@@ -55,6 +55,7 @@ type SearchReconciler struct {
 }
 
 const searchFinalizer = "search.open-cluster-management.io/finalizer"
+const OperatorName = "search-v2-operator"
 
 var log = logf.Log.WithName("searchoperator")
 var once sync.Once
@@ -96,7 +97,7 @@ func (r *SearchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	log.V(2).Info("Reconciling from search-v2-operator for ", req.Name, req.Namespace)
 	r.context = ctx
 	instance := &searchv1alpha1.Search{}
-	err := r.Client.Get(ctx, types.NamespacedName{Name: "search-v2-operator", Namespace: req.Namespace}, instance) //nolint:staticcheck // "could remove embedded field 'Client' from selector
+	err := r.Client.Get(ctx, types.NamespacedName{Name: OperatorName, Namespace: req.Namespace}, instance) //nolint:staticcheck // "could remove embedded field 'Client' from selector
 	if err != nil {
 		if errors.IsNotFound(err) {
 			return ctrl.Result{}, nil
@@ -327,7 +328,7 @@ func (r *SearchReconciler) SetupWithManager(mgr ctrl.Manager) error {
 					return []reconcile.Request{
 						{
 							NamespacedName: types.NamespacedName{
-								Name:      "search-v2-operator",
+								Name:      OperatorName,
 								Namespace: a.GetNamespace(),
 							},
 						},
@@ -394,7 +395,7 @@ func (r *SearchReconciler) SetupWithManager(mgr ctrl.Manager) error {
 					return []reconcile.Request{
 						{
 							NamespacedName: types.NamespacedName{
-								Name:      "search-v2-operator",
+								Name:      OperatorName,
 								Namespace: os.Getenv("POD_NAMESPACE"),
 							},
 						},
