@@ -166,6 +166,7 @@ spec:
           verbs:
           - get
           - list
+          - watch
         - apiGroups:
           - coordination.k8s.io
           resources:
@@ -324,6 +325,11 @@ spec:
                 command:
                 - /manager
                 env:
+                - name: POD_NAMESPACE
+                  valueFrom:
+                    fieldRef:
+                      apiVersion: v1
+                      fieldPath: metadata.namespace
                 - name: WATCH_NAMESPACE
                   valueFrom:
                     fieldRef:

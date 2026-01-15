@@ -34,6 +34,11 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.namespace
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.namespace
         - name: POSTGRES_IMAGE
           value: registry.redhat.io/rhel9/postgresql-16:placeholder-image-tag
         - name: INDEXER_IMAGE

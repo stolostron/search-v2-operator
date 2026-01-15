@@ -39,6 +39,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/dynamic"
+	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -54,6 +55,7 @@ type SearchReconciler struct {
 }
 
 const searchFinalizer = "search.open-cluster-management.io/finalizer"
+const OperatorName = "search-v2-operator"
 
 var log = logf.Log.WithName("searchoperator")
 var once sync.Once
@@ -76,7 +78,7 @@ var cleanOnce sync.Once
 //+kubebuilder:rbac:groups=addon.open-cluster-management.io,resources=managedclusteraddons/finalizers;clustermanagementaddons/finalizers;managedclusteraddons/finalizers,verbs=update
 //+kubebuilder:rbac:groups=addon.open-cluster-management.io,resources=managedclusteraddons/status;clustermanagementaddons/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=authentication.open-cluster-management.io,resources=managedserviceaccounts,verbs=create;get;delete
-//+kubebuilder:rbac:groups=cluster.open-cluster-management.io,resources=managedclusters,verbs=get;list
+//+kubebuilder:rbac:groups=cluster.open-cluster-management.io,resources=managedclusters,verbs=get;list;watch
 //+kubebuilder:rbac:groups=operator.open-cluster-management.io,resources=multiclusterglobalhubs;multiclusterhubs,verbs=get;list
 //+kubebuilder:rbac:groups=proxy.open-cluster-management.io,resources=clusterstatuses/aggregator,verbs=create
 //+kubebuilder:rbac:groups=rbac.open-cluster-management.io,resources=clusterpermissions,verbs=create;get;delete
@@ -95,7 +97,7 @@ func (r *SearchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	log.V(2).Info("Reconciling from search-v2-operator for ", req.Name, req.Namespace)
 	r.context = ctx
 	instance := &searchv1alpha1.Search{}
-	err := r.Client.Get(ctx, types.NamespacedName{Name: "search-v2-operator", Namespace: req.Namespace}, instance) //nolint:staticcheck // "could remove embedded field 'Client' from selector
+	err := r.Client.Get(ctx, types.NamespacedName{Name: OperatorName, Namespace: req.Namespace}, instance) //nolint:staticcheck // "could remove embedded field 'Client' from selector
 	if err != nil {
 		if errors.IsNotFound(err) {
 			return ctrl.Result{}, nil
@@ -301,13 +303,16 @@ func (r *SearchReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			return false
 		},
 	}
-	// Trigger on create or update.
-	triggerOnUpdatePred := predicate.Funcs{
+	// Trigger on create and update for ConfigMaps
+	configMapPred := predicate.Funcs{
 		CreateFunc: func(e event.CreateEvent) bool {
-			return false
+			return true
 		},
 		UpdateFunc: func(e event.UpdateEvent) bool {
 			return true
+		},
+		DeleteFunc: func(e event.DeleteEvent) bool {
+			return false
 		},
 	}
 	return ctrl.NewControllerManagedBy(mgr).
@@ -316,8 +321,36 @@ func (r *SearchReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			&searchv1alpha1.Search{}, handler.OnlyControllerOwner()), builder.WithPredicates(pred)).
 		Watches(&corev1.Secret{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(),
 			&searchv1alpha1.Search{}, handler.OnlyControllerOwner()), builder.WithPredicates(pred)).
-		Watches(&corev1.ConfigMap{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(),
-			&searchv1alpha1.Search{}, handler.OnlyControllerOwner()), builder.WithPredicates(triggerOnUpdatePred)).
+		Watches(&corev1.ConfigMap{}, handler.EnqueueRequestsFromMapFunc(
+			func(ctx context.Context, a client.Object) []reconcile.Request {
+				// Trigger reconcile if SEARCH_GLOBAL_CONFIG configmap
+				if a.GetName() == SEARCH_GLOBAL_CONFIG && a.GetNamespace() == os.Getenv("POD_NAMESPACE") {
+					return []reconcile.Request{
+						{
+							NamespacedName: types.NamespacedName{
+								Name:      OperatorName,
+								Namespace: a.GetNamespace(),
+							},
+						},
+					}
+				}
+				// Trigger reconcile for owned ConfigMaps
+				for _, ref := range a.GetOwnerReferences() {
+					if ref.APIVersion == searchv1alpha1.GroupVersion.String() &&
+						ref.Kind == "Search" &&
+						ref.Controller != nil && *ref.Controller {
+						return []reconcile.Request{
+							{
+								NamespacedName: types.NamespacedName{
+									Name:      ref.Name,
+									Namespace: a.GetNamespace(),
+								},
+							},
+						}
+					}
+				}
+				return nil
+			}), builder.WithPredicates(configMapPred)).
 		Watches(&corev1.Pod{}, handler.EnqueueRequestsFromMapFunc(
 			func(ctx context.Context, a client.Object) []reconcile.Request {
 				// Trigger reconcile if search pod
@@ -344,6 +377,26 @@ func (r *SearchReconciler) SetupWithManager(mgr ctrl.Manager) error {
 							NamespacedName: types.NamespacedName{
 								Name:      "ClusterRole/" + a.GetName(),
 								Namespace: os.Getenv("WATCH_NAMESPACE"),
+							},
+						},
+					}
+				}
+				return nil
+			}),
+		).
+		Watches(&clusterv1.ManagedCluster{}, handler.EnqueueRequestsFromMapFunc(
+			func(ctx context.Context, a client.Object) []reconcile.Request {
+				// Only trigger reconcile for managedHub clusters
+				mc, ok := a.(*clusterv1.ManagedCluster)
+				if !ok {
+					return nil
+				}
+				if isManagedHub(mc) {
+					return []reconcile.Request{
+						{
+							NamespacedName: types.NamespacedName{
+								Name:      OperatorName,
+								Namespace: os.Getenv("POD_NAMESPACE"),
 							},
 						},
 					}
@@ -421,6 +474,19 @@ func (r *SearchReconciler) finalizeSearch(instance *searchv1alpha1.Search) error
 	}
 	log.Info("Successfully finalized search")
 	return nil
+}
+
+// isManagedHub checks if a ManagedCluster is a managedHub by inspecting its clusterClaims
+func isManagedHub(mc *clusterv1.ManagedCluster) bool {
+	if mc == nil {
+		return false
+	}
+	for _, claim := range mc.Status.ClusterClaims {
+		if claim.Name == "hub.open-cluster-management.io" && claim.Value != "NotInstalled" {
+			return true
+		}
+	}
+	return false
 }
 
 func (r *SearchReconciler) setFinalizer(ctx context.Context, instance *searchv1alpha1.Search) (bool, error) {
