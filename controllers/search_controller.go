@@ -97,7 +97,7 @@ func (r *SearchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	log.V(2).Info("Reconciling from search-v2-operator for ", req.Name, req.Namespace)
 	r.context = ctx
 	instance := &searchv1alpha1.Search{}
-	err := r.Client.Get(ctx, types.NamespacedName{Name: OperatorName, Namespace: req.Namespace}, instance) //nolint:staticcheck // "could remove embedded field 'Client' from selector
+	err := r.Client.Get(ctx, types.NamespacedName{Name: OperatorName, Namespace: req.Namespace}, instance)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			return ctrl.Result{}, nil
@@ -335,17 +335,17 @@ func (r *SearchReconciler) SetupWithManager(mgr ctrl.Manager) error {
 					}
 				}
 				// Trigger reconcile for owned ConfigMaps
-				if metav1.IsControlledBy(a, &searchv1alpha1.Search{}) {
-					for _, ref := range a.GetOwnerReferences() {
-						if ref.Controller != nil && *ref.Controller {
-							return []reconcile.Request{
-								{
-									NamespacedName: types.NamespacedName{
-										Name:      ref.Name,
-										Namespace: a.GetNamespace(),
-									},
+				for _, ref := range a.GetOwnerReferences() {
+					if ref.APIVersion == searchv1alpha1.GroupVersion.String() &&
+						ref.Kind == "Search" &&
+						ref.Controller != nil && *ref.Controller {
+						return []reconcile.Request{
+							{
+								NamespacedName: types.NamespacedName{
+									Name:      ref.Name,
+									Namespace: a.GetNamespace(),
 								},
-							}
+							},
 						}
 					}
 				}
