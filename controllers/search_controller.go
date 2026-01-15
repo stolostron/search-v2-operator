@@ -97,7 +97,7 @@ func (r *SearchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	log.V(2).Info("Reconciling from search-v2-operator for ", req.Name, req.Namespace)
 	r.context = ctx
 	instance := &searchv1alpha1.Search{}
-	err := r.Client.Get(ctx, types.NamespacedName{Name: OperatorName, Namespace: req.Namespace}, instance)
+	err := r.Client.Get(ctx, types.NamespacedName{Name: OperatorName, Namespace: req.Namespace}, instance) //nolint:staticcheck // "could remove embedded field 'Client' from selector
 	if err != nil {
 		if errors.IsNotFound(err) {
 			return ctrl.Result{}, nil
