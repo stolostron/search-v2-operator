@@ -23,7 +23,7 @@ func (r *SearchReconciler) reconcileFineGrainedRBACConfiguration(ctx context.Con
 	}
 
 	if instance.Annotations["fine-grained-rbac"] == "true" {
-		log.Info("The annotation fine-grained-rbac=true or fine-grained-rbac=true is present. Updating configuration.")
+		log.Info("The annotation fine-grained-rbac=true is present. Updating configuration.")
 
 		err := r.updateSearchApiDeployment(ctx, instance,
 			corev1.EnvVar{Name: "FEATURE_FINE_GRAINED_RBAC", Value: "true"})
