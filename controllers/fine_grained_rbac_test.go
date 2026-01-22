@@ -17,7 +17,7 @@ func Test_enableFineGrainedRBAC(t *testing.T) {
 			Name:      "search-operator",
 			Namespace: "open-cluster-management",
 			Annotations: map[string]string{
-				"fine-grained-rbac-preview": "true",
+				"fine-grained-rbac": "true",
 			},
 		},
 		Spec: searchv1alpha1.SearchSpec{},

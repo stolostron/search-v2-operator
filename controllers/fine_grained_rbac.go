@@ -18,8 +18,12 @@ const CONDITION_FINE_GRAINED_RBAC = "FineGrainedRBACReady"
 func (r *SearchReconciler) reconcileFineGrainedRBACConfiguration(ctx context.Context,
 	instance *searchv1alpha1.Search) (*reconcile.Result, error) {
 
-	if instance.ObjectMeta.Annotations["fine-grained-rbac-preview"] == "true" { //nolint:staticcheck // "could remove embedded field 'ObjectMeta' from selector
-		log.Info("The annotation fine-grained-rbac-preview=true is present. Updating configuration.")
+	if _, exists := instance.Annotations["fine-grained-rbac-preview"]; exists {
+		log.Info("The annotation [fine-grained-rbac-preview] is present, but has been deprecated. Use fine-grained-rbac instead.")
+	}
+
+	if instance.Annotations["fine-grained-rbac"] == "true" {
+		log.Info("The annotation fine-grained-rbac=true or fine-grained-rbac=true is present. Updating configuration.")
 
 		err := r.updateSearchApiDeployment(ctx, instance,
 			corev1.EnvVar{Name: "FEATURE_FINE_GRAINED_RBAC", Value: "true"})
@@ -44,7 +48,7 @@ func (r *SearchReconciler) reconcileFineGrainedRBACConfiguration(ctx context.Con
 		})
 
 	} else {
-		log.V(3).Info("The fine-grained-rbac-preview annotation is false or not present.")
+		log.V(3).Info("The fine-grained-rbac annotation is false or not present.")
 
 		err := r.updateSearchApiDeployment(ctx, instance, corev1.EnvVar{Name: "FEATURE_FINE_GRAINED_RBAC", Value: ""})
 		if err != nil {
