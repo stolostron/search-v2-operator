@@ -975,3 +975,60 @@ func TestCreateOrUpdateConfigMap_PostgresNoCustomConfig(t *testing.T) {
 	expectedCustomConf := "# Customizations appended to postgresql.conf"
 	assert.Equal(t, expectedCustomConf, updated.Data["custom-postgresql.conf"])
 }
+
+func TestGetPrometheusAlertMaxAppsCount(t *testing.T) {
+	search := &searchv1alpha1.Search{
+		TypeMeta:   metav1.TypeMeta{Kind: "Search"},
+		ObjectMeta: metav1.ObjectMeta{Name: "search-v2-operator", Namespace: "test-namespace"},
+		Spec:       searchv1alpha1.SearchSpec{},
+	}
+
+	// Check default value (no env var or annotation set)
+	assert.Equal(t, defaultPrometheusAlertMaxAppsCount, getPrometheusAlertMaxAppsCount(search))
+
+	// Set default value from env var
+	t.Setenv("PROMETHEUS_ALERT_MAX_APPS_COUNT", "70")
+	assert.Equal(t, "70", getPrometheusAlertMaxAppsCount(search))
+
+	// Test case: Annotation overrides default value from env var
+	search.Annotations = map[string]string{AnnotationPrometheusAlertMaxAppsCount: "80"}
+	assert.Equal(t, "80", getPrometheusAlertMaxAppsCount(search))
+}
+
+func TestGetPrometheusAlertMaxManagedClustersCount(t *testing.T) {
+	search := &searchv1alpha1.Search{
+		TypeMeta:   metav1.TypeMeta{Kind: "Search"},
+		ObjectMeta: metav1.ObjectMeta{Name: "search-v2-operator", Namespace: "test-namespace"},
+		Spec:       searchv1alpha1.SearchSpec{},
+	}
+
+	// Check default value (no env var or annotation set)
+	assert.Equal(t, defaultPrometheusAlertMaxManagedClustersCount, getPrometheusAlertMaxManagedClustersCount(search))
+
+	// Set default value from env var
+	t.Setenv("PROMETHEUS_ALERT_MAX_MANAGED_CLUSTERS_COUNT", "700")
+	assert.Equal(t, "700", getPrometheusAlertMaxManagedClustersCount(search))
+
+	// Test case: Annotation overrides default value from env var
+	search.Annotations = map[string]string{AnnotationPrometheusAlertMaxManagedClustersCount: "8"}
+	assert.Equal(t, "8", getPrometheusAlertMaxManagedClustersCount(search))
+}
+
+func TestGetPrometheusAlertMaxIndexerCountOver30m(t *testing.T) {
+	search := &searchv1alpha1.Search{
+		TypeMeta:   metav1.TypeMeta{Kind: "Search"},
+		ObjectMeta: metav1.ObjectMeta{Name: "search-v2-operator", Namespace: "test-namespace"},
+		Spec:       searchv1alpha1.SearchSpec{},
+	}
+
+	// Check default value (no env var or annotation set)
+	assert.Equal(t, defaultPrometheusAlertMaxIndexerCountOver30m, getPrometheusAlertMaxIndexerCountOver30m(search))
+
+	// Set default value from env var
+	t.Setenv("PROMETHEUS_ALERT_MAX_INDEXER_COUNT_OVER_30M", "555")
+	assert.Equal(t, "555", getPrometheusAlertMaxIndexerCountOver30m(search))
+
+	// Test case: Annotation overrides default value from env var
+	search.Annotations = map[string]string{AnnotationPrometheusAlertMaxIndexerCountOver30m: "8000"}
+	assert.Equal(t, "8000", getPrometheusAlertMaxIndexerCountOver30m(search))
+}

@@ -23,10 +23,10 @@ const SearchPVCAlertRuleName = "search-pvc-info-alert"
 func (r *SearchReconciler) SearchPVCPrometheusRule(instance *searchv1alpha1.Search) *monitorv1.PrometheusRule {
 	pvcAbsentExpr := fmt.Sprintf(`absent(kube_persistentvolumeclaim_info{namespace="%s", persistentvolumeclaim=~".*-search"}) == 1`, instance.GetNamespace())
 
-	manyManagedClustersExpr := fmt.Sprintf(`acm_managed_cluster_count > %s`, getPrometheusAlertMaxManagedClustersCount())
+	manyManagedClustersExpr := fmt.Sprintf(`acm_managed_cluster_count > %s`, getPrometheusAlertMaxManagedClustersCount(instance))
 
 	manyAppsExpr := fmt.Sprintf(`( max(apiserver_storage_objects{resource="subscriptions.apps.open-cluster-management.io"}) +
-		max(apiserver_storage_objects{resource="applicationsets.argoproj.io"}) ) > %s`, getPrometheusAlertMaxAppsCount())
+		max(apiserver_storage_objects{resource="applicationsets.argoproj.io"}) ) > %s`, getPrometheusAlertMaxAppsCount(instance))
 
 	searchPostgresOOMExpr := fmt.Sprintf(`
 		kube_pod_container_status_last_terminated_reason{
@@ -45,7 +45,7 @@ func (r *SearchReconciler) SearchPVCPrometheusRule(instance *searchv1alpha1.Sear
 	`, instance.GetNamespace())
 
 	searchIndexerRequestSizeExpr := fmt.Sprintf(`increase(search_indexer_request_size_count[30m]) > %s`,
-		getPrometheusAlertMaxIndexerCountOver30m())
+		getPrometheusAlertMaxIndexerCountOver30m(instance))
 
 	searchPVCCriticalExpr := fmt.Sprintf(`
 		( %s )
@@ -97,11 +97,11 @@ func (r *SearchReconciler) SearchPVCPrometheusRule(instance *searchv1alpha1.Sear
 								//"description": "Search PVC is not present in namespace " + instance.GetNamespace() + ". You should configure persistent storage for RHACM Search in production environments. See docs.redhat.com for more information about RHACM Search with persistent storage.",
 								"description": "The alert fires when [The Search PVC is missing in namespace " + instance.GetNamespace() + "] AND [Your environment is under heavy load OR a core search pod has crashed due to memory limits].\n\n" +
 									"The underlying \"Load\" or \"Crash\" condition:\n" +
-									"- Scale: You are managing more than " + getPrometheusAlertMaxManagedClustersCount() + " clusters.\n" +
-									"- App Load: You have a combined total of more than " + getPrometheusAlertMaxAppsCount() + " Subscriptions and Argo ApplicationSets in your API server.\n" +
+									"- Scale: You are managing more than " + getPrometheusAlertMaxManagedClustersCount(instance) + " clusters.\n" +
+									"- App Load: You have a combined total of more than " + getPrometheusAlertMaxAppsCount(instance) + " Subscriptions and Argo ApplicationSets in your API server.\n" +
 									"- Database Failure: The search-postgres pod was recently killed because it ran out of memory (OOMKilled).\n" +
 									"- Indexer Failure: The search-indexer pod was recently killed because it ran out of memory (OOMKilled).\n" +
-									"- Traffic Spike: The search indexer has seen a surge in requests (more than " + getPrometheusAlertMaxIndexerCountOver30m() + " new requests in the last 30 minutes).\n\n" +
+									"- Traffic Spike: The search indexer has seen a surge in requests (more than " + getPrometheusAlertMaxIndexerCountOver30m(instance) + " new requests in the last 30 minutes).\n\n" +
 									"When is the Alert Reset?\n" +
 									"The alert will stop firing (reset) when either of these two things happens:\n" +
 									"- The PVC is created/restored: As soon as kube_persistentvolumeclaim_info appears in Prometheus for the " + instance.GetNamespace() + " namespace\n" +

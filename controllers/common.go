@@ -38,6 +38,11 @@ const (
 	defaultPrometheusAlertMaxAppsCount            = "100"
 	defaultPrometheusAlertMaxManagedClustersCount = "10"
 	defaultPrometheusAlertMaxIndexerCountOver30m  = "100"
+
+	// Annotations on the search CR to override the default values for the Prometheus alerts above
+	AnnotationPrometheusAlertMaxAppsCount            = "search.open-cluster-management.io/max-apps-count"
+	AnnotationPrometheusAlertMaxManagedClustersCount = "search.open-cluster-management.io/max-managed-clusters-count"
+	AnnotationPrometheusAlertMaxIndexerCountOver30m  = "search.open-cluster-management.io/max-indexer-count-over-30m"
 )
 
 var (
@@ -351,24 +356,45 @@ func getImageSha(deploymentName string, instance *searchv1alpha1.Search) string 
 	return ""
 }
 
-func getPrometheusAlertMaxAppsCount() string {
+func getPrometheusAlertMaxAppsCount(instance *searchv1alpha1.Search) string {
 	maxAppsCount := os.Getenv("PROMETHEUS_ALERT_MAX_APPS_COUNT")
+
+	// Override with value from annotation on search CR if present
+	if value, ok := instance.Annotations[AnnotationPrometheusAlertMaxAppsCount]; ok {
+		maxAppsCount = value
+	}
+
+	// Use default value if not overridden by env var or annotation
 	if maxAppsCount == "" {
 		maxAppsCount = defaultPrometheusAlertMaxAppsCount
 	}
 	return maxAppsCount
 }
 
-func getPrometheusAlertMaxManagedClustersCount() string {
+func getPrometheusAlertMaxManagedClustersCount(instance *searchv1alpha1.Search) string {
 	maxManagedClustersCount := os.Getenv("PROMETHEUS_ALERT_MAX_MANAGED_CLUSTERS_COUNT")
+
+	// Override with value from annotation on search CR if present
+	if value, ok := instance.Annotations[AnnotationPrometheusAlertMaxManagedClustersCount]; ok {
+		maxManagedClustersCount = value
+	}
+
+	// Use default value if not overridden by env var or annotation
 	if maxManagedClustersCount == "" {
 		maxManagedClustersCount = defaultPrometheusAlertMaxManagedClustersCount
 	}
 	return maxManagedClustersCount
 }
 
-func getPrometheusAlertMaxIndexerCountOver30m() string {
+func getPrometheusAlertMaxIndexerCountOver30m(instance *searchv1alpha1.Search) string {
 	maxIndexerCountOver30m := os.Getenv("PROMETHEUS_ALERT_MAX_INDEXER_COUNT_OVER_30M")
+
+	// Override with value from annotation on search CR if present
+	if value, ok := instance.Annotations[AnnotationPrometheusAlertMaxIndexerCountOver30m]; ok {
+		maxIndexerCountOver30m = value
+	}
+
+	// Use default value if not overridden by env var or annotation
 	if maxIndexerCountOver30m == "" {
 		maxIndexerCountOver30m = defaultPrometheusAlertMaxIndexerCountOver30m
 	}
