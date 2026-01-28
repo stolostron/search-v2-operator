@@ -84,37 +84,42 @@ func (r *SearchReconciler) SearchPVCPrometheusRule(instance *searchv1alpha1.Sear
 								"message":     "Search is currently running without persistent storage. Consider configuring a PVC by setting spec.dbStorage.storageClassName in the RHACM Search CR for better performance.",
 							},
 						},
-						{
-							Alert: "SearchPVCNotPresentCritical",
-							Expr:  intstr.FromString(searchPVCCriticalExpr),
-							For:   monitorv1.Duration("5m"),
-							Labels: map[string]string{
-								"severity":  "critical",
-								"component": "search",
-							},
-							Annotations: map[string]string{
-								"summary": "Search Persistent Volume Claim is not present and critical conditions are met",
-								//"description": "Search PVC is not present in namespace " + instance.GetNamespace() + ". You should configure persistent storage for RHACM Search in production environments. See docs.redhat.com for more information about RHACM Search with persistent storage.",
-								"description": "The alert fires when [The Search PVC is missing in namespace " + instance.GetNamespace() + "] AND [Your environment is under heavy load OR a core search pod has crashed due to memory limits].\n\n" +
-									"The underlying \"Load\" or \"Crash\" condition:\n" +
-									"- Scale: You are managing more than " + getPrometheusAlertMaxManagedClustersCount(instance) + " clusters.\n" +
-									"- App Load: You have a combined total of more than " + getPrometheusAlertMaxAppsCount(instance) + " Subscriptions and Argo ApplicationSets in your API server.\n" +
-									"- Database Failure: The search-postgres pod was recently killed because it ran out of memory (OOMKilled).\n" +
-									"- Indexer Failure: The search-indexer pod was recently killed because it ran out of memory (OOMKilled).\n" +
-									"- Traffic Spike: The search indexer has seen a surge in requests (more than " + getPrometheusAlertMaxIndexerCountOver30m(instance) + " new requests in the last 30 minutes).\n\n" +
-									"When is the Alert Reset?\n" +
-									"The alert will stop firing (reset) when either of these two things happens:\n" +
-									"- The PVC is created/restored: As soon as kube_persistentvolumeclaim_info appears in Prometheus for the " + instance.GetNamespace() + " namespace\n" +
-									"OR\n" +
-									"- The underlying \"Load\" or \"Crash\" clears",
-								"message": "Search is currently running without persistent storage. System usage is high enough that persistent storage is needed to avoid performance issues. Consider configuring a PVC by setting spec.dbStorage.storageClassName in the RHACM Search CR for better performance.",
-							},
-						},
 					},
 				},
 			},
 		},
 	}
+
+	if !isPrometheusAlertSearchPVCCriticalDisabled(instance) {
+		// Add the Search PVC critical alert - will fire if the PVC is missing and the conditions are met (system load high enough or a core search pod has crashed due to memory limits)
+		rule.Spec.Groups[0].Rules = append(rule.Spec.Groups[0].Rules, monitorv1.Rule{
+			Alert: "SearchPVCNotPresentCritical",
+			Expr:  intstr.FromString(searchPVCCriticalExpr),
+			For:   monitorv1.Duration("5m"),
+			Labels: map[string]string{
+				"severity":  "critical",
+				"component": "search",
+			},
+			Annotations: map[string]string{
+				"summary": "Search Persistent Volume Claim is not present and critical conditions are met",
+				//"description": "Search PVC is not present in namespace " + instance.GetNamespace() + ". You should configure persistent storage for RHACM Search in production environments. See docs.redhat.com for more information about RHACM Search with persistent storage.",
+				"description": "The alert fires when [The Search PVC is missing in namespace " + instance.GetNamespace() + "] AND [Your environment is under heavy load OR a core search pod has crashed due to memory limits].\n\n" +
+					"The underlying \"Load\" or \"Crash\" condition:\n" +
+					"- Scale: You are managing more than " + getPrometheusAlertMaxManagedClustersCount(instance) + " clusters.\n" +
+					"- App Load: You have a combined total of more than " + getPrometheusAlertMaxAppsCount(instance) + " Subscriptions and Argo ApplicationSets in your API server.\n" +
+					"- Database Failure: The search-postgres pod was recently killed because it ran out of memory (OOMKilled).\n" +
+					"- Indexer Failure: The search-indexer pod was recently killed because it ran out of memory (OOMKilled).\n" +
+					"- Traffic Spike: The search indexer has seen a surge in requests (more than " + getPrometheusAlertMaxIndexerCountOver30m(instance) + " new requests in the last 30 minutes).\n\n" +
+					"When is the Alert Reset?\n" +
+					"The alert will stop firing (reset) when either of these two things happens:\n" +
+					"- The PVC is created/restored: As soon as kube_persistentvolumeclaim_info appears in Prometheus for the " + instance.GetNamespace() + " namespace\n" +
+					"OR\n" +
+					"- The underlying \"Load\" or \"Crash\" clears",
+				"message": "Search is currently running without persistent storage. System usage is high enough that persistent storage is needed to avoid performance issues. Consider configuring a PVC by setting spec.dbStorage.storageClassName in the RHACM Search CR for better performance.",
+			},
+		})
+	}
+
 	err := controllerutil.SetControllerReference(instance, rule, r.Scheme)
 	if err != nil {
 		log.Info("Could not set controller reference for PrometheusRule", "name", SearchPVCAlertRuleName)

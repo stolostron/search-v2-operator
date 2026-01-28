@@ -43,6 +43,8 @@ const (
 	AnnotationPrometheusAlertMaxAppsCount            = "search.open-cluster-management.io/max-apps-count"
 	AnnotationPrometheusAlertMaxManagedClustersCount = "search.open-cluster-management.io/max-managed-clusters-count"
 	AnnotationPrometheusAlertMaxIndexerCountOver30m  = "search.open-cluster-management.io/max-indexer-count-over-30m"
+	// Annotation to disable the Search PVC critical alert entirely
+	AnnotationPrometheusAlertSearchPVCCriticalDisable = "search.open-cluster-management.io/disable-pvc-critical-alert"
 )
 
 var (
@@ -354,6 +356,14 @@ func getImageSha(deploymentName string, instance *searchv1alpha1.Search) string 
 	}
 	log.V(2).Info("Unknown deployment ", "name", deploymentName)
 	return ""
+}
+
+func isPrometheusAlertSearchPVCCriticalDisabled(instance *searchv1alpha1.Search) bool {
+	if _, ok := instance.Annotations[AnnotationPrometheusAlertSearchPVCCriticalDisable]; ok {
+		// If the annotation is present (with any value), return true
+		return true
+	}
+	return false
 }
 
 func getPrometheusAlertMaxAppsCount(instance *searchv1alpha1.Search) string {
