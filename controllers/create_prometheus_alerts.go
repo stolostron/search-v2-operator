@@ -29,7 +29,7 @@ func (r *SearchReconciler) SearchPVCPrometheusRule(instance *searchv1alpha1.Sear
 		max(apiserver_storage_objects{resource="applicationsets.argoproj.io"}) ) > %s`, getPrometheusAlertMaxAppsCount())
 
 	searchPostgresOOMExpr := fmt.Sprintf(`
-		kube_pod_container_status_terminated_reason{
+		kube_pod_container_status_last_terminated_reason{
 			namespace="%s",
 			pod=~"search-postgres.*",
 			reason="OOMKilled"
@@ -37,7 +37,7 @@ func (r *SearchReconciler) SearchPVCPrometheusRule(instance *searchv1alpha1.Sear
 	`, instance.GetNamespace())
 
 	searchIndexerOOMExpr := fmt.Sprintf(`
-		kube_pod_container_status_terminated_reason{
+		kube_pod_container_status_last_terminated_reason{
 			namespace="%s",
 			pod=~"search-indexer.*",
 			reason="OOMKilled"
@@ -53,7 +53,8 @@ func (r *SearchReconciler) SearchPVCPrometheusRule(instance *searchv1alpha1.Sear
 		(
 			(%s) or (%s) or (%s) or (%s) or (%s)
 		)
-	`, pvcAbsentExpr, manyManagedClustersExpr, manyAppsExpr, searchPostgresOOMExpr, searchIndexerOOMExpr, searchIndexerRequestSizeExpr)
+	`, pvcAbsentExpr,
+		manyManagedClustersExpr, manyAppsExpr, searchPostgresOOMExpr, searchIndexerOOMExpr, searchIndexerRequestSizeExpr)
 
 	rule := &monitorv1.PrometheusRule{
 		TypeMeta: metav1.TypeMeta{
@@ -92,9 +93,21 @@ func (r *SearchReconciler) SearchPVCPrometheusRule(instance *searchv1alpha1.Sear
 								"component": "search",
 							},
 							Annotations: map[string]string{
-								"summary":     "Search Persistent Volume Claim is not present and critical conditions are met",
-								"description": "Search PVC is not present in namespace " + instance.GetNamespace() + ". You should configure persistent storage for RHACM Search in production environments. See docs.redhat.com for more information about RHACM Search with persistent storage.",
-								"message":     "Search is currently running without persistent storage. System usage is high enough that persistent storage is needed to avoid performance issues. Consider configuring a PVC by setting spec.dbStorage.storageClassName in the RHACM Search CR for better performance.",
+								"summary": "Search Persistent Volume Claim is not present and critical conditions are met",
+								//"description": "Search PVC is not present in namespace " + instance.GetNamespace() + ". You should configure persistent storage for RHACM Search in production environments. See docs.redhat.com for more information about RHACM Search with persistent storage.",
+								"description": "The alert fires when [The Search PVC is missing in namespace " + instance.GetNamespace() + "] AND [Your environment is under heavy load OR a core search pod has crashed due to memory limits].\n\n" +
+									"The underlying \"Load\" or \"Crash\" condition:\n" +
+									"- Scale: You are managing more than " + getPrometheusAlertMaxManagedClustersCount() + " clusters.\n" +
+									"- App Load: You have a combined total of more than " + getPrometheusAlertMaxAppsCount() + " Subscriptions and Argo ApplicationSets in your API server.\n" +
+									"- Database Failure: The search-postgres pod was recently killed because it ran out of memory (OOMKilled).\n" +
+									"- Indexer Failure: The search-indexer pod was recently killed because it ran out of memory (OOMKilled).\n" +
+									"- Traffic Spike: The search indexer has seen a surge in requests (more than " + getPrometheusAlertMaxIndexerCountOver30m() + " new requests in the last 30 minutes).\n\n" +
+									"When is the Alert Reset?\n" +
+									"The alert will stop firing (reset) when either of these two things happens:\n" +
+									"- The PVC is created/restored: As soon as kube_persistentvolumeclaim_info appears in Prometheus for the " + instance.GetNamespace() + " namespace\n" +
+									"OR\n" +
+									"- The underlying \"Load\" or \"Crash\" clears",
+								"message": "Search is currently running without persistent storage. System usage is high enough that persistent storage is needed to avoid performance issues. Consider configuring a PVC by setting spec.dbStorage.storageClassName in the RHACM Search CR for better performance.",
 							},
 						},
 					},
