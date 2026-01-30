@@ -40,6 +40,9 @@ spec:
     value: Dockerfile.rhtap
   - name: path-context
     value: .
+  - name: build-args
+    value:
+    - ACM_VERSION=2.16
   pipelineRef:
     resolver: git
     params:
