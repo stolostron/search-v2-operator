@@ -30,6 +30,8 @@ USER ${USER_UID}
 
 ENTRYPOINT ["/manager"]
 
+ARG ACM_VERSION=${ACM_VERSION}
+
 LABEL com.redhat.component="acm-search-operator-container" \
       url="https://github.com/stolostron/search-v2-operator" \
       description="Search operator service" \
@@ -40,4 +42,5 @@ LABEL com.redhat.component="acm-search-operator-container" \
       summary="Search operator service" \
       io.k8s.display-name="Search operator" \
       io.k8s.description="Search operator service" \
-      io.openshift.tags="data,images"
+      io.openshift.tags="data,images" \
+      cpe="cpe:/a:redhat:acm:${ACM_VERSION}::el9"
