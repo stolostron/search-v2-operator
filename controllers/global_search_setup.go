@@ -251,6 +251,12 @@ func (r *SearchReconciler) enableGlobalSearch(ctx context.Context, instance *sea
 	if err == nil && clusterList != nil {
 		for _, cluster := range clusterList.Items {
 			isManagedHub := false
+			// skip the local cluster
+			if cluster.GetLabels() != nil && cluster.GetLabels()["local-cluster"] == "true" {
+				log.V(5).Info("Skipping local cluster.", "name", cluster.GetName())
+				continue
+			}
+			// Check if the cluster is a Managed Hub by looking at the clusterClaims.
 			if cluster.Object["status"] == nil || cluster.Object["status"].(map[string]interface{})["clusterClaims"] == nil {
 				log.V(5).Info("Cluster doesn't have status or clusterClaims.", "cluster", cluster.GetName())
 				continue
