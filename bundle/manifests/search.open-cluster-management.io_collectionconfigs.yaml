@@ -2,23 +2,22 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   creationTimestamp: null
-  name: searchcollectorcustomizableconfigs.search.open-cluster-management.io
+  name: collectionconfigs.search.open-cluster-management.io
 spec:
   group: search.open-cluster-management.io
   names:
-    kind: SearchCollectorCustomizableConfig
-    listKind: SearchCollectorCustomizableConfigList
-    plural: searchcollectorcustomizableconfigs
+    kind: CollectionConfig
+    listKind: CollectionConfigList
+    plural: collectionconfigs
     shortNames:
     - sccc
-    singular: searchcollectorcustomizableconfig
+    singular: collectionconfig
   scope: Namespaced
   versions:
   - name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: search-collector-customizable-config is the schema for the search-collector-customizable-configs
-          API.
+        description: collection-config is the schema for the collection-configs API.
         properties:
           apiVersion:
             description: |-
@@ -38,8 +37,8 @@ spec:
           metadata:
             type: object
           spec:
-            description: search-collector-customizable-config spec defines the configuration
-              changes made to the resources and fields indexed by Search Collectors
+            description: collection-config spec defines the configuration changes
+              made to the resources and fields indexed by Search Collectors
             properties:
               allowedResources:
                 description: Specifies a list of resources to be indexed by Search
@@ -113,23 +112,45 @@ spec:
                         - jsonPath
                         type: object
                       type: array
-                    inNamespace:
-                      description: Specifies the namespace where resources are to
-                        be indexed by Search Collectors
-                      items:
-                        type: string
-                      type: array
                     kind:
                       description: Specifies the Kind of resource to make the configuration
                         changes made to the resources and fields indexed by Search
                         Collectors
                       type: string
-                    notInNamespace:
-                      description: Specifies the namespace where the resources are
-                        not to be indexed by Search Collectors
-                      items:
-                        type: string
-                      type: array
+                    namespaceSelector:
+                      description: Specifies the namespaces where resources are to
+                        be indexed by Search Collectors
+                      properties:
+                        exclude:
+                          description: List of namespace names to exclude
+                          items:
+                            type: string
+                          type: array
+                        include:
+                          description: List of namespace names to include
+                          items:
+                            type: string
+                          type: array
+                        matchExpressions:
+                          description: Label selector expressions for matching namespaces
+                          items:
+                            properties:
+                              key:
+                                type: string
+                              operator:
+                                type: string
+                              values:
+                                items:
+                                  type: string
+                                type: array
+                            type: object
+                          type: array
+                        matchLabels:
+                          additionalProperties:
+                            type: string
+                          description: Label selector for matching namespaces
+                          type: object
+                      type: object
                   type: object
                 type: array
               deniedResources:
