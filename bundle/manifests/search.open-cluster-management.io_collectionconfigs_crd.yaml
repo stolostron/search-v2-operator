@@ -86,16 +86,39 @@ spec:
                       collectAdditionalPrinterColumnsPriority:
                         description: Specifies the priority on additionalPrinterColumns for which to collect
                         type: integer
-                      inNamespace:
-                        description: Specifies the namespace where resources are to be indexed by Search Collectors
-                        type: array
-                        items:
-                          type: string
-                      notInNamespace:
-                        description: Specifies the namespace where the resources are not to be indexed by Search Collectors
-                        type: array
-                        items:
-                          type: string
+                      namespaceSelector:
+                        description: Specifies the namespaces where resources are to be indexed by Search Collectors
+                        type: object
+                        properties:
+                          include:
+                            description: List of namespace names to include
+                            type: array
+                            items:
+                              type: string
+                          exclude:
+                            description: List of namespace names to exclude
+                            type: array
+                            items:
+                              type: string
+                          matchExpressions:
+                            description: Label selector expressions for matching namespaces
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                key:
+                                  type: string
+                                operator:
+                                  type: string
+                                values:
+                                  type: array
+                                  items:
+                                    type: string
+                          matchLabels:
+                            description: Label selector for matching namespaces
+                            type: object
+                            additionalProperties:
+                              type: string
                 allowedResources:
                   description: Specifies a list of resources to be indexed by Search Collectors
                   type: array
