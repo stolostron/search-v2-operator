@@ -599,8 +599,8 @@ func TestManifestAddonAgent(t *testing.T) {
 			t.Fatalf("failed to get manifests %v", err)
 		}
 
-		if len(objects) != 4 {
-			t.Fatalf("expected 4 manifests, but %v", objects)
+		if len(objects) != 5 {
+			t.Fatalf("expected 5 manifests, but %v", objects)
 		}
 
 		c.verifyDeployment(t, objects)
