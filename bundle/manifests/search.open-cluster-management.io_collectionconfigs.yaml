@@ -117,42 +117,45 @@ spec:
                         changes made to the resources and fields indexed by Search
                         Collectors
                       type: string
-                    namespaceSelector:
-                      description: Specifies the namespaces where resources are to
-                        be indexed by Search Collectors
-                      properties:
-                        exclude:
-                          description: List of namespace names to exclude
-                          items:
-                            type: string
-                          type: array
-                        include:
-                          description: List of namespace names to include
-                          items:
-                            type: string
-                          type: array
-                        matchExpressions:
-                          description: Label selector expressions for matching namespaces
-                          items:
-                            properties:
-                              key:
-                                type: string
-                              operator:
-                                type: string
-                              values:
-                                items:
-                                  type: string
-                                type: array
-                            type: object
-                          type: array
-                        matchLabels:
-                          additionalProperties:
-                            type: string
-                          description: Label selector for matching namespaces
-                          type: object
-                      type: object
                   type: object
                 type: array
+              collectNamespaces:
+                description: Specified the namespaces where resources are to be indexed
+                  by Search Collectors
+                properties:
+                  namespaceSelector:
+                    properties:
+                      exclude:
+                        description: List of namespace names to exclude
+                        items:
+                          type: string
+                        type: array
+                      include:
+                        description: List of namespace names to include
+                        items:
+                          type: string
+                        type: array
+                      matchExpressions:
+                        description: Label selector expressions for matching namespaces
+                        items:
+                          properties:
+                            key:
+                              type: string
+                            operator:
+                              type: string
+                            values:
+                              items:
+                                type: string
+                              type: array
+                          type: object
+                        type: array
+                      matchLabels:
+                        additionalProperties:
+                          type: string
+                        description: Label selector for matching namespaces
+                        type: object
+                    type: object
+                type: object
               deniedResources:
                 description: Specifies a list of resources not to be indexed by Search
                   Collectors
