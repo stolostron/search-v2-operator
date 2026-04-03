@@ -40,85 +40,6 @@ spec:
             description: collection-config spec defines the configuration changes
               made to the resources and fields indexed by Search Collectors
             properties:
-              allowedResources:
-                description: Specifies a list of resources to be indexed by Search
-                  Collectors
-                items:
-                  properties:
-                    apiGroups:
-                      description: Specifies apiGroups of resources to be indexed
-                      items:
-                        type: string
-                      type: array
-                    resources:
-                      description: Specifies kinds of resources to be indexed
-                      items:
-                        type: string
-                      type: array
-                  required:
-                  - apiGroups
-                  - resources
-                  type: object
-                type: array
-              collectFields:
-                description: Specifies the additional fields to be indexed on resources
-                  by Search Collectors
-                items:
-                  properties:
-                    apiGroup:
-                      description: Specifies apiGroup of resource to make the configuration
-                        changes made to the resources and fields indexed by Search
-                        Collectors
-                      type: string
-                    collectAdditionalPrinterColumnsPriority:
-                      description: Specifies the priority on additionalPrinterColumns
-                        for which to collect
-                      type: integer
-                    collectAnnotations:
-                      description: Specifies to collect annotations for the resource
-                      type: boolean
-                    collectConditions:
-                      description: Specifies to collect status conditions for the
-                        resource
-                      type: boolean
-                    fields:
-                      description: Specifies the fields on the resource to index by
-                        Search Collectors
-                      items:
-                        properties:
-                          displayName:
-                            type: string
-                          jsonPath:
-                            type: string
-                          name:
-                            description: |-
-                              Specified the name of the collected item on the resource.
-                              The system prepends a special character to this name to avoid collisions with built in collected attributes
-                            type: string
-                          priority:
-                            type: integer
-                          type:
-                            description: Data type of resource field to be indexed
-                              by Search Collectors. Default is a string
-                            enum:
-                            - DataTypeBytes
-                            - DataTypeSlice
-                            - DataTypeString
-                            - DataTypeNumber
-                            - DataTypeMapString
-                            type: string
-                        required:
-                        - name
-                        - jsonPath
-                        type: object
-                      type: array
-                    kind:
-                      description: Specifies the Kind of resource to make the configuration
-                        changes made to the resources and fields indexed by Search
-                        Collectors
-                      type: string
-                  type: object
-                type: array
               collectNamespaces:
                 description: Specified the namespaces where resources are to be indexed
                   by Search Collectors
@@ -156,24 +77,74 @@ spec:
                         type: object
                     type: object
                 type: object
-              deniedResources:
-                description: Specifies a list of resources not to be indexed by Search
-                  Collectors
+              collectionRules:
+                description: Defines a list of rules for collecting resources and
+                  specific fields, as proposed in the Alternatives section.
                 items:
                   properties:
-                    apiGroups:
-                      description: Specifies apiGroups of resources not to be indexed
+                    action:
+                      description: Defines whether to Include (collect) or Exclude
+                        (deny collection) resources matching the selector.
+                      enum:
+                      - Include
+                      - Exclude
+                      type: string
+                    collectAdditionalPrinterColumnsPriority:
+                      description: Specifies the priority on additionalPrinterColumns
+                        for which to collect.
+                      type: integer
+                    collectAnnotations:
+                      description: Specifies to collect annotations for the resource.
+                      type: boolean
+                    collectConditions:
+                      description: Specifies to collect status conditions for the
+                        resource.
+                      type: boolean
+                    fields:
+                      description: Specifies the additional fields on the resource
+                        to index by Search Collectors.
                       items:
-                        type: string
+                        properties:
+                          displayName:
+                            type: string
+                          jsonPath:
+                            type: string
+                          name:
+                            description: Specified the name of the collected item
+                              on the resource.
+                            type: string
+                          type:
+                            description: Data type of resource field to be indexed
+                              by Search Collectors. Default is a string.
+                            enum:
+                            - DataTypeBytes
+                            - DataTypeSlice
+                            - DataTypeString
+                            - DataTypeNumber
+                            - DataTypeMapString
+                            type: string
+                        required:
+                        - name
+                        - jsonPath
+                        type: object
                       type: array
-                    resources:
-                      description: Specified kinds of resources not to be indexed
-                      items:
-                        type: string
-                      type: array
-                  required:
-                  - apiGroups
-                  - resources
+                    resourceSelector:
+                      description: Specifies which resources this rule applies to.
+                      properties:
+                        apiGroups:
+                          description: Specifies apiGroups of resources.
+                          items:
+                            type: string
+                          type: array
+                        kinds:
+                          description: Specifies kinds of resources.
+                          items:
+                            type: string
+                          type: array
+                      required:
+                      - apiGroups
+                      - kinds
+                      type: object
                   type: object
                 type: array
             type: object
