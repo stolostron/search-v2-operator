@@ -1,154 +1,195 @@
+---
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.18.0
   name: collectionconfigs.search.open-cluster-management.io
 spec:
   group: search.open-cluster-management.io
-  scope: Namespaced
   names:
-    plural: collectionconfigs
-    singular: collectionconfig
-    listKind: CollectionConfigList
     kind: CollectionConfig
-    shortNames: [sccc]
+    listKind: CollectionConfigList
+    plural: collectionconfigs
+    shortNames:
+    - sccc
+    singular: collectionconfig
+  scope: Namespaced
   versions:
-    - name: v1alpha1
-      served: true
-      storage: true
-      schema:
-        openAPIV3Schema:
-          description: collection-config is the schema for the collection-configs API.
-          type: object
-          properties:
-            apiVersion:
-              description: |-
-                APIVersion defines the versioned schema of this representation of an object.
-                Servers should convert recognized schemas to the latest internal value, and
-                may reject unrecognized values.
-                More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
-              type: string
-            kind:
-              description: |-
-                Kind is a string value representing the REST resource this object represents.
-                Servers may infer this from the endpoint the client submits requests to.
-                Cannot be updated.
-                In CamelCase.
-                More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
-              type: string
-            metadata:
-              type: object
-            spec:
-              description: collection-config spec defines the configuration changes made to the resources and fields indexed by Search Collectors
-              type: object
-              properties:
-                collectNamespaces:
-                  description: Specified the namespaces where resources are to be indexed by Search Collectors
-                  type: object
-                  properties:
-                    namespaceSelector:
-                      description: >-
-                        NamespaceSelector determines namespaces on the managed cluster from which to collect resources. The Include and Exclude parameters accept file path expressions to include and exclude namespaces by name. The MatchExpressions and MatchLabels parameters specify namespaces to include by label. See the Kubernetes labels and selectors documentation. The resulting list is compiled by using the intersection of results from all parameters. You must provide either Include or at least one of MatchExpressions or MatchLabels to retrieve namespaces.
-                      type: object
-                      properties:
-                        exclude:
-                          description: Exclude is an array of filepath expressions to exclude objects by name.
-                          type: array
-                          items:
-                            minLength: 1
-                            type: string
-                        include:
-                          description: Include is an array of filepath expressions to include objects by name.
-                          type: array
-                          items:
-                            minLength: 1
-                            type: string
-                        matchExpressions:
-                          description: MatchExpressions is an array of label selector requirements matching objects by label.
-                          type: array
-                          items:
-                            description: >-
-                              A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values.
-                            type: object
-                            required:
-                              - key
-                              - operator
-                            properties:
-                              key:
-                                description: key is the label key that the selector applies to.
-                                type: string
-                              operator:
-                                description: >-
-                                  operator represents a key's relationship to a set of values. Valid operators are In, NotIn, Exists and DoesNotExist.
-                                type: string
-                              values:
-                                description: >-
-                                  values is an array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. This array is replaced during a strategic merge patch.
-                                type: array
-                                items:
-                                  type: string
-                                x-kubernetes-list-type: atomic
-                        matchLabels:
-                          description: MatchLabels is a map of {key,value} pairs matching objects by label.
-                          type: object
-                          additionalProperties:
-                            type: string
-                collectionRules:
-                  description: Defines a list of rules for collecting resources and specific fields.
-                  type: array
-                  items:
-                    type: object
-                    required:
-                      - action
-                      - resourceSelector
+  - name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: CollectionConfig is the schema for the collection-configs API.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: CollectionConfigSpec defines the configuration changes made
+              to the resources and fields indexed by Search Collectors.
+            properties:
+              collectNamespaces:
+                description: Specifies the namespaces where resources are to be indexed
+                  by Search Collectors
+                properties:
+                  namespaceSelector:
+                    description: |-
+                      NamespaceSelector determines namespaces on the managed cluster from which to collect resources.
+                      The Include and Exclude parameters accept file path expressions to include and exclude namespaces by name.
+                      The MatchExpressions and MatchLabels parameters specify namespaces to include by label.
+                      See the Kubernetes labels and selectors documentation.
+                      The resulting list is compiled by using the intersection of results from all parameters.
+                      You must provide either Include or at least one of MatchExpressions or MatchLabels to retrieve namespaces.
                     properties:
-                      action:
-                        description: Defines whether to Include (collect) or Exclude (deny collection) resources matching the selector.
-                        type: string
-                        enum: [Include, Exclude]
-                      resourceSelector:
-                        description: Specifies which resources this rule applies to.
-                        type: object
-                        properties:
-                          apiGroups:
-                            description: Specifies apiGroups of resources.
-                            type: array
-                            items:
-                              type: string
-                          kinds:
-                            description: Specifies kinds of resources.
-                            type: array
-                            items:
-                              type: string
-                        required:
-                          - apiGroups
-                          - kinds
-                      fields:
-                        description: Specifies the additional fields on the resource to index by Search Collectors.
-                        type: array
+                      exclude:
+                        description: Exclude is an array of filepath expressions to
+                          exclude objects by name.
                         items:
-                          type: object
+                          minLength: 1
+                          type: string
+                        type: array
+                      include:
+                        description: Include is an array of filepath expressions to
+                          include objects by name.
+                        items:
+                          minLength: 1
+                          type: string
+                        type: array
+                      matchExpressions:
+                        description: MatchExpressions is an array of label selector
+                          requirements matching objects by label.
+                        items:
+                          description: |-
+                            A label selector requirement is a selector that contains values, a key, and an operator that
+                            relates the key and values.
                           properties:
-                            name:
-                              description: Specified the name of the collected item on the resource.
+                            key:
+                              description: key is the label key that the selector
+                                applies to.
                               type: string
-                            jsonPath:
+                            operator:
+                              description: |-
+                                operator represents a key's relationship to a set of values.
+                                Valid operators are In, NotIn, Exists and DoesNotExist.
                               type: string
-                            type:
-                              description: Data type of resource field to be indexed by Search Collectors. Default is a string.
-                              type: string
-                              default: DataTypeString
-                              enum: [DataTypeBytes, DataTypeSlice, DataTypeString, DataTypeNumber, DataTypeMapString]
-                            displayName:
-                              type: string
+                            values:
+                              description: |-
+                                values is an array of string values. If the operator is In or NotIn,
+                                the values array must be non-empty. If the operator is Exists or DoesNotExist,
+                                the values array must be empty. This array is replaced during a strategic
+                                merge patch.
+                              items:
+                                type: string
+                              type: array
+                              x-kubernetes-list-type: atomic
                           required:
-                            - name
-                            - jsonPath
-                      collectAnnotations:
-                        description: Specifies to collect annotations for the resource.
-                        type: boolean
-                      collectConditions:
-                        description: Specifies to collect status conditions for the resource.
-                        type: boolean
-                      collectAdditionalPrinterColumnsPriority:
-                        description: Specifies the priority on additionalPrinterColumns for which to collect.
-                        type: integer
+                          - key
+                          - operator
+                          type: object
+                        type: array
+                      matchLabels:
+                        additionalProperties:
+                          type: string
+                        description: MatchLabels is a map of {key,value} pairs matching
+                          objects by label.
+                        type: object
+                    type: object
+                type: object
+              collectionRules:
+                description: Defines a list of rules for collecting resources and
+                  specific fields.
+                items:
+                  description: CollectionRule defines a rule for collecting resources
+                    and specific fields.
+                  properties:
+                    action:
+                      description: Defines whether to Include (collect) or Exclude
+                        (deny collection) resources matching the selector.
+                      enum:
+                      - Include
+                      - Exclude
+                      type: string
+                    collectAdditionalPrinterColumnsPriority:
+                      description: Specifies the priority on additionalPrinterColumns
+                        for which to collect.
+                      type: integer
+                    collectAnnotations:
+                      description: Specifies to collect annotations for the resource.
+                      type: boolean
+                    collectConditions:
+                      description: Specifies to collect status conditions for the
+                        resource.
+                      type: boolean
+                    fields:
+                      description: Specifies the additional fields on the resource
+                        to index by Search Collectors.
+                      items:
+                        description: Field specifies an additional field on the resource
+                          to index by Search Collectors.
+                        properties:
+                          displayName:
+                            description: Display name for the field.
+                            type: string
+                          jsonPath:
+                            description: JSONPath to the field on the resource.
+                            type: string
+                          name:
+                            description: Specifies the name of the collected item
+                              on the resource.
+                            type: string
+                          type:
+                            default: DataTypeString
+                            description: Data type of resource field to be indexed
+                              by Search Collectors. Default is a string.
+                            enum:
+                            - DataTypeBytes
+                            - DataTypeSlice
+                            - DataTypeString
+                            - DataTypeNumber
+                            - DataTypeMapString
+                            type: string
+                        required:
+                        - jsonPath
+                        - name
+                        type: object
+                      type: array
+                    resourceSelector:
+                      description: Specifies which resources this rule applies to.
+                      properties:
+                        apiGroups:
+                          description: Specifies apiGroups of resources.
+                          items:
+                            type: string
+                          type: array
+                        kinds:
+                          description: Specifies kinds of resources.
+                          items:
+                            type: string
+                          type: array
+                      required:
+                      - apiGroups
+                      - kinds
+                      type: object
+                  required:
+                  - action
+                  - resourceSelector
+                  type: object
+                type: array
+            type: object
+        type: object
+    served: true
+    storage: true
