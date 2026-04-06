@@ -78,7 +78,7 @@ spec:
                           additionalProperties:
                             type: string
                 collectionRules:
-                  description: Defines a list of rules for collecting resources and specific fields, as proposed in the Alternatives section.
+                  description: Defines a list of rules for collecting resources and specific fields.
                   type: array
                   items:
                     type: object

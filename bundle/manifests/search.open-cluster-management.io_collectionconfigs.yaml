@@ -79,7 +79,7 @@ spec:
                 type: object
               collectionRules:
                 description: Defines a list of rules for collecting resources and
-                  specific fields, as proposed in the Alternatives section.
+                  specific fields.
                 items:
                   properties:
                     action:
