@@ -46,34 +46,49 @@ spec:
                   type: object
                   properties:
                     namespaceSelector:
+                      description: >-
+                        NamespaceSelector determines namespaces on the managed cluster in which to validate certificates. The Include and Exclude parameters accept file path expressions to include and exclude namespaces by name. The MatchExpressions and MatchLabels parameters specify namespaces to include by label. See the Kubernetes labels and selectors documentation. The resulting list is compiled by using the intersection of results from all parameters. You must provide either Include or at least one of MatchExpressions or MatchLabels to retrieve namespaces.
                       type: object
                       properties:
-                        include:
-                          description: List of namespace names to include
-                          type: array
-                          items:
-                            type: string
                         exclude:
-                          description: List of namespace names to exclude
+                          description: Exclude is an array of filepath expressions to exclude objects by name.
                           type: array
                           items:
+                            minLength: 1
+                            type: string
+                        include:
+                          description: Include is an array of filepath expressions to include objects by name.
+                          type: array
+                          items:
+                            minLength: 1
                             type: string
                         matchExpressions:
-                          description: Label selector expressions for matching namespaces
+                          description: MatchExpressions is an array of label selector requirements matching objects by label.
                           type: array
                           items:
+                            description: >-
+                              A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values.
                             type: object
+                            required:
+                              - key
+                              - operator
                             properties:
                               key:
+                                description: key is the label key that the selector applies to.
                                 type: string
                               operator:
+                                description: >-
+                                  operator represents a key's relationship to a set of values. Valid operators are In, NotIn, Exists and DoesNotExist.
                                 type: string
                               values:
+                                description: >-
+                                  values is an array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. This array is replaced during a strategic merge patch.
                                 type: array
                                 items:
                                   type: string
+                                x-kubernetes-list-type: atomic
                         matchLabels:
-                          description: Label selector for matching namespaces
+                          description: MatchLabels is a map of {key,value} pairs matching objects by label.
                           type: object
                           additionalProperties:
                             type: string
@@ -82,6 +97,9 @@ spec:
                   type: array
                   items:
                     type: object
+                    required:
+                      - action
+                      - resourceSelector
                     properties:
                       action:
                         description: Defines whether to Include (collect) or Exclude (deny collection) resources matching the selector.
@@ -118,6 +136,7 @@ spec:
                             type:
                               description: Data type of resource field to be indexed by Search Collectors. Default is a string.
                               type: string
+                              default: DataTypeString
                               enum: [DataTypeBytes, DataTypeSlice, DataTypeString, DataTypeNumber, DataTypeMapString]
                             displayName:
                               type: string
