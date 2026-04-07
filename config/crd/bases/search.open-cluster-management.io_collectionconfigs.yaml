@@ -56,22 +56,22 @@ spec:
                       You must provide either Include or at least one of MatchExpressions or MatchLabels to retrieve namespaces.
                     properties:
                       exclude:
-                        description: Exclude is an array of filepath expressions to
-                          exclude objects by name.
+                        description: '[NOT IMPLEMENTED] Exclude is an array of filepath
+                          expressions to exclude objects by name.'
                         items:
                           minLength: 1
                           type: string
                         type: array
                       include:
-                        description: Include is an array of filepath expressions to
-                          include objects by name.
+                        description: '[NOT IMPLEMENTED] Include is an array of filepath
+                          expressions to include objects by name.'
                         items:
                           minLength: 1
                           type: string
                         type: array
                       matchExpressions:
-                        description: MatchExpressions is an array of label selector
-                          requirements matching objects by label.
+                        description: '[NOT IMPLEMENTED] MatchExpressions is an array
+                          of label selector requirements matching objects by label.'
                         items:
                           description: |-
                             A label selector requirement is a selector that contains values, a key, and an operator that
@@ -104,8 +104,8 @@ spec:
                       matchLabels:
                         additionalProperties:
                           type: string
-                        description: MatchLabels is a map of {key,value} pairs matching
-                          objects by label.
+                        description: '[NOT IMPLEMENTED] MatchLabels is a map of {key,value}
+                          pairs matching objects by label.'
                         type: object
                     type: object
                 type: object
@@ -120,19 +120,20 @@ spec:
                       description: Defines whether to Include (collect) or Exclude
                         (deny collection) resources matching the selector.
                       enum:
-                      - Include
-                      - Exclude
+                      - include
+                      - exclude
                       type: string
                     collectAdditionalPrinterColumnsPriority:
-                      description: Specifies the priority on additionalPrinterColumns
-                        for which to collect.
+                      description: '[NOT IMPLEMENTED] Specifies to collect additionalPrinterColumns
+                        from the CRD with the specified priority or higher.'
                       type: integer
                     collectAnnotations:
-                      description: Specifies to collect annotations for the resource.
+                      description: '[NOT IMPLEMENTED] Specifies to collect annotations
+                        for the resource.'
                       type: boolean
                     collectConditions:
-                      description: Specifies to collect status conditions for the
-                        resource.
+                      description: '[NOT IMPLEMENTED] Specifies to collect status
+                        conditions for the resource.'
                       type: boolean
                     fields:
                       description: Specifies the additional fields on the resource
@@ -141,9 +142,6 @@ spec:
                         description: Field specifies an additional field on the resource
                           to index by Search Collectors.
                         properties:
-                          displayName:
-                            description: Display name for the field.
-                            type: string
                           jsonPath:
                             description: JSONPath to the field on the resource.
                             type: string
@@ -152,15 +150,15 @@ spec:
                               on the resource.
                             type: string
                           type:
-                            default: DataTypeString
+                            default: string
                             description: Data type of resource field to be indexed
                               by Search Collectors. Default is a string.
                             enum:
-                            - DataTypeBytes
-                            - DataTypeSlice
-                            - DataTypeString
-                            - DataTypeNumber
-                            - DataTypeMapString
+                            - bytes
+                            - slice
+                            - string
+                            - number
+                            - mapString
                             type: string
                         required:
                         - jsonPath

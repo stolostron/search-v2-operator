@@ -9,24 +9,24 @@ import (
 // Important: Run the "make manifests" command to regenerate the manifests after you modify this file.
 
 // DataType represents the data type of a collected field
-// +kubebuilder:validation:Enum=DataTypeBytes;DataTypeSlice;DataTypeString;DataTypeNumber;DataTypeMapString
+// +kubebuilder:validation:Enum=bytes;slice;string;number;mapString
 type DataType string
 
 const (
-	DataTypeBytes     DataType = "DataTypeBytes"
-	DataTypeSlice     DataType = "DataTypeSlice"
-	DataTypeString    DataType = "DataTypeString"
-	DataTypeNumber    DataType = "DataTypeNumber"
-	DataTypeMapString DataType = "DataTypeMapString"
+	DataTypeBytes     DataType = "bytes"
+	DataTypeSlice     DataType = "slice"
+	DataTypeString    DataType = "string"
+	DataTypeNumber    DataType = "number"
+	DataTypeMapString DataType = "mapString"
 )
 
 // ActionType represents the action to take for a collection rule
-// +kubebuilder:validation:Enum=Include;Exclude
+// +kubebuilder:validation:Enum=include;exclude
 type ActionType string
 
 const (
-	ActionInclude ActionType = "Include"
-	ActionExclude ActionType = "Exclude"
+	ActionInclude ActionType = "include"
+	ActionExclude ActionType = "exclude"
 )
 
 // +kubebuilder:object:root=true
@@ -66,21 +66,21 @@ type CollectNamespaces struct {
 // NamespaceSelector defines the selector for namespaces.
 type NamespaceSelector struct {
 	// +optional
-	// Include is an array of filepath expressions to include objects by name.
+	// [NOT IMPLEMENTED] Include is an array of filepath expressions to include objects by name.
 	// +kubebuilder:validation:items:MinLength=1
 	Include []string `json:"include,omitempty"`
 
 	// +optional
-	// Exclude is an array of filepath expressions to exclude objects by name.
+	// [NOT IMPLEMENTED] Exclude is an array of filepath expressions to exclude objects by name.
 	// +kubebuilder:validation:items:MinLength=1
 	Exclude []string `json:"exclude,omitempty"`
 
 	// +optional
-	// MatchExpressions is an array of label selector requirements matching objects by label.
+	// [NOT IMPLEMENTED] MatchExpressions is an array of label selector requirements matching objects by label.
 	MatchExpressions []metav1.LabelSelectorRequirement `json:"matchExpressions,omitempty"`
 
 	// +optional
-	// MatchLabels is a map of {key,value} pairs matching objects by label.
+	// [NOT IMPLEMENTED] MatchLabels is a map of {key,value} pairs matching objects by label.
 	MatchLabels map[string]string `json:"matchLabels,omitempty"`
 }
 
@@ -97,15 +97,15 @@ type CollectionRule struct {
 	Fields []Field `json:"fields,omitempty"`
 
 	// +optional
-	// Specifies to collect annotations for the resource.
+	// [NOT IMPLEMENTED] Specifies to collect annotations for the resource.
 	CollectAnnotations *bool `json:"collectAnnotations,omitempty"`
 
 	// +optional
-	// Specifies to collect status conditions for the resource.
+	// [NOT IMPLEMENTED] Specifies to collect status conditions for the resource.
 	CollectConditions *bool `json:"collectConditions,omitempty"`
 
 	// +optional
-	// Specifies the priority on additionalPrinterColumns for which to collect.
+	// [NOT IMPLEMENTED] Specifies to collect additionalPrinterColumns from the CRD with the specified priority or higher.
 	CollectAdditionalPrinterColumnsPriority *int `json:"collectAdditionalPrinterColumnsPriority,omitempty"`
 }
 
@@ -127,13 +127,9 @@ type Field struct {
 	JSONPath string `json:"jsonPath"`
 
 	// +optional
-	// +kubebuilder:default=DataTypeString
+	// +kubebuilder:default=string
 	// Data type of resource field to be indexed by Search Collectors. Default is a string.
 	Type DataType `json:"type,omitempty"`
-
-	// +optional
-	// Display name for the field.
-	DisplayName string `json:"displayName,omitempty"`
 }
 
 // +kubebuilder:object:root=true
