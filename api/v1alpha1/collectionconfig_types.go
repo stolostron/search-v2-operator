@@ -55,11 +55,11 @@ type CollectionConfigSpec struct {
 type CollectNamespaces struct {
 	// +optional
 	// NamespaceSelector determines namespaces on the managed cluster from which to collect resources.
-	// The Include and Exclude parameters accept file path expressions to include and exclude namespaces by name.
-	// The MatchExpressions and MatchLabels parameters specify namespaces to include by label.
+	// The include and exclude parameters accept file path expressions to include and exclude namespaces by name.
+	// The matchExpressions and matchLabels parameters specify namespaces to include by label.
 	// See the Kubernetes labels and selectors documentation.
 	// The resulting list is compiled by using the intersection of results from all parameters.
-	// You must provide either Include or at least one of MatchExpressions or MatchLabels to retrieve namespaces.
+	// You must provide either include or at least one of matchExpressions or matchLabels to retrieve namespaces.
 	NamespaceSelector *NamespaceSelector `json:"namespaceSelector,omitempty"`
 }
 
