@@ -3,6 +3,7 @@
 # It should be run by config/default
 resources:
 - bases/search.open-cluster-management.io_searches.yaml
+- bases/search.open-cluster-management.io_collectorconfigs.yaml
 #+kubebuilder:scaffold:crdkustomizeresource
 
 patchesStrategicMerge:

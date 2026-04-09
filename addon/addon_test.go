@@ -113,7 +113,7 @@ func TestManifest(t *testing.T) {
 			addon:                  newAddon(SearchAddonName, "cluster1", "", annotationsTest),
 			expectedNamespace:      "open-cluster-management-agent-addon",
 			expectedImage:          "quay.io/test/search_collector:test",
-			expectedCount:          4,
+			expectedCount:          5,
 			expectedLimit:          "2000Mi",
 			expectedRequest:        "1000Mi",
 			expectedArgs:           "--v=2",
@@ -127,7 +127,7 @@ func TestManifest(t *testing.T) {
 			addon:                  newAddon(SearchAddonName, "cluster1", "test", annotations250),
 			expectedNamespace:      "test",
 			expectedImage:          "quay.io/stolostron/search_collector:2.7.0",
-			expectedCount:          4,
+			expectedCount:          5,
 			expectedLimit:          "2000Mi",
 			expectedRequest:        "1000Mi",
 			expectedArgs:           "--v=2",
@@ -599,8 +599,8 @@ func TestManifestAddonAgent(t *testing.T) {
 			t.Fatalf("failed to get manifests %v", err)
 		}
 
-		if len(objects) != 4 {
-			t.Fatalf("expected 4 manifests, but %v", objects)
+		if len(objects) != 5 {
+			t.Fatalf("expected 5 manifests, but %v", objects)
 		}
 
 		c.verifyDeployment(t, objects)

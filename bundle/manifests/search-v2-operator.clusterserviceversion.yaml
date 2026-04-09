@@ -23,6 +23,9 @@ spec:
   apiservicedefinitions: {}
   customresourcedefinitions:
     owned:
+    - kind: CollectorConfig
+      name: collectorconfigs.search.open-cluster-management.io
+      version: v1alpha1
     - description: Search is the schema for the searches API.
       displayName: Search
       kind: Search
