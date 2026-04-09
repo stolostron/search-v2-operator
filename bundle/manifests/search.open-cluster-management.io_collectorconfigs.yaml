@@ -12,7 +12,7 @@ spec:
     listKind: CollectorConfigList
     plural: collectorconfigs
     shortNames:
-    - scc
+    - sccc
     singular: collectorconfig
   scope: Namespaced
   versions:

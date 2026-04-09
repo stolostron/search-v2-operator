@@ -30,7 +30,7 @@ const (
 )
 
 // +kubebuilder:object:root=true
-// +kubebuilder:resource:shortName=scc
+// +kubebuilder:resource:shortName=sccc
 
 // CollectorConfig is the schema for the collector-configs API.
 type CollectorConfig struct {
