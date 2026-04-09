@@ -30,18 +30,18 @@ const (
 )
 
 // +kubebuilder:object:root=true
-// +kubebuilder:resource:shortName=sccc
+// +kubebuilder:resource:shortName=scc
 
-// CollectionConfig is the schema for the collection-configs API.
-type CollectionConfig struct {
+// CollectorConfig is the schema for the collector-configs API.
+type CollectorConfig struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec CollectionConfigSpec `json:"spec,omitempty"`
+	Spec CollectorConfigSpec `json:"spec,omitempty"`
 }
 
-// CollectionConfigSpec defines the configuration changes made to the resources and fields indexed by Search Collectors.
-type CollectionConfigSpec struct {
+// CollectorConfigSpec defines the configuration changes made to the resources and fields indexed by Search Collectors.
+type CollectorConfigSpec struct {
 	// +optional
 	// Specifies the namespaces where resources are to be indexed by Search Collectors
 	CollectNamespaces *CollectNamespaces `json:"collectNamespaces,omitempty"`
@@ -134,13 +134,13 @@ type Field struct {
 
 // +kubebuilder:object:root=true
 
-// CollectionConfigList contains a list of CollectionConfig.
-type CollectionConfigList struct {
+// CollectorConfigList contains a list of CollectorConfig.
+type CollectorConfigList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []CollectionConfig `json:"items"`
+	Items           []CollectorConfig `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&CollectionConfig{}, &CollectionConfigList{})
+	SchemeBuilder.Register(&CollectorConfig{}, &CollectorConfigList{})
 }
