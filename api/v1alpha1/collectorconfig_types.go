@@ -97,6 +97,14 @@ type CollectionRule struct {
 	Fields []Field `json:"fields,omitempty"`
 
 	// +optional
+	// +kubebuilder:default=""
+	// FieldSuffix appended to custom field names in this rule to avoid collisions with built-in fields.
+	// For example, if fieldSuffix is "grc", a field named "status" becomes "status.grc".
+	// Defaults to "" (no suffix). If a collision is detected, the built-in field takes precedence.
+	// This allows different extensions (GRC, Virt, etc.) to use different suffixes in the same config.
+	FieldSuffix string `json:"fieldSuffix,omitempty"`
+
+	// +optional
 	// [NOT IMPLEMENTED] Specifies to collect annotations for the resource.
 	CollectAnnotations *bool `json:"collectAnnotations,omitempty"`
 
