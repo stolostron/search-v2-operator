@@ -106,6 +106,10 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "Search")
 		os.Exit(1)
 	}
+	if err = (&searchv1alpha1.CollectorConfig{}).SetupWebhookWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create webhook", "webhook", "CollectorConfig")
+		os.Exit(1)
+	}
 	//+kubebuilder:scaffold:builder
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
