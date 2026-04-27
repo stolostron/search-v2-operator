@@ -1,23 +1,10 @@
-/*
-Copyright 2022.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
+// Copyright Contributors to the Open Cluster Management project
 
 package v1alpha1
 
 import (
 	"context"
+	"fmt"
 	"regexp"
 	"strings"
 
@@ -32,38 +19,54 @@ import (
 // log is for logging in this package.
 var collectorconfiglog = logf.Log.WithName("collectorconfig-resource")
 
+// Precompiled validation patterns.
+var (
+	fieldNamePattern   = regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9\-_.]*$`)
+	fieldSuffixPattern = regexp.MustCompile(`^[a-z0-9\-.]+$`)
+)
+
 func (r *CollectorConfig) SetupWebhookWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewWebhookManagedBy(mgr).
 		For(r).
+		WithValidator(r).
 		Complete()
 }
 
-// TODO(user): EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
-
-// TODO(user): change verbs to "verbs=create;update;delete" if you want to enable deletion validation.
 //+kubebuilder:webhook:path=/validate-search-open-cluster-management-io-v1alpha1-collectorconfig,mutating=false,failurePolicy=fail,sideEffects=None,groups=search.open-cluster-management.io,resources=collectorconfigs,verbs=create;update,versions=v1alpha1,name=vcollectorconfig.kb.io,admissionReviewVersions=v1
 
 var _ webhook.CustomValidator = &CollectorConfig{}
 
 // ValidateCreate implements webhook.CustomValidator so a webhook will be registered for the type
 func (r *CollectorConfig) ValidateCreate(ctx context.Context, obj runtime.Object) (admission.Warnings, error) {
-	collectorconfiglog.Info("validate create", "name", r.Name)
+	cc, ok := obj.(*CollectorConfig)
+	if !ok {
+		return nil, fmt.Errorf("expected a CollectorConfig object but got %T", obj)
+	}
+	collectorconfiglog.Info("validate create", "name", cc.Name)
 
-	err := r.validateCollectorConfig()
+	err := cc.validateCollectorConfig()
 	return nil, err
 }
 
 // ValidateUpdate implements webhook.CustomValidator so a webhook will be registered for the type
 func (r *CollectorConfig) ValidateUpdate(ctx context.Context, oldObj, newObj runtime.Object) (admission.Warnings, error) {
-	collectorconfiglog.Info("validate update", "name", r.Name)
+	cc, ok := newObj.(*CollectorConfig)
+	if !ok {
+		return nil, fmt.Errorf("expected a CollectorConfig object but got %T", newObj)
+	}
+	collectorconfiglog.Info("validate update", "name", cc.Name)
 
-	err := r.validateCollectorConfig()
+	err := cc.validateCollectorConfig()
 	return nil, err
 }
 
 // ValidateDelete implements webhook.CustomValidator so a webhook will be registered for the type
 func (r *CollectorConfig) ValidateDelete(ctx context.Context, obj runtime.Object) (admission.Warnings, error) {
-	collectorconfiglog.Info("validate delete", "name", r.Name)
+	cc, ok := obj.(*CollectorConfig)
+	if !ok {
+		return nil, fmt.Errorf("expected a CollectorConfig object but got %T", obj)
+	}
+	collectorconfiglog.Info("validate delete", "name", cc.Name)
 
 	// No validation needed for deletion
 	return nil, nil
@@ -206,21 +209,13 @@ func (r *CollectorConfig) validateField(customField *Field, path *field.Path) fi
 // isValidFieldName checks if a field name is valid
 // Must start with a letter and contain only alphanumeric, '-', '_', or '.'
 func isValidFieldName(name string) bool {
-	// Field name must start with a letter
-	if len(name) == 0 || !isLetter(rune(name[0])) {
-		return false
-	}
-
-	// Remaining characters can be alphanumeric, dash, underscore, or dot
-	validPattern := regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9\-_.]*$`)
-	return validPattern.MatchString(name)
+	return fieldNamePattern.MatchString(name)
 }
 
 // isValidFieldSuffix checks if a field suffix is valid
 // Can only contain lowercase alphanumeric, '-', or '.'
 func isValidFieldSuffix(suffix string) bool {
-	validPattern := regexp.MustCompile(`^[a-z0-9\-.]+$`)
-	return validPattern.MatchString(suffix)
+	return fieldSuffixPattern.MatchString(suffix)
 }
 
 // isValidJSONPath performs basic JSONPath syntax validation
@@ -233,11 +228,6 @@ func isValidJSONPath(jsonPath string) bool {
 	// Basic validation - contains at least one path element
 	inner := strings.TrimPrefix(strings.TrimSuffix(jsonPath, "}"), "{.")
 	return len(inner) > 0
-}
-
-// isLetter checks if a rune is a letter
-func isLetter(r rune) bool {
-	return (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z')
 }
 
 // contains checks if a slice contains a string
