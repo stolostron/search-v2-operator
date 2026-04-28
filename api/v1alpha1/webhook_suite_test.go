@@ -1,5 +1,9 @@
 // Copyright Contributors to the Open Cluster Management project
 
+// This file provides an envtest-based integration test for the webhook server.
+// It requires kubebuilder binaries (etcd, kube-apiserver) to be installed.
+// Set KUBEBUILDER_ASSETS to the path containing the binaries before running.
+
 package v1alpha1
 
 import (
@@ -7,47 +11,36 @@ import (
 	"crypto/tls"
 	"fmt"
 	"net"
+	"os"
 	"path/filepath"
 	"testing"
 	"time"
 
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
-
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	admissionv1beta1 "k8s.io/api/admission/v1beta1"
-	//+kubebuilder:scaffold:imports
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 )
 
-// These tests use Ginkgo (BDD-style Go testing framework). Refer to
-// http://onsi.github.io/ginkgo/ to learn more about Ginkgo.
+// TestWebhookServer boots an envtest API server with the webhook registered and
+// verifies the webhook server becomes reachable over TLS.
+func TestWebhookServer(t *testing.T) {
+	if os.Getenv("KUBEBUILDER_ASSETS") == "" {
+		t.Skip("KUBEBUILDER_ASSETS not set, skipping envtest integration test")
+	}
 
-var cfg *rest.Config
-var k8sClient client.Client
-var testEnv *envtest.Environment
-var ctx context.Context
-var cancel context.CancelFunc
+	logf.SetLogger(zap.New(zap.WriteTo(os.Stdout), zap.UseDevMode(true)))
 
-func TestAPIs(t *testing.T) {
-	RegisterFailHandler(Fail)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
-	RunSpecs(t, "Webhook Suite")
-}
-
-var _ = BeforeSuite(func() {
-	logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true)))
-
-	ctx, cancel = context.WithCancel(context.TODO())
-
-	By("bootstrapping test environment")
-	testEnv = &envtest.Environment{
+	// Bootstrap envtest with CRDs and webhook config
+	testEnv := &envtest.Environment{
 		CRDDirectoryPaths:     []string{filepath.Join("..", "..", "config", "crd", "bases")},
 		ErrorIfCRDPathMissing: false,
 		WebhookInstallOptions: envtest.WebhookInstallOptions{
@@ -55,66 +48,49 @@ var _ = BeforeSuite(func() {
 		},
 	}
 
-	var err error
-	// cfg is defined in this file globally.
-	cfg, err = testEnv.Start()
-	Expect(err).NotTo(HaveOccurred())
-	Expect(cfg).NotTo(BeNil())
+	cfg, err := testEnv.Start()
+	require.NoError(t, err, "failed to start envtest")
+	require.NotNil(t, cfg)
+	defer func() {
+		assert.NoError(t, testEnv.Stop(), "failed to stop envtest")
+	}()
 
+	// Build scheme
 	scheme := runtime.NewScheme()
-	err = AddToScheme(scheme)
-	Expect(err).NotTo(HaveOccurred())
+	require.NoError(t, AddToScheme(scheme))
+	require.NoError(t, admissionv1beta1.AddToScheme(scheme))
 
-	err = admissionv1beta1.AddToScheme(scheme)
-	Expect(err).NotTo(HaveOccurred())
-
-	//+kubebuilder:scaffold:scheme
-
-	k8sClient, err = client.New(cfg, client.Options{Scheme: scheme})
-	Expect(err).NotTo(HaveOccurred())
-	Expect(k8sClient).NotTo(BeNil())
-
-	// start webhook server using Manager
-	webhookInstallOptions := &testEnv.WebhookInstallOptions
+	// Start manager with webhook server
+	webhookOpts := testEnv.WebhookInstallOptions
 	mgr, err := ctrl.NewManager(cfg, ctrl.Options{
 		Scheme: scheme,
 		WebhookServer: webhook.NewServer(webhook.Options{
-			Host:    webhookInstallOptions.LocalServingHost,
-			Port:    webhookInstallOptions.LocalServingPort,
-			CertDir: webhookInstallOptions.LocalServingCertDir,
+			Host:    webhookOpts.LocalServingHost,
+			Port:    webhookOpts.LocalServingPort,
+			CertDir: webhookOpts.LocalServingCertDir,
 		}),
 		LeaderElection: false,
 	})
-	Expect(err).NotTo(HaveOccurred())
+	require.NoError(t, err, "failed to create manager")
 
-	err = (&CollectorConfig{}).SetupWebhookWithManager(mgr)
-	Expect(err).NotTo(HaveOccurred())
-
-	//+kubebuilder:scaffold:webhook
+	require.NoError(t, (&CollectorConfig{}).SetupWebhookWithManager(mgr), "failed to setup webhook")
 
 	go func() {
-		defer GinkgoRecover()
-		err = mgr.Start(ctx)
-		Expect(err).NotTo(HaveOccurred())
+		if err := mgr.Start(ctx); err != nil {
+			t.Logf("manager exited: %v", err)
+		}
 	}()
 
-	// wait for the webhook server to get ready
+	// Wait for webhook server to accept TLS connections
 	dialer := &net.Dialer{Timeout: time.Second}
-	addrPort := fmt.Sprintf("%s:%d", webhookInstallOptions.LocalServingHost, webhookInstallOptions.LocalServingPort)
-	Eventually(func() error {
+	addrPort := fmt.Sprintf("%s:%d", webhookOpts.LocalServingHost, webhookOpts.LocalServingPort)
+
+	require.Eventually(t, func() bool {
 		conn, err := tls.DialWithDialer(dialer, "tcp", addrPort, &tls.Config{InsecureSkipVerify: true})
 		if err != nil {
-			return err
+			return false
 		}
-		conn.Close()
-		return nil
-	}).Should(Succeed())
-
-})
-
-var _ = AfterSuite(func() {
-	cancel()
-	By("tearing down the test environment")
-	err := testEnv.Stop()
-	Expect(err).NotTo(HaveOccurred())
-})
+		_ = conn.Close()
+		return true
+	}, 10*time.Second, 250*time.Millisecond, "webhook server did not become ready")
+}
