@@ -14,7 +14,7 @@ metadata:
         }
       ]
     capabilities: Basic Install
-    createdAt: "2026-04-28T16:47:15Z"
+    createdAt: "2025-08-27T19:14:13Z"
     operators.operatorframework.io/builder: operator-sdk-v1.37.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
   name: search-v2-operator.v0.0.1
@@ -288,7 +288,7 @@ spec:
           - subjectaccessreviews
           verbs:
           - create
-        serviceAccountName: search-v2-operator-controller-manager
+        serviceAccountName: search-v2-operator
       deployments:
       - label:
           app: search
@@ -308,19 +308,37 @@ spec:
             spec:
               containers:
               - args:
+                - --secure-listen-address=0.0.0.0:8443
+                - --upstream=http://127.0.0.1:8080/
+                - --logtostderr=true
+                - --v=10
+                - --tls-min-version=VersionTLS13
+                image: gcr.io/kubebuilder/kube-rbac-proxy:v0.8.0
+                name: kube-rbac-proxy
+                ports:
+                - containerPort: 8443
+                  name: https
+                  protocol: TCP
+                resources:
+                  requests:
+                    cpu: 10m
+                    memory: 256Mi
+              - args:
+                - --health-probe-bind-address=:8081
+                - --metrics-bind-address=127.0.0.1:8080
                 - --leader-elect
                 command:
                 - /manager
                 env:
-                - name: WATCH_NAMESPACE
-                  valueFrom:
-                    fieldRef:
-                      fieldPath: metadata.annotations['olm.targetNamespaces']
                 - name: POD_NAMESPACE
                   valueFrom:
                     fieldRef:
                       apiVersion: v1
                       fieldPath: metadata.namespace
+                - name: WATCH_NAMESPACE
+                  valueFrom:
+                    fieldRef:
+                      fieldPath: metadata.annotations['olm.targetNamespaces']
                 - name: POSTGRES_IMAGE
                   value: registry.redhat.io/rhel9/postgresql-16:placeholder-image-tag
                 - name: INDEXER_IMAGE
@@ -361,7 +379,7 @@ spec:
               - name: search-pull-secret
               securityContext:
                 runAsNonRoot: true
-              serviceAccountName: search-v2-operator-controller-manager
+              serviceAccountName: search-v2-operator
               terminationGracePeriodSeconds: 10
               volumes:
               - name: cert
@@ -451,7 +469,7 @@ spec:
           verbs:
           - create
           - patch
-        serviceAccountName: search-v2-operator-controller-manager
+        serviceAccountName: search-v2-operator
     strategy: deployment
   installModes:
   - supported: true
