@@ -51,6 +51,10 @@ spec:
         - --leader-elect
         image: controller:latest
         name: manager
+        ports:
+        - containerPort: 9443
+          name: webhook-server
+          protocol: TCP
         securityContext:
           allowPrivilegeEscalation: false
         livenessProbe:
@@ -69,7 +73,16 @@ spec:
           requests:
             cpu: 10m
             memory: 256Mi
+        volumeMounts:
+        - mountPath: /tmp/k8s-webhook-server/serving-certs
+          name: cert
+          readOnly: true
       serviceAccountName: controller-manager
       terminationGracePeriodSeconds: 10
+      volumes:
+      - name: cert
+        secret:
+          defaultMode: 420
+          secretName: webhook-server-cert
       imagePullSecrets:
         - name: search-pull-secret
