@@ -4,8 +4,6 @@ go 1.25.0
 
 require (
 	github.com/cloudflare/cfssl v1.6.5
-	github.com/onsi/ginkgo/v2 v2.22.0
-	github.com/onsi/gomega v1.36.1
 	github.com/stretchr/testify v1.10.0
 	k8s.io/api v0.33.2
 	k8s.io/apimachinery v0.33.2
@@ -20,17 +18,14 @@ require (
 	dario.cat/mergo v1.0.1 // indirect
 	github.com/evanphx/json-patch/v5 v5.9.11 // indirect
 	github.com/fxamacker/cbor/v2 v2.7.0 // indirect
-	github.com/go-task/slim-sprig/v3 v3.0.0 // indirect
 	github.com/google/btree v1.1.3 // indirect
 	github.com/google/gnostic-models v0.6.9 // indirect
-	github.com/google/pprof v0.0.0-20241029153458-d1b30febd7db // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	go.opentelemetry.io/otel v1.33.0 // indirect
 	go.opentelemetry.io/otel/trace v1.33.0 // indirect
 	golang.org/x/net v0.47.0 // indirect
 	golang.org/x/sync v0.18.0 // indirect
-	golang.org/x/tools v0.38.0 // indirect
 	gopkg.in/evanphx/json-patch.v4 v4.12.0 // indirect
 	open-cluster-management.io/sdk-go v0.16.0 // indirect
 	sigs.k8s.io/randfill v1.0.0 // indirect
