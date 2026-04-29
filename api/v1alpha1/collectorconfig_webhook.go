@@ -5,6 +5,7 @@ package v1alpha1
 import (
 	"context"
 	"fmt"
+	"k8s.io/client-go/util/jsonpath"
 	"regexp"
 	"strings"
 
@@ -220,6 +221,7 @@ func isValidFieldSuffix(suffix string) bool {
 
 // isValidJSONPath performs basic JSONPath syntax validation
 func isValidJSONPath(jsonPath string) bool {
+	// FUTURE: ACM-33144 removes necessity of '{}' in jsonPath and default to parse-based validation check
 	// Must start with {. and end with }
 	if !strings.HasPrefix(jsonPath, "{.") || !strings.HasSuffix(jsonPath, "}") {
 		return false
@@ -227,7 +229,13 @@ func isValidJSONPath(jsonPath string) bool {
 
 	// Basic validation - contains at least one path element
 	inner := strings.TrimPrefix(strings.TrimSuffix(jsonPath, "}"), "{.")
-	return len(inner) > 0
+	if len(inner) < 1 {
+		return false
+	}
+
+	// Parse-based validation
+	jp := jsonpath.New("collectorconfig-field")
+	return jp.Parse(jsonPath) == nil
 }
 
 // contains checks if a slice contains a string
