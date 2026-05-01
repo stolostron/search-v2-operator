@@ -29,7 +29,11 @@ const (
 	ActionExclude ActionType = "exclude"
 )
 
+// CollectorConfigStatus defines the observed state of CollectorConfig.
+type CollectorConfigStatus struct{}
+
 // +kubebuilder:object:root=true
+// +kubebuilder:subresource:status
 // +kubebuilder:resource:shortName=sccc
 
 // CollectorConfig is the schema for the collector-configs API.
@@ -37,7 +41,8 @@ type CollectorConfig struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec CollectorConfigSpec `json:"spec,omitempty"`
+	Spec   CollectorConfigSpec   `json:"spec,omitempty"`
+	Status CollectorConfigStatus `json:"status,omitempty"`
 }
 
 // CollectorConfigSpec defines the configuration changes made to the resources and fields indexed by Search Collectors.

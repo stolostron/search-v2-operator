@@ -23,7 +23,9 @@ spec:
   apiservicedefinitions: {}
   customresourcedefinitions:
     owned:
-    - kind: CollectorConfig
+    - description: CollectorConfig is the schema for the collector-configs API.
+      displayName: Collector Config
+      kind: CollectorConfig
       name: collectorconfigs.search.open-cluster-management.io
       version: v1alpha1
     - description: Search is the schema for the searches API.
@@ -353,6 +355,10 @@ spec:
                   initialDelaySeconds: 15
                   periodSeconds: 20
                 name: manager
+                ports:
+                - containerPort: 9443
+                  name: webhook-server
+                  protocol: TCP
                 readinessProbe:
                   httpGet:
                     path: /readyz
@@ -365,12 +371,21 @@ spec:
                     memory: 256Mi
                 securityContext:
                   allowPrivilegeEscalation: false
+                volumeMounts:
+                - mountPath: /tmp/k8s-webhook-server/serving-certs
+                  name: cert
+                  readOnly: true
               imagePullSecrets:
               - name: search-pull-secret
               securityContext:
                 runAsNonRoot: true
               serviceAccountName: search-v2-operator
               terminationGracePeriodSeconds: 10
+              volumes:
+              - name: cert
+                secret:
+                  defaultMode: 420
+                  secretName: webhook-server-cert
       permissions:
       - rules:
         - apiGroups:
@@ -480,3 +495,24 @@ spec:
   provider:
     name: Red Hat
   version: 0.0.1
+  webhookdefinitions:
+  - admissionReviewVersions:
+    - v1
+    containerPort: 443
+    deploymentName: search-v2-operator-controller-manager
+    failurePolicy: Fail
+    generateName: vcollectorconfig.kb.io
+    rules:
+    - apiGroups:
+      - search.open-cluster-management.io
+      apiVersions:
+      - v1alpha1
+      operations:
+      - CREATE
+      - UPDATE
+      resources:
+      - collectorconfigs
+    sideEffects: None
+    targetPort: 9443
+    type: ValidatingAdmissionWebhook
+    webhookPath: /validate-search-open-cluster-management-io-v1alpha1-collectorconfig

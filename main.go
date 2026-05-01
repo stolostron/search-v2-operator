@@ -29,6 +29,7 @@ import (
 	monitorv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	searchv1alpha1 "github.com/stolostron/search-v2-operator/api/v1alpha1"
 	"github.com/stolostron/search-v2-operator/controllers"
+	admissionv1 "k8s.io/api/admission/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -54,6 +55,7 @@ func init() {
 	utilruntime.Must(searchv1alpha1.AddToScheme(scheme))
 	utilruntime.Must(monitorv1.AddToScheme(scheme))
 	utilruntime.Must(clusterv1.AddToScheme(scheme))
+	utilruntime.Must(admissionv1.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
 }
 
@@ -74,13 +76,19 @@ func main() {
 
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
+	watchNs := os.Getenv("WATCH_NAMESPACE")
+	var cacheOpts cache.Options
+	if watchNs != "" {
+		cacheOpts = cache.Options{DefaultNamespaces: map[string]cache.Config{watchNs: {}}}
+	}
+
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:                 scheme,
-		Metrics:                server.Options{BindAddress: metricsAddr},       // https://github.com/kubernetes-sigs/controller-runtime/blob/release-0.16/pkg/manager/manager.go#L226
-		WebhookServer:          webhook.NewServer(webhook.Options{Port: 9443}), // https://github.com/kubernetes-sigs/controller-runtime/blob/release-0.15/pkg/manager/manager.go#L286
+		Metrics:                server.Options{BindAddress: metricsAddr},
+		WebhookServer:          webhook.NewServer(webhook.Options{Port: 9443}),
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
-		Cache:                  cache.Options{DefaultNamespaces: map[string]cache.Config{os.Getenv("WATCH_NAMESPACE"): {}}}, // https://github.com/kubernetes-sigs/controller-runtime/blob/release-0.15/pkg/manager/manager.go#L257
+		Cache:                  cacheOpts,
 		LeaderElectionID:       "b648e39a.open-cluster-management.io",
 	})
 
@@ -104,6 +112,10 @@ func main() {
 		Scheme:        mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Search")
+		os.Exit(1)
+	}
+	if err = (&searchv1alpha1.CollectorConfig{}).SetupWebhookWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create webhook", "webhook", "CollectorConfig")
 		os.Exit(1)
 	}
 	//+kubebuilder:scaffold:builder
