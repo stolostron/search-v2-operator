@@ -191,6 +191,11 @@ func getRules() []rbacv1.PolicyRule {
 			Resources: []string{"users", "serviceaccounts", "groups"},
 			Verbs:     []string{"impersonate"},
 		},
+		{
+			APIGroups: []string{"search.open-cluster-management.io"},
+			Resources: []string{"collectorconfigs/status"},
+			Verbs:     []string{"patch", "update"},
+		},
 	}
 }
 

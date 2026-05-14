@@ -40,3 +40,10 @@ rules:
   - update
   - watch
   - create
+- apiGroups:
+  - search.open-cluster-management.io
+  resources:
+  - collectorconfigs/status
+  verbs:
+  - patch
+  - update

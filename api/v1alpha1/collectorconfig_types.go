@@ -29,8 +29,28 @@ const (
 	ActionExclude ActionType = "exclude"
 )
 
+// CollectorConfigConditionApplied is set on a CollectorConfig to indicate whether the configuration
+// was applied successfully. When False, the Message field describes which rules were skipped and why.
+const CollectorConfigConditionApplied = "Applied"
+
+// Reason constants for the CollectorConfig Applied condition.
+const (
+	// CollectorConfigReasonApplied means all rules were processed and applied successfully.
+	CollectorConfigReasonApplied = "Applied"
+	// CollectorConfigReasonRulesSkipped means one or more rules were skipped due to configuration issues.
+	CollectorConfigReasonRulesSkipped = "RulesSkipped"
+	// CollectorConfigReasonLoadError means the CollectorConfig resource could not be loaded or parsed.
+	CollectorConfigReasonLoadError = "LoadError"
+)
+
 // CollectorConfigStatus defines the observed state of CollectorConfig.
-type CollectorConfigStatus struct{}
+type CollectorConfigStatus struct {
+	// +optional
+	// Conditions contains the latest status conditions for this CollectorConfig.
+	// The "Applied" condition indicates whether the configuration was applied without errors.
+	// When Applied is False, the Message field lists which rules were skipped and why.
+	Conditions []metav1.Condition `json:"conditions,omitempty"`
+}
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
