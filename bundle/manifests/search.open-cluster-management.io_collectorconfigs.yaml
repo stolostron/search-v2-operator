@@ -132,8 +132,7 @@ spec:
                         for the resource.'
                       type: boolean
                     collectConditions:
-                      description: '[NOT IMPLEMENTED] Specifies to collect status
-                        conditions for the resource.'
+                      description: 'Specifies to collect status conditions for the resource.'
                       type: boolean
                     fieldSuffix:
                       default: ""
@@ -182,7 +181,8 @@ spec:
                             type: string
                           type: array
                         kinds:
-                          description: Specifies kinds of resources.
+                          description: Specifies kinds of resources. Use "*" to match
+                            all kinds in the apiGroup (only with collectConditions).
                           items:
                             type: string
                           type: array

@@ -114,7 +114,7 @@ type CollectionRule struct {
 	CollectAnnotations *bool `json:"collectAnnotations,omitempty"`
 
 	// +optional
-	// [NOT IMPLEMENTED] Specifies to collect status conditions for the resource.
+	// Specifies to collect status conditions for the resource.
 	CollectConditions *bool `json:"collectConditions,omitempty"`
 
 	// +optional
@@ -127,7 +127,7 @@ type ResourceSelector struct {
 	// Specifies apiGroups of resources.
 	APIGroups []string `json:"apiGroups"`
 
-	// Specifies kinds of resources.
+	// Specifies kinds of resources. Use "*" to match all kinds in the apiGroup (only with collectConditions).
 	Kinds []string `json:"kinds"`
 }
 

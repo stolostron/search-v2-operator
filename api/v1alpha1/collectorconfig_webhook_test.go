@@ -255,3 +255,65 @@ func TestValidateDeleteAlwaysPasses(t *testing.T) {
 	_, err := c.ValidateDelete(context.Background(), c)
 	assert.NoError(t, err)
 }
+
+// Accept collectConditions with a specific kind and no fields.
+func TestAcceptCollectConditionsWithKind(t *testing.T) {
+	collectConditions := true
+	c := validConfig()
+	c.Spec.CollectionRules[0].CollectConditions = &collectConditions
+	_, err := c.ValidateCreate(context.Background(), c)
+	assert.NoError(t, err)
+}
+
+// Accept collectConditions with multiple kinds and no fields.
+func TestAcceptCollectConditionsWithMultipleKinds(t *testing.T) {
+	collectConditions := true
+	c := validConfig()
+	c.Spec.CollectionRules[0].CollectConditions = &collectConditions
+	c.Spec.CollectionRules[0].ResourceSelector.Kinds = []string{"Deployment", "StatefulSet"}
+	_, err := c.ValidateCreate(context.Background(), c)
+	assert.NoError(t, err)
+}
+
+// Accept collectConditions with wildcard kinds (apigroup-wide conditions).
+func TestAcceptCollectConditionsWithWildcardKind(t *testing.T) {
+	collectConditions := true
+	c := validConfig()
+	c.Spec.CollectionRules[0].CollectConditions = &collectConditions
+	c.Spec.CollectionRules[0].ResourceSelector.Kinds = []string{"*"}
+	_, err := c.ValidateCreate(context.Background(), c)
+	assert.NoError(t, err)
+}
+
+// Reject wildcard kinds without collectConditions.
+func TestRejectWildcardKindWithoutCollectConditions(t *testing.T) {
+	c := validConfig()
+	c.Spec.CollectionRules[0].ResourceSelector.Kinds = []string{"*"}
+	_, err := c.ValidateCreate(context.Background(), c)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "wildcard kind")
+}
+
+// Reject collectConditions wildcard kinds with fields.
+func TestRejectWildcardKindWithFields(t *testing.T) {
+	collectConditions := true
+	c := validConfig()
+	c.Spec.CollectionRules[0].CollectConditions = &collectConditions
+	c.Spec.CollectionRules[0].ResourceSelector.Kinds = []string{"*"}
+	c.Spec.CollectionRules[0].Fields = []Field{{Name: "replicas", JSONPath: "{.spec.replicas}"}}
+	_, err := c.ValidateCreate(context.Background(), c)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "wildcard kind")
+}
+
+// Reject collectConditions without apiGroups.
+func TestRejectCollectConditionsWithoutApiGroups(t *testing.T) {
+	collectConditions := true
+	c := validConfig()
+	c.Spec.CollectionRules[0].CollectConditions = &collectConditions
+	c.Spec.CollectionRules[0].ResourceSelector.APIGroups = []string{}
+	c.Spec.CollectionRules[0].ResourceSelector.Kinds = []string{"*"}
+	_, err := c.ValidateCreate(context.Background(), c)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "must specify at least one apiGroup")
+}
