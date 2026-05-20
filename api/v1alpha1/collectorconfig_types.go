@@ -46,6 +46,8 @@ const (
 // CollectorConfigStatus defines the observed state of CollectorConfig.
 type CollectorConfigStatus struct {
 	// +optional
+	// +listType=map
+	// +listMapKey=type
 	// Conditions contains the latest status conditions for this CollectorConfig.
 	// The "Applied" condition indicates whether the configuration was applied without errors.
 	// When Applied is False, the Message field lists which rules were skipped and why.
