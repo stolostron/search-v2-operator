@@ -285,16 +285,15 @@ func TestAcceptCollectConditionsWithWildcardKind(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-// Reject wildcard kinds without collectConditions.
-func TestRejectWildcardKindWithoutCollectConditions(t *testing.T) {
+// Accept wildcard kinds without collectConditions (no-op rule, but valid).
+func TestAcceptWildcardKindWithoutCollectConditions(t *testing.T) {
 	c := validConfig()
 	c.Spec.CollectionRules[0].ResourceSelector.Kinds = []string{"*"}
 	_, err := c.ValidateCreate(context.Background(), c)
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "wildcard kind")
+	assert.NoError(t, err)
 }
 
-// Reject collectConditions wildcard kinds with fields.
+// Reject wildcard kinds with fields.
 func TestRejectWildcardKindWithFields(t *testing.T) {
 	collectConditions := true
 	c := validConfig()

@@ -96,19 +96,10 @@ func (r *CollectorConfig) validateCollectorConfig() error {
 			allErrs = append(allErrs, err...)
 		}
 
-		hasCollectConditions := rule.CollectConditions != nil && *rule.CollectConditions
 		hasFields := len(rule.Fields) > 0
 
-		// Validate wildcard kind "*": only allowed with collectConditions and without fields
+		// Validate wildcard kind "*": cannot be used with fields
 		for _, k := range rule.ResourceSelector.Kinds {
-			if k == "*" && !hasCollectConditions {
-				allErrs = append(allErrs, field.Invalid(
-					rulePath.Child("resourceSelector", "kinds"),
-					rule.ResourceSelector.Kinds,
-					"wildcard kind \"*\" is only allowed when collectConditions is true",
-				))
-				break
-			}
 			if k == "*" && hasFields {
 				allErrs = append(allErrs, field.Invalid(
 					rulePath.Child("resourceSelector", "kinds"),
