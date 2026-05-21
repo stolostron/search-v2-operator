@@ -96,8 +96,22 @@ func (r *CollectorConfig) validateCollectorConfig() error {
 			allErrs = append(allErrs, err...)
 		}
 
+		hasFields := len(rule.Fields) > 0
+
+		// Validate wildcard kind "*": cannot be used with fields
+		for _, k := range rule.ResourceSelector.Kinds {
+			if k == "*" && hasFields {
+				allErrs = append(allErrs, field.Invalid(
+					rulePath.Child("resourceSelector", "kinds"),
+					rule.ResourceSelector.Kinds,
+					"wildcard kind \"*\" cannot be used with fields",
+				))
+				break
+			}
+		}
+
 		// Validate Fields (only for Include actions)
-		if rule.Action == ActionInclude && len(rule.Fields) > 0 {
+		if rule.Action == ActionInclude && hasFields {
 			// When fields are specified, must have exactly 1 kind and 1 apiGroup
 			if len(rule.ResourceSelector.Kinds) != 1 {
 				allErrs = append(allErrs, field.Invalid(
