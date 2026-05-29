@@ -7,7 +7,10 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	admissionv1 "k8s.io/api/admission/v1"
+	authenticationv1 "k8s.io/api/authentication/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
 func validConfig() *CollectorConfig {
@@ -315,4 +318,101 @@ func TestRejectCollectConditionsWithoutApiGroups(t *testing.T) {
 	_, err := c.ValidateCreate(context.Background(), c)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "must specify at least one apiGroup")
+}
+
+// --- Webhook protection tests ---
+
+func ctxWithUser(username string) context.Context {
+	return admission.NewContextWithRequest(context.Background(), admission.Request{
+		AdmissionRequest: admissionv1.AdmissionRequest{
+			UserInfo: authenticationv1.UserInfo{Username: username},
+		},
+	})
+}
+
+func operatorCtx() context.Context {
+	return ctxWithUser("system:serviceaccount:open-cluster-management:search-serviceaccount")
+}
+
+func nonOperatorCtx() context.Context {
+	return ctxWithUser("system:serviceaccount:open-cluster-management:default")
+}
+
+// Non-operator creating merged-collector-config → rejected.
+func TestRejectNonOperatorCreateMerged(t *testing.T) {
+	c := validConfig()
+	c.Name = "merged-collector-config"
+	_, err := c.ValidateCreate(nonOperatorCtx(), c)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "managed by the search operator")
+}
+
+// Non-operator creating integration-collector-config → rejected.
+func TestRejectNonOperatorCreateIntegration(t *testing.T) {
+	c := validConfig()
+	c.Name = "integration-collector-config"
+	_, err := c.ValidateCreate(nonOperatorCtx(), c)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "managed by the search operator")
+}
+
+// Non-operator updating merged-collector-config → rejected.
+func TestRejectNonOperatorUpdateMerged(t *testing.T) {
+	old := validConfig()
+	old.Name = "merged-collector-config"
+	updated := old.DeepCopy()
+	_, err := updated.ValidateUpdate(nonOperatorCtx(), old, updated)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "managed by the search operator")
+}
+
+// Non-operator deleting merged-collector-config → rejected.
+func TestRejectNonOperatorDeleteMerged(t *testing.T) {
+	c := validConfig()
+	c.Name = "merged-collector-config"
+	_, err := c.ValidateDelete(nonOperatorCtx(), c)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "managed by the search operator")
+}
+
+// Non-operator deleting integration-collector-config → rejected.
+func TestRejectNonOperatorDeleteIntegration(t *testing.T) {
+	c := validConfig()
+	c.Name = "integration-collector-config"
+	_, err := c.ValidateDelete(nonOperatorCtx(), c)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "managed by the search operator")
+}
+
+// Non-operator creating customer-collector-config → allowed.
+func TestAllowNonOperatorCreateCustomer(t *testing.T) {
+	c := validConfig()
+	c.Name = "customer-collector-config"
+	_, err := c.ValidateCreate(nonOperatorCtx(), c)
+	assert.NoError(t, err)
+}
+
+// Operator SA creating merged-collector-config → allowed.
+func TestAllowOperatorCreateMerged(t *testing.T) {
+	c := validConfig()
+	c.Name = "merged-collector-config"
+	_, err := c.ValidateCreate(operatorCtx(), c)
+	assert.NoError(t, err)
+}
+
+// Operator SA updating integration-collector-config → allowed.
+func TestAllowOperatorUpdateIntegration(t *testing.T) {
+	old := validConfig()
+	old.Name = "integration-collector-config"
+	updated := old.DeepCopy()
+	_, err := updated.ValidateUpdate(operatorCtx(), old, updated)
+	assert.NoError(t, err)
+}
+
+// Operator SA deleting protected configs → allowed.
+func TestAllowOperatorDeleteProtected(t *testing.T) {
+	c := validConfig()
+	c.Name = "merged-collector-config"
+	_, err := c.ValidateDelete(operatorCtx(), c)
+	assert.NoError(t, err)
 }

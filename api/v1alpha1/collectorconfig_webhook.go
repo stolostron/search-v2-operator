@@ -17,6 +17,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
+const (
+	operatorServiceAccount = "search-serviceaccount"
+)
+
 // log is for logging in this package.
 var collectorconfiglog = logf.Log.WithName("collectorconfig-resource")
 
@@ -33,7 +37,7 @@ func (r *CollectorConfig) SetupWebhookWithManager(mgr ctrl.Manager) error {
 		Complete()
 }
 
-//+kubebuilder:webhook:path=/validate-search-open-cluster-management-io-v1alpha1-collectorconfig,mutating=false,failurePolicy=fail,sideEffects=None,groups=search.open-cluster-management.io,resources=collectorconfigs,verbs=create;update,versions=v1alpha1,name=vcollectorconfig.kb.io,admissionReviewVersions=v1
+//+kubebuilder:webhook:path=/validate-search-open-cluster-management-io-v1alpha1-collectorconfig,mutating=false,failurePolicy=fail,sideEffects=None,groups=search.open-cluster-management.io,resources=collectorconfigs,verbs=create;update;delete,versions=v1alpha1,name=vcollectorconfig.kb.io,admissionReviewVersions=v1
 
 var _ webhook.CustomValidator = &CollectorConfig{}
 
@@ -44,6 +48,10 @@ func (r *CollectorConfig) ValidateCreate(ctx context.Context, obj runtime.Object
 		return nil, fmt.Errorf("expected a CollectorConfig object but got %T", obj)
 	}
 	collectorconfiglog.Info("validate create", "name", cc.Name)
+
+	if err := rejectIfProtected(ctx, cc.Name); err != nil {
+		return nil, err
+	}
 
 	err := cc.validateCollectorConfig()
 	return nil, err
@@ -57,6 +65,10 @@ func (r *CollectorConfig) ValidateUpdate(ctx context.Context, oldObj, newObj run
 	}
 	collectorconfiglog.Info("validate update", "name", cc.Name)
 
+	if err := rejectIfProtected(ctx, cc.Name); err != nil {
+		return nil, err
+	}
+
 	err := cc.validateCollectorConfig()
 	return nil, err
 }
@@ -69,7 +81,10 @@ func (r *CollectorConfig) ValidateDelete(ctx context.Context, obj runtime.Object
 	}
 	collectorconfiglog.Info("validate delete", "name", cc.Name)
 
-	// No validation needed for deletion
+	if err := rejectIfProtected(ctx, cc.Name); err != nil {
+		return nil, err
+	}
+
 	return nil, nil
 }
 
@@ -260,4 +275,27 @@ func contains(slice []string, item string) bool {
 		}
 	}
 	return false
+}
+
+// isProtectedConfig returns true for configs managed by the operator.
+func isProtectedConfig(name string) bool {
+	return name == "merged-collector-config" || name == "integration-collector-config"
+}
+
+// isOperatorServiceAccount checks whether the request originates from the operator's service account.
+func isOperatorServiceAccount(ctx context.Context) bool {
+	req, err := admission.RequestFromContext(ctx)
+	if err != nil {
+		return false
+	}
+	return strings.HasPrefix(req.UserInfo.Username, "system:serviceaccount:") &&
+		strings.HasSuffix(req.UserInfo.Username, ":"+operatorServiceAccount)
+}
+
+// rejectIfProtected returns an error if the config is operator-managed and the caller is not the operator SA.
+func rejectIfProtected(ctx context.Context, name string) error {
+	if isProtectedConfig(name) && !isOperatorServiceAccount(ctx) {
+		return fmt.Errorf("%s is managed by the search operator and cannot be modified directly", name)
+	}
+	return nil
 }
