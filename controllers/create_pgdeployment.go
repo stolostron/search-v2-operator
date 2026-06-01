@@ -73,6 +73,17 @@ func (r *SearchReconciler) PGDeployment(instance *searchv1alpha1.Search) *appsv1
 				},
 			},
 		},
+		Lifecycle: &corev1.Lifecycle{
+			PreStop: &corev1.LifecycleHandler{
+				Exec: &corev1.ExecAction{
+					Command: []string{
+						"/bin/sh", "-c",
+						// disconnect clients, wait for server shutdown, timeout after 55 seconds leaving 5-second terminationGracePeriod
+						"pg_ctl stop -D /var/lib/pgsql/data/userdata -m fast -w -t 55",
+					},
+				},
+			},
+		},
 	}
 	args := getContainerArgs(deploymentName, instance)
 	if args != nil {
@@ -160,7 +171,7 @@ func (r *SearchReconciler) PGDeployment(instance *searchv1alpha1.Search) *appsv1
 		Type: appsv1.RecreateDeploymentStrategyType,
 	}
 	// Increase the termination grace period to allow connections to finish.
-	terminationGracePeriodSeconds := int64(300) // 5 minutes
+	terminationGracePeriodSeconds := int64(60) // 1 minutes
 	deployment.Spec.Template.Spec.TerminationGracePeriodSeconds = &terminationGracePeriodSeconds
 
 	if getNodeSelector(deploymentName, instance) != nil {
