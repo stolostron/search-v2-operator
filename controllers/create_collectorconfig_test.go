@@ -38,11 +38,29 @@ func newCollectorConfig(name string, spec searchv1alpha1.CollectorConfigSpec) *s
 	}
 }
 
+// newIntegrationTeamConfig creates a CollectorConfig with the integration team label.
+func newIntegrationTeamConfig(name string, spec searchv1alpha1.CollectorConfigSpec) *searchv1alpha1.CollectorConfig {
+	cc := newCollectorConfig(name, spec)
+	cc.Labels = map[string]string{
+		integrationTeamLabel: integrationTeamLabelValue,
+	}
+	return cc
+}
+
 func setupReconciler(objs ...runtime.Object) *SearchReconciler {
 	s := scheme.Scheme
 	_ = searchv1alpha1.SchemeBuilder.AddToScheme(s)
 	cl := fake.NewClientBuilder().WithRuntimeObjects(objs...).Build()
 	return &SearchReconciler{Client: cl, Scheme: s}
+}
+
+func getIntegrationConfig(r *SearchReconciler) (*searchv1alpha1.CollectorConfig, error) {
+	cc := &searchv1alpha1.CollectorConfig{}
+	err := r.Get(context.TODO(), types.NamespacedName{
+		Name:      integrationCollectorConfigName,
+		Namespace: testNamespace,
+	}, cc)
+	return cc, err
 }
 
 func getMergedConfig(r *SearchReconciler) (*searchv1alpha1.CollectorConfig, error) {
@@ -54,40 +72,265 @@ func getMergedConfig(r *SearchReconciler) (*searchv1alpha1.CollectorConfig, erro
 	return merged, err
 }
 
-// Test: only integration-collector-config exists -> merged = integration rules
-func TestMerge_IntegrationOnly(t *testing.T) {
+// --- Integration team config discovery tests ---
+
+func TestIntegration_MultipleTeamConfigs(t *testing.T) {
 	instance := newSearchInstance()
-	integrationCC := newCollectorConfig(integrationCollectorConfigName, searchv1alpha1.CollectorConfigSpec{
+	teamA := newIntegrationTeamConfig("team-a-config", searchv1alpha1.CollectorConfigSpec{
 		CollectionRules: []searchv1alpha1.CollectionRule{
 			{
 				Action:           searchv1alpha1.ActionInclude,
-				FieldSuffix:      "GRC",
+				FieldSuffix:      "FOO",
 				ResourceSelector: searchv1alpha1.ResourceSelector{APIGroups: []string{"policy.open-cluster-management.io"}, Kinds: []string{"Policy"}},
 				Fields:           []searchv1alpha1.Field{{Name: "severity", JSONPath: "{.spec.severity}"}},
 			},
 		},
 	})
-	r := setupReconciler(instance, integrationCC)
+	teamB := newIntegrationTeamConfig("team-b-config", searchv1alpha1.CollectorConfigSpec{
+		CollectionRules: []searchv1alpha1.CollectionRule{
+			{
+				Action:           searchv1alpha1.ActionInclude,
+				FieldSuffix:      "BAR",
+				ResourceSelector: searchv1alpha1.ResourceSelector{APIGroups: []string{"kubevirt.io"}, Kinds: []string{"VirtualMachine"}},
+				Fields:           []searchv1alpha1.Field{{Name: "running", JSONPath: "{.spec.running}"}},
+			},
+		},
+	})
+	r := setupReconciler(instance, teamA, teamB)
 
-	result, err := r.createOrUpdateMergedCollectorConfig(context.TODO(), instance)
+	result, err := r.createOrUpdateIntegrationCollectorConfig(context.TODO(), instance)
 	assert.Nil(t, err)
 	assert.Nil(t, result)
+
+	integrationCC, err := getIntegrationConfig(r)
+	assert.Nil(t, err)
+	assert.Len(t, integrationCC.Spec.CollectionRules, 2)
+}
+
+func TestIntegration_ZeroTeamConfigs(t *testing.T) {
+	instance := newSearchInstance()
+	r := setupReconciler(instance)
+
+	result, err := r.createOrUpdateIntegrationCollectorConfig(context.TODO(), instance)
+	assert.Nil(t, err)
+	assert.Nil(t, result)
+
+	integrationCC, err := getIntegrationConfig(r)
+	assert.Nil(t, err)
+	assert.Empty(t, integrationCC.Spec.CollectionRules)
+}
+
+func TestIntegration_TeamConfigDeleted(t *testing.T) {
+	instance := newSearchInstance()
+	teamA := newIntegrationTeamConfig("team-a-config", searchv1alpha1.CollectorConfigSpec{
+		CollectionRules: []searchv1alpha1.CollectionRule{
+			{
+				Action:           searchv1alpha1.ActionInclude,
+				FieldSuffix:      "FOO",
+				ResourceSelector: searchv1alpha1.ResourceSelector{APIGroups: []string{"policy.open-cluster-management.io"}, Kinds: []string{"Policy"}},
+			},
+		},
+	})
+	teamB := newIntegrationTeamConfig("team-b-config", searchv1alpha1.CollectorConfigSpec{
+		CollectionRules: []searchv1alpha1.CollectionRule{
+			{
+				Action:           searchv1alpha1.ActionInclude,
+				FieldSuffix:      "BAR",
+				ResourceSelector: searchv1alpha1.ResourceSelector{APIGroups: []string{"kubevirt.io"}, Kinds: []string{"VirtualMachine"}},
+			},
+		},
+	})
+	r := setupReconciler(instance, teamA, teamB)
+
+	// First merge with both team configs.
+	result, err := r.createOrUpdateIntegrationCollectorConfig(context.TODO(), instance)
+	assert.Nil(t, err)
+	assert.Nil(t, result)
+
+	integrationCC, err := getIntegrationConfig(r)
+	assert.Nil(t, err)
+	assert.Len(t, integrationCC.Spec.CollectionRules, 2)
+
+	// Delete team-b.
+	err = r.Delete(context.TODO(), teamB)
+	assert.Nil(t, err)
+
+	// Re-merge should have only team-a's rules.
+	result, err = r.createOrUpdateIntegrationCollectorConfig(context.TODO(), instance)
+	assert.Nil(t, err)
+	assert.Nil(t, result)
+
+	integrationCC, err = getIntegrationConfig(r)
+	assert.Nil(t, err)
+	assert.Len(t, integrationCC.Spec.CollectionRules, 1)
+	assert.Equal(t, "FOO", integrationCC.Spec.CollectionRules[0].FieldSuffix)
+}
+
+func TestIntegration_Idempotency(t *testing.T) {
+	instance := newSearchInstance()
+	teamA := newIntegrationTeamConfig("team-a-config", searchv1alpha1.CollectorConfigSpec{
+		CollectionRules: []searchv1alpha1.CollectionRule{
+			{
+				Action:           searchv1alpha1.ActionInclude,
+				FieldSuffix:      "FOO",
+				ResourceSelector: searchv1alpha1.ResourceSelector{APIGroups: []string{"policy.open-cluster-management.io"}, Kinds: []string{"Policy"}},
+			},
+		},
+	})
+	r := setupReconciler(instance, teamA)
+
+	// First call creates integration-collector-config.
+	result, err := r.createOrUpdateIntegrationCollectorConfig(context.TODO(), instance)
+	assert.Nil(t, err)
+	assert.Nil(t, result)
+
+	cc1, err := getIntegrationConfig(r)
+	assert.Nil(t, err)
+	rv1 := cc1.ResourceVersion
+
+	// Second call with no changes should not update.
+	result, err = r.createOrUpdateIntegrationCollectorConfig(context.TODO(), instance)
+	assert.Nil(t, err)
+	assert.Nil(t, result)
+
+	cc2, err := getIntegrationConfig(r)
+	assert.Nil(t, err)
+	assert.Equal(t, rv1, cc2.ResourceVersion)
+}
+
+func TestIntegration_DeterministicOrder(t *testing.T) {
+	instance := newSearchInstance()
+	// Create in reverse alphabetical order to verify sorting.
+	teamZ := newIntegrationTeamConfig("z-team-config", searchv1alpha1.CollectorConfigSpec{
+		CollectionRules: []searchv1alpha1.CollectionRule{
+			{Action: searchv1alpha1.ActionInclude, FieldSuffix: "Z", ResourceSelector: searchv1alpha1.ResourceSelector{APIGroups: []string{""}, Kinds: []string{"Pod"}}},
+		},
+	})
+	teamA := newIntegrationTeamConfig("a-team-config", searchv1alpha1.CollectorConfigSpec{
+		CollectionRules: []searchv1alpha1.CollectionRule{
+			{Action: searchv1alpha1.ActionInclude, FieldSuffix: "A", ResourceSelector: searchv1alpha1.ResourceSelector{APIGroups: []string{""}, Kinds: []string{"Service"}}},
+		},
+	})
+	teamM := newIntegrationTeamConfig("m-team-config", searchv1alpha1.CollectorConfigSpec{
+		CollectionRules: []searchv1alpha1.CollectionRule{
+			{Action: searchv1alpha1.ActionInclude, FieldSuffix: "M", ResourceSelector: searchv1alpha1.ResourceSelector{APIGroups: []string{""}, Kinds: []string{"ConfigMap"}}},
+		},
+	})
+	r := setupReconciler(instance, teamZ, teamA, teamM)
+
+	result, err := r.createOrUpdateIntegrationCollectorConfig(context.TODO(), instance)
+	assert.Nil(t, err)
+	assert.Nil(t, result)
+
+	integrationCC, err := getIntegrationConfig(r)
+	assert.Nil(t, err)
+	assert.Len(t, integrationCC.Spec.CollectionRules, 3)
+	assert.Equal(t, "A", integrationCC.Spec.CollectionRules[0].FieldSuffix)
+	assert.Equal(t, "M", integrationCC.Spec.CollectionRules[1].FieldSuffix)
+	assert.Equal(t, "Z", integrationCC.Spec.CollectionRules[2].FieldSuffix)
+}
+
+func TestIntegration_OnlyLabeledConfigsIncluded(t *testing.T) {
+	instance := newSearchInstance()
+	// Labeled integration team config — should be included.
+	teamA := newIntegrationTeamConfig("team-a-config", searchv1alpha1.CollectorConfigSpec{
+		CollectionRules: []searchv1alpha1.CollectionRule{
+			{
+				Action:           searchv1alpha1.ActionInclude,
+				FieldSuffix:      "FOO",
+				ResourceSelector: searchv1alpha1.ResourceSelector{APIGroups: []string{"policy.open-cluster-management.io"}, Kinds: []string{"Policy"}},
+			},
+		},
+	})
+	// Unlabeled config — should NOT be included.
+	unlabeled := newCollectorConfig("unlabeled-config", searchv1alpha1.CollectorConfigSpec{
+		CollectionRules: []searchv1alpha1.CollectionRule{
+			{
+				Action:           searchv1alpha1.ActionExclude,
+				ResourceSelector: searchv1alpha1.ResourceSelector{APIGroups: []string{""}, Kinds: []string{"Secret"}},
+			},
+		},
+	})
+	// Customer config — should NOT be included in integration merge.
+	customerCC := newCollectorConfig(customerCollectorConfigName, searchv1alpha1.CollectorConfigSpec{
+		CollectionRules: []searchv1alpha1.CollectionRule{
+			{
+				Action:           searchv1alpha1.ActionInclude,
+				ResourceSelector: searchv1alpha1.ResourceSelector{APIGroups: []string{""}, Kinds: []string{"ConfigMap"}},
+			},
+		},
+	})
+	r := setupReconciler(instance, teamA, unlabeled, customerCC)
+
+	result, err := r.createOrUpdateIntegrationCollectorConfig(context.TODO(), instance)
+	assert.Nil(t, err)
+	assert.Nil(t, result)
+
+	integrationCC, err := getIntegrationConfig(r)
+	assert.Nil(t, err)
+	assert.Len(t, integrationCC.Spec.CollectionRules, 1)
+	assert.Equal(t, "FOO", integrationCC.Spec.CollectionRules[0].FieldSuffix)
+}
+
+func TestIntegration_OwnerReference(t *testing.T) {
+	instance := newSearchInstance()
+	r := setupReconciler(instance)
+
+	result, err := r.createOrUpdateIntegrationCollectorConfig(context.TODO(), instance)
+	assert.Nil(t, err)
+	assert.Nil(t, result)
+
+	integrationCC, err := getIntegrationConfig(r)
+	assert.Nil(t, err)
+	assert.Len(t, integrationCC.OwnerReferences, 1)
+	assert.Equal(t, OperatorName, integrationCC.OwnerReferences[0].Name)
+	assert.Equal(t, "Search", integrationCC.OwnerReferences[0].Kind)
+}
+
+// --- End-to-end merge tests (integration + customer → merged) ---
+
+// runFullMerge calls both stages: integration team merge, then final merge.
+func runFullMerge(r *SearchReconciler, instance *searchv1alpha1.Search) error {
+	if result, err := r.createOrUpdateIntegrationCollectorConfig(context.TODO(), instance); err != nil || result != nil {
+		return err
+	}
+	if result, err := r.createOrUpdateMergedCollectorConfig(context.TODO(), instance); err != nil || result != nil {
+		return err
+	}
+	return nil
+}
+
+func TestMerge_IntegrationOnly(t *testing.T) {
+	instance := newSearchInstance()
+	teamA := newIntegrationTeamConfig("team-a-config", searchv1alpha1.CollectorConfigSpec{
+		CollectionRules: []searchv1alpha1.CollectionRule{
+			{
+				Action:           searchv1alpha1.ActionInclude,
+				FieldSuffix:      "FOO",
+				ResourceSelector: searchv1alpha1.ResourceSelector{APIGroups: []string{"policy.open-cluster-management.io"}, Kinds: []string{"Policy"}},
+				Fields:           []searchv1alpha1.Field{{Name: "severity", JSONPath: "{.spec.severity}"}},
+			},
+		},
+	})
+	r := setupReconciler(instance, teamA)
+
+	err := runFullMerge(r, instance)
+	assert.Nil(t, err)
 
 	merged, err := getMergedConfig(r)
 	assert.Nil(t, err)
 	assert.Len(t, merged.Spec.CollectionRules, 1)
-	assert.Equal(t, "GRC", merged.Spec.CollectionRules[0].FieldSuffix)
+	assert.Equal(t, "FOO", merged.Spec.CollectionRules[0].FieldSuffix)
 	assert.Nil(t, merged.Spec.CollectNamespaces)
 }
 
-// Test: both exist -> merged = union of both rule sets
 func TestMerge_BothExist(t *testing.T) {
 	instance := newSearchInstance()
-	integrationCC := newCollectorConfig(integrationCollectorConfigName, searchv1alpha1.CollectorConfigSpec{
+	teamA := newIntegrationTeamConfig("team-a-config", searchv1alpha1.CollectorConfigSpec{
 		CollectionRules: []searchv1alpha1.CollectionRule{
 			{
 				Action:           searchv1alpha1.ActionInclude,
-				FieldSuffix:      "GRC",
+				FieldSuffix:      "FOO",
 				ResourceSelector: searchv1alpha1.ResourceSelector{APIGroups: []string{"policy.open-cluster-management.io"}, Kinds: []string{"Policy"}},
 			},
 		},
@@ -100,28 +343,26 @@ func TestMerge_BothExist(t *testing.T) {
 			},
 		},
 	})
-	r := setupReconciler(instance, integrationCC, customerCC)
+	r := setupReconciler(instance, teamA, customerCC)
 
-	result, err := r.createOrUpdateMergedCollectorConfig(context.TODO(), instance)
+	err := runFullMerge(r, instance)
 	assert.Nil(t, err)
-	assert.Nil(t, result)
 
 	merged, err := getMergedConfig(r)
 	assert.Nil(t, err)
 	assert.Len(t, merged.Spec.CollectionRules, 2)
-	// Integration rules come first
-	assert.Equal(t, "GRC", merged.Spec.CollectionRules[0].FieldSuffix)
+	// Integration rules come first.
+	assert.Equal(t, "FOO", merged.Spec.CollectionRules[0].FieldSuffix)
 	assert.Equal(t, searchv1alpha1.ActionExclude, merged.Spec.CollectionRules[1].Action)
 }
 
-// Test: customer-collector-config has empty rules -> merged = integration only
 func TestMerge_CustomerEmptyRules(t *testing.T) {
 	instance := newSearchInstance()
-	integrationCC := newCollectorConfig(integrationCollectorConfigName, searchv1alpha1.CollectorConfigSpec{
+	teamA := newIntegrationTeamConfig("team-a-config", searchv1alpha1.CollectorConfigSpec{
 		CollectionRules: []searchv1alpha1.CollectionRule{
 			{
 				Action:           searchv1alpha1.ActionInclude,
-				FieldSuffix:      "GRC",
+				FieldSuffix:      "FOO",
 				ResourceSelector: searchv1alpha1.ResourceSelector{APIGroups: []string{"policy.open-cluster-management.io"}, Kinds: []string{"Policy"}},
 			},
 		},
@@ -129,39 +370,32 @@ func TestMerge_CustomerEmptyRules(t *testing.T) {
 	customerCC := newCollectorConfig(customerCollectorConfigName, searchv1alpha1.CollectorConfigSpec{
 		CollectionRules: []searchv1alpha1.CollectionRule{},
 	})
-	r := setupReconciler(instance, integrationCC, customerCC)
+	r := setupReconciler(instance, teamA, customerCC)
 
-	result, err := r.createOrUpdateMergedCollectorConfig(context.TODO(), instance)
+	err := runFullMerge(r, instance)
 	assert.Nil(t, err)
-	assert.Nil(t, result)
 
 	merged, err := getMergedConfig(r)
 	assert.Nil(t, err)
 	assert.Len(t, merged.Spec.CollectionRules, 1)
-	assert.Equal(t, "GRC", merged.Spec.CollectionRules[0].FieldSuffix)
+	assert.Equal(t, "FOO", merged.Spec.CollectionRules[0].FieldSuffix)
 }
 
-// Test: both empty -> merged has empty rules
 func TestMerge_BothEmpty(t *testing.T) {
 	instance := newSearchInstance()
-	integrationCC := newCollectorConfig(integrationCollectorConfigName, searchv1alpha1.CollectorConfigSpec{
-		CollectionRules: []searchv1alpha1.CollectionRule{},
-	})
-	r := setupReconciler(instance, integrationCC)
+	r := setupReconciler(instance) // No team configs, no customer config.
 
-	result, err := r.createOrUpdateMergedCollectorConfig(context.TODO(), instance)
+	err := runFullMerge(r, instance)
 	assert.Nil(t, err)
-	assert.Nil(t, result)
 
 	merged, err := getMergedConfig(r)
 	assert.Nil(t, err)
 	assert.Empty(t, merged.Spec.CollectionRules)
 }
 
-// Test: customer-collector-config has collectNamespaces -> merged inherits it
 func TestMerge_CustomerCollectNamespaces(t *testing.T) {
 	instance := newSearchInstance()
-	integrationCC := newCollectorConfig(integrationCollectorConfigName, searchv1alpha1.CollectorConfigSpec{
+	teamA := newIntegrationTeamConfig("team-a-config", searchv1alpha1.CollectorConfigSpec{
 		CollectionRules: []searchv1alpha1.CollectionRule{},
 	})
 	customerCC := newCollectorConfig(customerCollectorConfigName, searchv1alpha1.CollectorConfigSpec{
@@ -173,11 +407,10 @@ func TestMerge_CustomerCollectNamespaces(t *testing.T) {
 			},
 		},
 	})
-	r := setupReconciler(instance, integrationCC, customerCC)
+	r := setupReconciler(instance, teamA, customerCC)
 
-	result, err := r.createOrUpdateMergedCollectorConfig(context.TODO(), instance)
+	err := runFullMerge(r, instance)
 	assert.Nil(t, err)
-	assert.Nil(t, result)
 
 	merged, err := getMergedConfig(r)
 	assert.Nil(t, err)
@@ -186,81 +419,80 @@ func TestMerge_CustomerCollectNamespaces(t *testing.T) {
 	assert.Equal(t, []string{"production-debug"}, merged.Spec.CollectNamespaces.NamespaceSelector.Exclude)
 }
 
-// Test: customer has no collectNamespaces -> merged has no namespace restriction
 func TestMerge_NoCollectNamespaces(t *testing.T) {
 	instance := newSearchInstance()
-	integrationCC := newCollectorConfig(integrationCollectorConfigName, searchv1alpha1.CollectorConfigSpec{
+	teamA := newIntegrationTeamConfig("team-a-config", searchv1alpha1.CollectorConfigSpec{
 		CollectionRules: []searchv1alpha1.CollectionRule{},
 	})
 	customerCC := newCollectorConfig(customerCollectorConfigName, searchv1alpha1.CollectorConfigSpec{
 		CollectionRules: []searchv1alpha1.CollectionRule{},
 	})
-	r := setupReconciler(instance, integrationCC, customerCC)
+	r := setupReconciler(instance, teamA, customerCC)
 
-	result, err := r.createOrUpdateMergedCollectorConfig(context.TODO(), instance)
+	err := runFullMerge(r, instance)
 	assert.Nil(t, err)
-	assert.Nil(t, result)
 
 	merged, err := getMergedConfig(r)
 	assert.Nil(t, err)
 	assert.Nil(t, merged.Spec.CollectNamespaces)
 }
 
-// Test: integration-collector-config not found -> skip merge, no error
-func TestMerge_IntegrationNotFound(t *testing.T) {
+func TestMerge_NoTeamConfigs(t *testing.T) {
 	instance := newSearchInstance()
 	r := setupReconciler(instance)
 
-	result, err := r.createOrUpdateMergedCollectorConfig(context.TODO(), instance)
+	// With no team configs, integration-collector-config should still be created (empty).
+	result, err := r.createOrUpdateIntegrationCollectorConfig(context.TODO(), instance)
 	assert.Nil(t, err)
 	assert.Nil(t, result)
 
-	// merged-collector-config should not exist
-	_, err = getMergedConfig(r)
-	assert.True(t, err != nil, "merged-collector-config should not exist")
+	// Merged should also work.
+	result, err = r.createOrUpdateMergedCollectorConfig(context.TODO(), instance)
+	assert.Nil(t, err)
+	assert.Nil(t, result)
+
+	merged, err := getMergedConfig(r)
+	assert.Nil(t, err)
+	assert.Empty(t, merged.Spec.CollectionRules)
 }
 
-// Test: idempotency, reconcile with no changes produces no update
 func TestMerge_Idempotency(t *testing.T) {
 	instance := newSearchInstance()
-	integrationCC := newCollectorConfig(integrationCollectorConfigName, searchv1alpha1.CollectorConfigSpec{
+	teamA := newIntegrationTeamConfig("team-a-config", searchv1alpha1.CollectorConfigSpec{
 		CollectionRules: []searchv1alpha1.CollectionRule{
 			{
 				Action:           searchv1alpha1.ActionInclude,
-				FieldSuffix:      "GRC",
+				FieldSuffix:      "FOO",
 				ResourceSelector: searchv1alpha1.ResourceSelector{APIGroups: []string{"policy.open-cluster-management.io"}, Kinds: []string{"Policy"}},
 			},
 		},
 	})
-	r := setupReconciler(instance, integrationCC)
+	r := setupReconciler(instance, teamA)
 
-	// First call creates merged-collector-config
-	result, err := r.createOrUpdateMergedCollectorConfig(context.TODO(), instance)
+	// First full merge.
+	err := runFullMerge(r, instance)
 	assert.Nil(t, err)
-	assert.Nil(t, result)
 
 	merged1, err := getMergedConfig(r)
 	assert.Nil(t, err)
 	rv1 := merged1.ResourceVersion
 
-	// Second call should not update (spec unchanged)
-	result, err = r.createOrUpdateMergedCollectorConfig(context.TODO(), instance)
+	// Second full merge should not update (spec unchanged).
+	err = runFullMerge(r, instance)
 	assert.Nil(t, err)
-	assert.Nil(t, result)
 
 	merged2, err := getMergedConfig(r)
 	assert.Nil(t, err)
 	assert.Equal(t, rv1, merged2.ResourceVersion)
 }
 
-// Test: customer deleted after merge -> merged updates to integration only
 func TestMerge_CustomerDeleted(t *testing.T) {
 	instance := newSearchInstance()
-	integrationCC := newCollectorConfig(integrationCollectorConfigName, searchv1alpha1.CollectorConfigSpec{
+	teamA := newIntegrationTeamConfig("team-a-config", searchv1alpha1.CollectorConfigSpec{
 		CollectionRules: []searchv1alpha1.CollectionRule{
 			{
 				Action:           searchv1alpha1.ActionInclude,
-				FieldSuffix:      "GRC",
+				FieldSuffix:      "FOO",
 				ResourceSelector: searchv1alpha1.ResourceSelector{APIGroups: []string{"policy.open-cluster-management.io"}, Kinds: []string{"Policy"}},
 			},
 		},
@@ -278,45 +510,38 @@ func TestMerge_CustomerDeleted(t *testing.T) {
 			},
 		},
 	})
-	r := setupReconciler(instance, integrationCC, customerCC)
+	r := setupReconciler(instance, teamA, customerCC)
 
-	// First merge with both configs
-	result, err := r.createOrUpdateMergedCollectorConfig(context.TODO(), instance)
+	// First merge with both.
+	err := runFullMerge(r, instance)
 	assert.Nil(t, err)
-	assert.Nil(t, result)
 
 	merged, err := getMergedConfig(r)
 	assert.Nil(t, err)
 	assert.Len(t, merged.Spec.CollectionRules, 2)
 	assert.NotNil(t, merged.Spec.CollectNamespaces)
 
-	// Delete customer-collector-config
+	// Delete customer-collector-config.
 	err = r.Delete(context.TODO(), customerCC)
 	assert.Nil(t, err)
 
-	// Re-merge, should revert to integration only
-	result, err = r.createOrUpdateMergedCollectorConfig(context.TODO(), instance)
+	// Re-merge, should revert to integration only.
+	err = runFullMerge(r, instance)
 	assert.Nil(t, err)
-	assert.Nil(t, result)
 
 	merged, err = getMergedConfig(r)
 	assert.Nil(t, err)
 	assert.Len(t, merged.Spec.CollectionRules, 1)
-	assert.Equal(t, "GRC", merged.Spec.CollectionRules[0].FieldSuffix)
+	assert.Equal(t, "FOO", merged.Spec.CollectionRules[0].FieldSuffix)
 	assert.Nil(t, merged.Spec.CollectNamespaces)
 }
 
-// Test: merged-collector-config has owner reference to Search CR
 func TestMerge_OwnerReference(t *testing.T) {
 	instance := newSearchInstance()
-	integrationCC := newCollectorConfig(integrationCollectorConfigName, searchv1alpha1.CollectorConfigSpec{
-		CollectionRules: []searchv1alpha1.CollectionRule{},
-	})
-	r := setupReconciler(instance, integrationCC)
+	r := setupReconciler(instance)
 
-	result, err := r.createOrUpdateMergedCollectorConfig(context.TODO(), instance)
+	err := runFullMerge(r, instance)
 	assert.Nil(t, err)
-	assert.Nil(t, result)
 
 	merged, err := getMergedConfig(r)
 	assert.Nil(t, err)
@@ -325,36 +550,39 @@ func TestMerge_OwnerReference(t *testing.T) {
 	assert.Equal(t, "Search", merged.OwnerReferences[0].Kind)
 }
 
-// Test: createCollectorConfig creates integration-collector-config if not found
+// --- createCollectorConfig helper tests ---
+
 func TestCreateCollectorConfig(t *testing.T) {
 	instance := newSearchInstance()
 	r := setupReconciler(instance)
 
-	cc := r.IntegrationCollectorConfig(instance)
+	cc := newCollectorConfig("test-config", searchv1alpha1.CollectorConfigSpec{
+		CollectionRules: []searchv1alpha1.CollectionRule{},
+	})
 	result, err := r.createCollectorConfig(context.TODO(), cc)
 	assert.Nil(t, err)
 	assert.Nil(t, result)
 
-	// Verify it was created
+	// Verify it was created.
 	found := &searchv1alpha1.CollectorConfig{}
 	err = r.Get(context.TODO(), types.NamespacedName{
-		Name:      integrationCollectorConfigName,
+		Name:      "test-config",
 		Namespace: testNamespace,
 	}, found)
 	assert.Nil(t, err)
-	assert.Equal(t, integrationCollectorConfigName, found.Name)
-	assert.Empty(t, found.Spec.CollectionRules)
+	assert.Equal(t, "test-config", found.Name)
 }
 
-// Test: createCollectorConfig is idempotent, does not error if already exists
 func TestCreateCollectorConfig_AlreadyExists(t *testing.T) {
 	instance := newSearchInstance()
-	existingCC := newCollectorConfig(integrationCollectorConfigName, searchv1alpha1.CollectorConfigSpec{
+	existingCC := newCollectorConfig("test-config", searchv1alpha1.CollectorConfigSpec{
 		CollectionRules: []searchv1alpha1.CollectionRule{},
 	})
 	r := setupReconciler(instance, existingCC)
 
-	cc := r.IntegrationCollectorConfig(instance)
+	cc := newCollectorConfig("test-config", searchv1alpha1.CollectorConfigSpec{
+		CollectionRules: []searchv1alpha1.CollectionRule{},
+	})
 	result, err := r.createCollectorConfig(context.TODO(), cc)
 	assert.Nil(t, err)
 	assert.Nil(t, result)
