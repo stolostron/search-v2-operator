@@ -420,7 +420,7 @@ func (r *SearchReconciler) SetupWithManager(mgr ctrl.Manager) error {
 				}
 				// Trigger on customer config (by name) or any integration team config (by label).
 				if name == customerCollectorConfigName ||
-					a.GetLabels()[integrationTeamLabel] == integrationTeamLabelValue {
+					a.GetLabels()[searchv1alpha1.IntegrationTeamLabel] == searchv1alpha1.IntegrationTeamLabelValue {
 					return []reconcile.Request{
 						{
 							NamespacedName: types.NamespacedName{

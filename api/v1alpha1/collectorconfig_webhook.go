@@ -63,9 +63,17 @@ func (r *CollectorConfig) ValidateUpdate(ctx context.Context, oldObj, newObj run
 	if !ok {
 		return nil, fmt.Errorf("expected a CollectorConfig object but got %T", newObj)
 	}
+	oldCC, ok := oldObj.(*CollectorConfig)
+	if !ok {
+		return nil, fmt.Errorf("expected a CollectorConfig object but got %T", oldObj)
+	}
 	collectorconfiglog.Info("validate update", "name", cc.Name)
 
+	// Check both old and new objects — prevents stripping the integration label to bypass protection.
 	if err := rejectIfProtected(ctx, cc); err != nil {
+		return nil, err
+	}
+	if err := rejectIfProtected(ctx, oldCC); err != nil {
 		return nil, err
 	}
 
@@ -283,7 +291,7 @@ func isProtectedConfig(name string, labels map[string]string) bool {
 	if name == "merged-collector-config" {
 		return true
 	}
-	if labels["search.open-cluster-management.io/config-type"] == "integration" {
+	if labels[IntegrationTeamLabel] == IntegrationTeamLabelValue {
 		return true
 	}
 	return false

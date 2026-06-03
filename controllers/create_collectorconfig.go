@@ -19,11 +19,6 @@ import (
 const (
 	customerCollectorConfigName = "customer-collector-config"
 	mergedCollectorConfigName   = "merged-collector-config"
-
-	// integrationTeamLabel is the label key that integration teams apply to their CollectorConfig CRs
-	// so the operator discovers and merges them into merged-collector-config.
-	integrationTeamLabel      = "search.open-cluster-management.io/config-type"
-	integrationTeamLabelValue = "integration"
 )
 
 // createOrUpdateMergedCollectorConfig discovers all integration team CollectorConfig CRs (by label)
@@ -39,7 +34,7 @@ func (r *SearchReconciler) createOrUpdateMergedCollectorConfig(
 	teamConfigs := &searchv1alpha1.CollectorConfigList{}
 	err := r.List(ctx, teamConfigs,
 		client.InNamespace(namespace),
-		client.MatchingLabels{integrationTeamLabel: integrationTeamLabelValue},
+		client.MatchingLabels{searchv1alpha1.IntegrationTeamLabel: searchv1alpha1.IntegrationTeamLabelValue},
 	)
 	if err != nil {
 		log.Error(err, "Could not list integration team CollectorConfigs")
@@ -50,6 +45,8 @@ func (r *SearchReconciler) createOrUpdateMergedCollectorConfig(
 	sort.Slice(teamConfigs.Items, func(i, j int) bool {
 		return teamConfigs.Items[i].Name < teamConfigs.Items[j].Name
 	})
+
+	// FUTURE: detect and handle rule collisions between integration team configs.
 
 	// Build merged spec: integration team rules first, then customer rules.
 	mergedSpec := searchv1alpha1.CollectorConfigSpec{}

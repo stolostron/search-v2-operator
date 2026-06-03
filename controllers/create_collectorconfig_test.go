@@ -42,7 +42,7 @@ func newCollectorConfig(name string, spec searchv1alpha1.CollectorConfigSpec) *s
 func newIntegrationTeamConfig(name string, spec searchv1alpha1.CollectorConfigSpec) *searchv1alpha1.CollectorConfig {
 	cc := newCollectorConfig(name, spec)
 	cc.Labels = map[string]string{
-		integrationTeamLabel: integrationTeamLabelValue,
+		searchv1alpha1.IntegrationTeamLabel: searchv1alpha1.IntegrationTeamLabelValue,
 	}
 	return cc
 }
