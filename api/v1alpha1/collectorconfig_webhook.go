@@ -49,7 +49,7 @@ func (r *CollectorConfig) ValidateCreate(ctx context.Context, obj runtime.Object
 	}
 	collectorconfiglog.Info("validate create", "name", cc.Name)
 
-	if err := rejectIfProtected(ctx, cc.Name); err != nil {
+	if err := rejectIfProtected(ctx, cc); err != nil {
 		return nil, err
 	}
 
@@ -65,7 +65,7 @@ func (r *CollectorConfig) ValidateUpdate(ctx context.Context, oldObj, newObj run
 	}
 	collectorconfiglog.Info("validate update", "name", cc.Name)
 
-	if err := rejectIfProtected(ctx, cc.Name); err != nil {
+	if err := rejectIfProtected(ctx, cc); err != nil {
 		return nil, err
 	}
 
@@ -81,7 +81,7 @@ func (r *CollectorConfig) ValidateDelete(ctx context.Context, obj runtime.Object
 	}
 	collectorconfiglog.Info("validate delete", "name", cc.Name)
 
-	if err := rejectIfProtected(ctx, cc.Name); err != nil {
+	if err := rejectIfProtected(ctx, cc); err != nil {
 		return nil, err
 	}
 
@@ -278,8 +278,15 @@ func contains(slice []string, item string) bool {
 }
 
 // isProtectedConfig returns true for configs managed by the operator.
-func isProtectedConfig(name string) bool {
-	return name == "merged-collector-config" || name == "integration-collector-config"
+// This includes merged-collector-config (by name) and any config labeled as an integration team config.
+func isProtectedConfig(name string, labels map[string]string) bool {
+	if name == "merged-collector-config" {
+		return true
+	}
+	if labels["search.open-cluster-management.io/config-type"] == "integration" {
+		return true
+	}
+	return false
 }
 
 // isOperatorServiceAccount checks whether the request originates from the operator's service account.
@@ -293,9 +300,9 @@ func isOperatorServiceAccount(ctx context.Context) bool {
 }
 
 // rejectIfProtected returns an error if the config is operator-managed and the caller is not the operator SA.
-func rejectIfProtected(ctx context.Context, name string) error {
-	if isProtectedConfig(name) && !isOperatorServiceAccount(ctx) {
-		return fmt.Errorf("%s is managed by the search operator and cannot be modified directly", name)
+func rejectIfProtected(ctx context.Context, cc *CollectorConfig) error {
+	if isProtectedConfig(cc.Name, cc.Labels) && !isOperatorServiceAccount(ctx) {
+		return fmt.Errorf("%s is managed by the search operator and cannot be modified directly", cc.Name)
 	}
 	return nil
 }

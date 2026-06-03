@@ -347,13 +347,22 @@ func TestRejectNonOperatorCreateMerged(t *testing.T) {
 	assert.Contains(t, err.Error(), "managed by the search operator")
 }
 
-// Non-operator creating integration-collector-config → rejected.
-func TestRejectNonOperatorCreateIntegration(t *testing.T) {
+// Non-operator creating a labeled integration team config → rejected.
+func TestRejectNonOperatorCreateLabeledIntegrationConfig(t *testing.T) {
 	c := validConfig()
-	c.Name = "integration-collector-config"
+	c.Name = "team-a-collector-config"
+	c.Labels = map[string]string{"search.open-cluster-management.io/config-type": "integration"}
 	_, err := c.ValidateCreate(nonOperatorCtx(), c)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "managed by the search operator")
+}
+
+// Non-operator creating an unlabeled config → allowed.
+func TestAllowNonOperatorCreateUnlabeledConfig(t *testing.T) {
+	c := validConfig()
+	c.Name = "my-custom-config"
+	_, err := c.ValidateCreate(nonOperatorCtx(), c)
+	assert.NoError(t, err)
 }
 
 // Non-operator updating merged-collector-config → rejected.
@@ -375,10 +384,11 @@ func TestRejectNonOperatorDeleteMerged(t *testing.T) {
 	assert.Contains(t, err.Error(), "managed by the search operator")
 }
 
-// Non-operator deleting integration-collector-config → rejected.
-func TestRejectNonOperatorDeleteIntegration(t *testing.T) {
+// Non-operator deleting a labeled integration team config → rejected.
+func TestRejectNonOperatorDeleteLabeledIntegrationConfig(t *testing.T) {
 	c := validConfig()
-	c.Name = "integration-collector-config"
+	c.Name = "team-a-collector-config"
+	c.Labels = map[string]string{"search.open-cluster-management.io/config-type": "integration"}
 	_, err := c.ValidateDelete(nonOperatorCtx(), c)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "managed by the search operator")
@@ -400,12 +410,21 @@ func TestAllowOperatorCreateMerged(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-// Operator SA updating integration-collector-config → allowed.
-func TestAllowOperatorUpdateIntegration(t *testing.T) {
+// Operator SA updating merged-collector-config → allowed.
+func TestAllowOperatorUpdateMerged(t *testing.T) {
 	old := validConfig()
-	old.Name = "integration-collector-config"
+	old.Name = "merged-collector-config"
 	updated := old.DeepCopy()
 	_, err := updated.ValidateUpdate(operatorCtx(), old, updated)
+	assert.NoError(t, err)
+}
+
+// Operator SA creating a labeled integration team config → allowed.
+func TestAllowOperatorCreateLabeledIntegrationConfig(t *testing.T) {
+	c := validConfig()
+	c.Name = "team-a-collector-config"
+	c.Labels = map[string]string{"search.open-cluster-management.io/config-type": "integration"}
+	_, err := c.ValidateCreate(operatorCtx(), c)
 	assert.NoError(t, err)
 }
 

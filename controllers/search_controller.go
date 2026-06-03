@@ -171,11 +171,6 @@ func (r *SearchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		log.Error(err, "ClusterRoleBinding setup failed")
 		return *result, err
 	}
-	result, err = r.createOrUpdateIntegrationCollectorConfig(ctx, instance)
-	if result != nil {
-		log.Error(err, "Integration CollectorConfig setup failed")
-		return *result, err
-	}
 	result, err = r.createOrUpdateMergedCollectorConfig(ctx, instance)
 	if result != nil {
 		log.Error(err, "Merged CollectorConfig setup failed")
@@ -419,8 +414,8 @@ func (r *SearchReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Watches(&searchv1alpha1.CollectorConfig{}, handler.EnqueueRequestsFromMapFunc(
 			func(ctx context.Context, a client.Object) []reconcile.Request {
 				name := a.GetName()
-				// Skip operator-managed outputs to prevent reconcile loops.
-				if name == mergedCollectorConfigName || name == integrationCollectorConfigName {
+				// Skip operator-managed output to prevent reconcile loops.
+				if name == mergedCollectorConfigName {
 					return nil
 				}
 				// Trigger on customer config (by name) or any integration team config (by label).
