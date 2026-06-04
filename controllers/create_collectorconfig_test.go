@@ -254,7 +254,7 @@ func TestMerge_Idempotency(t *testing.T) {
 	assert.Equal(t, rv1, merged2.ResourceVersion)
 }
 
-// --- Integration + customer merge tests ---
+// --- Integration + user merge tests ---
 
 func TestMerge_IntegrationOnly(t *testing.T) {
 	instance := newSearchInstance()
@@ -292,7 +292,7 @@ func TestMerge_BothExist(t *testing.T) {
 			},
 		},
 	})
-	customerCC := newCollectorConfig(customerCollectorConfigName, searchv1alpha1.CollectorConfigSpec{
+	userCC := newCollectorConfig(userCollectorConfigName, searchv1alpha1.CollectorConfigSpec{
 		CollectionRules: []searchv1alpha1.CollectionRule{
 			{
 				Action:           searchv1alpha1.ActionExclude,
@@ -300,7 +300,7 @@ func TestMerge_BothExist(t *testing.T) {
 			},
 		},
 	})
-	r := setupReconciler(instance, teamA, customerCC)
+	r := setupReconciler(instance, teamA, userCC)
 
 	result, err := r.createOrUpdateMergedCollectorConfig(context.TODO(), instance)
 	assert.Nil(t, err)
@@ -314,7 +314,7 @@ func TestMerge_BothExist(t *testing.T) {
 	assert.Equal(t, searchv1alpha1.ActionExclude, merged.Spec.CollectionRules[1].Action)
 }
 
-func TestMerge_CustomerEmptyRules(t *testing.T) {
+func TestMerge_UserEmptyRules(t *testing.T) {
 	instance := newSearchInstance()
 	teamA := newIntegrationTeamConfig("team-a-config", searchv1alpha1.CollectorConfigSpec{
 		CollectionRules: []searchv1alpha1.CollectionRule{
@@ -325,10 +325,10 @@ func TestMerge_CustomerEmptyRules(t *testing.T) {
 			},
 		},
 	})
-	customerCC := newCollectorConfig(customerCollectorConfigName, searchv1alpha1.CollectorConfigSpec{
+	userCC := newCollectorConfig(userCollectorConfigName, searchv1alpha1.CollectorConfigSpec{
 		CollectionRules: []searchv1alpha1.CollectionRule{},
 	})
-	r := setupReconciler(instance, teamA, customerCC)
+	r := setupReconciler(instance, teamA, userCC)
 
 	result, err := r.createOrUpdateMergedCollectorConfig(context.TODO(), instance)
 	assert.Nil(t, err)
@@ -340,9 +340,9 @@ func TestMerge_CustomerEmptyRules(t *testing.T) {
 	assert.Equal(t, "FOO", merged.Spec.CollectionRules[0].FieldSuffix)
 }
 
-func TestMerge_CustomerCollectNamespaces(t *testing.T) {
+func TestMerge_UserCollectNamespaces(t *testing.T) {
 	instance := newSearchInstance()
-	customerCC := newCollectorConfig(customerCollectorConfigName, searchv1alpha1.CollectorConfigSpec{
+	userCC := newCollectorConfig(userCollectorConfigName, searchv1alpha1.CollectorConfigSpec{
 		CollectionRules: []searchv1alpha1.CollectionRule{},
 		CollectNamespaces: &searchv1alpha1.CollectNamespaces{
 			NamespaceSelector: &searchv1alpha1.NamespaceSelector{
@@ -351,7 +351,7 @@ func TestMerge_CustomerCollectNamespaces(t *testing.T) {
 			},
 		},
 	})
-	r := setupReconciler(instance, customerCC)
+	r := setupReconciler(instance, userCC)
 
 	result, err := r.createOrUpdateMergedCollectorConfig(context.TODO(), instance)
 	assert.Nil(t, err)
@@ -366,10 +366,10 @@ func TestMerge_CustomerCollectNamespaces(t *testing.T) {
 
 func TestMerge_NoCollectNamespaces(t *testing.T) {
 	instance := newSearchInstance()
-	customerCC := newCollectorConfig(customerCollectorConfigName, searchv1alpha1.CollectorConfigSpec{
+	userCC := newCollectorConfig(userCollectorConfigName, searchv1alpha1.CollectorConfigSpec{
 		CollectionRules: []searchv1alpha1.CollectionRule{},
 	})
-	r := setupReconciler(instance, customerCC)
+	r := setupReconciler(instance, userCC)
 
 	result, err := r.createOrUpdateMergedCollectorConfig(context.TODO(), instance)
 	assert.Nil(t, err)
@@ -380,7 +380,7 @@ func TestMerge_NoCollectNamespaces(t *testing.T) {
 	assert.Nil(t, merged.Spec.CollectNamespaces)
 }
 
-func TestMerge_CustomerDeleted(t *testing.T) {
+func TestMerge_UserDeleted(t *testing.T) {
 	instance := newSearchInstance()
 	teamA := newIntegrationTeamConfig("team-a-config", searchv1alpha1.CollectorConfigSpec{
 		CollectionRules: []searchv1alpha1.CollectionRule{
@@ -391,7 +391,7 @@ func TestMerge_CustomerDeleted(t *testing.T) {
 			},
 		},
 	})
-	customerCC := newCollectorConfig(customerCollectorConfigName, searchv1alpha1.CollectorConfigSpec{
+	userCC := newCollectorConfig(userCollectorConfigName, searchv1alpha1.CollectorConfigSpec{
 		CollectionRules: []searchv1alpha1.CollectionRule{
 			{
 				Action:           searchv1alpha1.ActionExclude,
@@ -404,7 +404,7 @@ func TestMerge_CustomerDeleted(t *testing.T) {
 			},
 		},
 	})
-	r := setupReconciler(instance, teamA, customerCC)
+	r := setupReconciler(instance, teamA, userCC)
 
 	// First merge with both.
 	result, err := r.createOrUpdateMergedCollectorConfig(context.TODO(), instance)
@@ -416,8 +416,8 @@ func TestMerge_CustomerDeleted(t *testing.T) {
 	assert.Len(t, merged.Spec.CollectionRules, 2)
 	assert.NotNil(t, merged.Spec.CollectNamespaces)
 
-	// Delete customer-collector-config.
-	err = r.Delete(context.TODO(), customerCC)
+	// Delete user-collector-config.
+	err = r.Delete(context.TODO(), userCC)
 	assert.Nil(t, err)
 
 	// Re-merge, should revert to integration only.

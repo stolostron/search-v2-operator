@@ -418,8 +418,8 @@ func (r *SearchReconciler) SetupWithManager(mgr ctrl.Manager) error {
 				if name == mergedCollectorConfigName {
 					return nil
 				}
-				// Trigger on customer config (by name) or any integration team config (by label).
-				if name == customerCollectorConfigName ||
+				// Trigger on user config (by name) or any integration team config (by label).
+				if name == userCollectorConfigName ||
 					a.GetLabels()[searchv1alpha1.IntegrationTeamLabel] == searchv1alpha1.IntegrationTeamLabelValue {
 					return []reconcile.Request{
 						{

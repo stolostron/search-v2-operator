@@ -17,12 +17,12 @@ import (
 )
 
 const (
-	customerCollectorConfigName = "customer-collector-config"
-	mergedCollectorConfigName   = "merged-collector-config"
+	userCollectorConfigName   = "user-collector-config"
+	mergedCollectorConfigName = "merged-collector-config"
 )
 
 // createOrUpdateMergedCollectorConfig discovers all integration team CollectorConfig CRs (by label)
-// and the customer-collector-config (by name), merges their CollectionRules, and writes the result
+// and the user-collector-config (by name), merges their CollectionRules, and writes the result
 // to merged-collector-config.
 func (r *SearchReconciler) createOrUpdateMergedCollectorConfig(
 	ctx context.Context,
@@ -48,25 +48,25 @@ func (r *SearchReconciler) createOrUpdateMergedCollectorConfig(
 
 	// FUTURE: detect and handle rule collisions between integration team configs.
 
-	// Build merged spec: integration team rules first, then customer rules.
+	// Build merged spec: integration team rules first, then user rules.
 	mergedSpec := searchv1alpha1.CollectorConfigSpec{}
 	for _, tc := range teamConfigs.Items {
 		mergedSpec.CollectionRules = append(mergedSpec.CollectionRules, tc.Spec.CollectionRules...)
 	}
 
-	// Get customer-collector-config. Not found is fine, customer may not have created one.
-	customerCC := &searchv1alpha1.CollectorConfig{}
+	// Get user-collector-config. Not found is fine, user may not have created one.
+	userCC := &searchv1alpha1.CollectorConfig{}
 	err = r.Get(ctx, types.NamespacedName{
-		Name:      customerCollectorConfigName,
+		Name:      userCollectorConfigName,
 		Namespace: namespace,
-	}, customerCC)
+	}, userCC)
 	if err != nil && !errors.IsNotFound(err) {
 		return &reconcile.Result{}, err
 	}
 	if err == nil {
-		mergedSpec.CollectionRules = append(mergedSpec.CollectionRules, customerCC.Spec.CollectionRules...)
-		if customerCC.Spec.CollectNamespaces != nil {
-			mergedSpec.CollectNamespaces = customerCC.Spec.CollectNamespaces.DeepCopy()
+		mergedSpec.CollectionRules = append(mergedSpec.CollectionRules, userCC.Spec.CollectionRules...)
+		if userCC.Spec.CollectNamespaces != nil {
+			mergedSpec.CollectNamespaces = userCC.Spec.CollectNamespaces.DeepCopy()
 		}
 	}
 

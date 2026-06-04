@@ -417,10 +417,10 @@ func TestRejectNonOperatorAddIntegrationLabel(t *testing.T) {
 	assert.Contains(t, err.Error(), "managed by the search operator")
 }
 
-// Non-operator creating customer-collector-config → allowed.
-func TestAllowNonOperatorCreateCustomer(t *testing.T) {
+// Non-operator creating user-collector-config → allowed.
+func TestAllowNonOperatorCreateUser(t *testing.T) {
 	c := validConfig()
-	c.Name = "customer-collector-config"
+	c.Name = "user-collector-config"
 	_, err := c.ValidateCreate(nonOperatorCtx(), c)
 	assert.NoError(t, err)
 }
