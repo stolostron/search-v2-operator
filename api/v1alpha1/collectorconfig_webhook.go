@@ -196,7 +196,7 @@ func (r *CollectorConfig) validateField(customField *Field, path *field.Path) fi
 		allErrs = append(allErrs, field.Invalid(
 			path.Child("jsonPath"),
 			customField.JSONPath,
-			"must be a valid JSONPath expression starting with '{.' and ending with '}'",
+			"must be a valid JSONPath expression (e.g. \".spec.myField\" or \"{.spec.myField}\")",
 		))
 	}
 
@@ -233,23 +233,27 @@ func isValidFieldSuffix(suffix string) bool {
 	return fieldSuffixPattern.MatchString(suffix)
 }
 
-// isValidJSONPath performs basic JSONPath syntax validation
+// isValidJSONPath performs basic JSONPath syntax validation.
+// Accepts both braced ("{.spec.myField}") and unbraced (".spec.myField") forms —
+// the collector normalizes to braced form at runtime (ACM-33144).
 func isValidJSONPath(jsonPath string) bool {
-	// FUTURE: ACM-33144 removes necessity of '{}' in jsonPath and default to parse-based validation check
-	// Must start with {. and end with }
-	if !strings.HasPrefix(jsonPath, "{.") || !strings.HasSuffix(jsonPath, "}") {
+	// Normalize to braced form for validation regardless of input format.
+	normalized := "{" + strings.TrimSuffix(strings.TrimPrefix(jsonPath, "{"), "}") + "}"
+
+	// Must start with {. — at least one path segment is required.
+	if !strings.HasPrefix(normalized, "{.") {
 		return false
 	}
 
-	// Basic validation - contains at least one path element
-	inner := strings.TrimPrefix(strings.TrimSuffix(jsonPath, "}"), "{.")
+	// Must have content after the opening {.
+	inner := strings.TrimPrefix(strings.TrimSuffix(normalized, "}"), "{.")
 	if len(inner) < 1 {
 		return false
 	}
 
-	// Parse-based validation
+	// Parse-based validation using the k8s jsonpath library.
 	jp := jsonpath.New("collectorconfig-field")
-	return jp.Parse(jsonPath) == nil
+	return jp.Parse(normalized) == nil
 }
 
 // contains checks if a slice contains a string
