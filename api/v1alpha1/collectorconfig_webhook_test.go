@@ -145,6 +145,24 @@ func TestAcceptFieldWithNoType(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+// Accept an unbraced jsonPath — the collector auto-wraps it at runtime (ACM-33144).
+func TestAcceptUnbracedJSONPath(t *testing.T) {
+	c := validConfig()
+	c.Spec.CollectionRules[0].Fields = []Field{{Name: "status", JSONPath: ".status.phase"}}
+	_, err := c.ValidateCreate(context.Background(), c)
+	assert.NoError(t, err)
+}
+
+// Accept a complex unbraced jsonPath with a filter expression.
+func TestAcceptUnbracedJSONPathWithFilter(t *testing.T) {
+	c := validConfig()
+	c.Spec.CollectionRules[0].Fields = []Field{
+		{Name: "ready", JSONPath: ".status.conditions[?(@.type=='Ready')].status"},
+	}
+	_, err := c.ValidateCreate(context.Background(), c)
+	assert.NoError(t, err)
+}
+
 // Reject a fieldSuffix containing uppercase letters.
 func TestRejectFieldSuffixWithUppercase(t *testing.T) {
 	c := validConfig()
