@@ -94,7 +94,8 @@ func (r *SearchReconciler) createOrUpdateMergedCollectorConfig(
 			Spec: mergedSpec,
 		}
 		if errRef := controllerutil.SetControllerReference(instance, merged, r.Scheme); errRef != nil {
-			log.V(2).Info("Could not set controller reference for merged-collector-config")
+			log.Error(errRef, "Could not set controller reference for merged-collector-config")
+			return &reconcile.Result{}, errRef
 		}
 		err = r.Create(ctx, merged)
 		if err != nil {

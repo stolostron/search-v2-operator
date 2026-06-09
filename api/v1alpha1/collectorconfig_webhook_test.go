@@ -325,7 +325,8 @@ func TestRejectCollectConditionsWithoutApiGroups(t *testing.T) {
 func ctxWithUser(username string) context.Context {
 	return admission.NewContextWithRequest(context.Background(), admission.Request{
 		AdmissionRequest: admissionv1.AdmissionRequest{
-			UserInfo: authenticationv1.UserInfo{Username: username},
+			UserInfo:  authenticationv1.UserInfo{Username: username},
+			Namespace: "open-cluster-management",
 		},
 	})
 }
@@ -457,4 +458,13 @@ func TestAllowOperatorDeleteProtected(t *testing.T) {
 	c.Name = "merged-collector-config"
 	_, err := c.ValidateDelete(operatorCtx(), c)
 	assert.NoError(t, err)
+}
+
+// SA with the correct name but wrong namespace → rejected.
+func TestRejectOperatorSAFromWrongNamespace(t *testing.T) {
+	wrongNsCtx := ctxWithUser("system:serviceaccount:attacker-ns:search-serviceaccount")
+	c := validConfig()
+	c.Name = "merged-collector-config"
+	_, err := c.ValidateCreate(wrongNsCtx, c)
+	assert.Error(t, err)
 }

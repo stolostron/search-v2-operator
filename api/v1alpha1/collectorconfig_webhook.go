@@ -297,14 +297,15 @@ func isProtectedConfig(name string, labels map[string]string) bool {
 	return false
 }
 
-// isOperatorServiceAccount checks whether the request originates from the operator's service account.
+// isOperatorServiceAccount checks whether the request originates from the operator's service account
+// in the same namespace as the CollectorConfig being acted on.
 func isOperatorServiceAccount(ctx context.Context) bool {
 	req, err := admission.RequestFromContext(ctx)
 	if err != nil {
 		return false
 	}
-	return strings.HasPrefix(req.UserInfo.Username, "system:serviceaccount:") &&
-		strings.HasSuffix(req.UserInfo.Username, ":"+operatorServiceAccount)
+	expectedUser := fmt.Sprintf("system:serviceaccount:%s:%s", req.Namespace, operatorServiceAccount)
+	return req.UserInfo.Username == expectedUser
 }
 
 // rejectIfProtected returns an error if the config is operator-managed and the caller is not the operator SA.
