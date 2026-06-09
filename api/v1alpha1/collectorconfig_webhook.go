@@ -33,7 +33,7 @@ func (r *CollectorConfig) SetupWebhookWithManager(mgr ctrl.Manager) error {
 		Complete()
 }
 
-//+kubebuilder:webhook:path=/validate-search-open-cluster-management-io-v1alpha1-collectorconfig,mutating=false,failurePolicy=fail,sideEffects=None,groups=search.open-cluster-management.io,resources=collectorconfigs,verbs=create;update,versions=v1alpha1,name=vcollectorconfig.kb.io,admissionReviewVersions=v1
+//+kubebuilder:webhook:path=/validate-search-open-cluster-management-io-v1alpha1-collectorconfig,mutating=false,failurePolicy=fail,sideEffects=None,groups=search.open-cluster-management.io,resources=collectorconfigs,verbs=create;update;delete,versions=v1alpha1,name=vcollectorconfig.kb.io,admissionReviewVersions=v1
 
 var _ webhook.CustomValidator = &CollectorConfig{}
 
@@ -45,6 +45,10 @@ func (r *CollectorConfig) ValidateCreate(ctx context.Context, obj runtime.Object
 	}
 	collectorconfiglog.Info("validate create", "name", cc.Name)
 
+	if err := rejectIfProtected(ctx, cc); err != nil {
+		return nil, err
+	}
+
 	err := cc.validateCollectorConfig()
 	return nil, err
 }
@@ -55,7 +59,19 @@ func (r *CollectorConfig) ValidateUpdate(ctx context.Context, oldObj, newObj run
 	if !ok {
 		return nil, fmt.Errorf("expected a CollectorConfig object but got %T", newObj)
 	}
+	oldCC, ok := oldObj.(*CollectorConfig)
+	if !ok {
+		return nil, fmt.Errorf("expected a CollectorConfig object but got %T", oldObj)
+	}
 	collectorconfiglog.Info("validate update", "name", cc.Name)
+
+	// Check both old and new objects — prevents stripping the owner reference to bypass protection.
+	if err := rejectIfProtected(ctx, cc); err != nil {
+		return nil, err
+	}
+	if err := rejectIfProtected(ctx, oldCC); err != nil {
+		return nil, err
+	}
 
 	err := cc.validateCollectorConfig()
 	return nil, err
@@ -69,7 +85,10 @@ func (r *CollectorConfig) ValidateDelete(ctx context.Context, obj runtime.Object
 	}
 	collectorconfiglog.Info("validate delete", "name", cc.Name)
 
-	// No validation needed for deletion
+	if err := rejectIfProtected(ctx, cc); err != nil {
+		return nil, err
+	}
+
 	return nil, nil
 }
 
@@ -264,4 +283,38 @@ func contains(slice []string, item string) bool {
 		}
 	}
 	return false
+}
+
+// isOperatorOwned returns true if the CollectorConfig has a controller owner reference,
+// indicating it is managed by the operator and should not be modified directly.
+func isOperatorOwned(cc *CollectorConfig) bool {
+	for _, ref := range cc.GetOwnerReferences() {
+		if ref.Controller != nil && *ref.Controller {
+			return true
+		}
+	}
+	return false
+}
+
+// rejectIfProtected returns an error if the config has a controller owner reference
+// and the caller is not a service account in the same namespace (i.e., not the operator).
+func rejectIfProtected(ctx context.Context, cc *CollectorConfig) error {
+	if !isOperatorOwned(cc) {
+		return nil
+	}
+
+	req, err := admission.RequestFromContext(ctx)
+	if err != nil {
+		return fmt.Errorf("could not extract admission request: %v", err)
+	}
+
+	// Allow any service account in the resource's namespace.
+	// Only the operator namespace should have write RBAC for CollectorConfigs,
+	// so namespace-scoped SA check is sufficient.
+	expectedPrefix := fmt.Sprintf("system:serviceaccount:%s:", req.Namespace)
+	if strings.HasPrefix(req.UserInfo.Username, expectedPrefix) {
+		return nil
+	}
+
+	return fmt.Errorf("%s is managed by the search operator and cannot be modified directly", cc.Name)
 }

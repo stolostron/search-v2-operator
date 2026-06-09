@@ -85,7 +85,8 @@ var cleanOnce sync.Once
 //+kubebuilder:rbac:groups=search.open-cluster-management.io,resources=searches,verbs=get;list;watch;update;patch
 //+kubebuilder:rbac:groups=search.open-cluster-management.io,resources=searches/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=search.open-cluster-management.io,resources=searches/finalizers,verbs=update
-//+kubebuilder:rbac:groups=search.open-cluster-management.io,resources=collectorconfigs/status,verbs=update;patch
+//+kubebuilder:rbac:groups=search.open-cluster-management.io,resources=collectorconfigs,verbs=get;list;watch;create;update;patch
+//+kubebuilder:rbac:groups=search.open-cluster-management.io,resources=collectorconfigs/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=work.open-cluster-management.io,resources=manifestworks,verbs=create;delete;get;list;patch
 //+kubebuilder:rbac:groups=multicluster.openshift.io,resources=multiclusterengines,verbs=get;list
 
@@ -168,6 +169,11 @@ func (r *SearchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	result, err = r.createRoleBinding(ctx, r.ClusterRoleBinding(instance))
 	if result != nil {
 		log.Error(err, "ClusterRoleBinding setup failed")
+		return *result, err
+	}
+	result, err = r.createOrUpdateMergedCollectorConfig(ctx, instance)
+	if result != nil {
+		log.Error(err, "Merged CollectorConfig setup failed")
 		return *result, err
 	}
 	result, err = r.createSecret(ctx, r.PGSecret(instance))
@@ -398,6 +404,28 @@ func (r *SearchReconciler) SetupWithManager(mgr ctrl.Manager) error {
 							NamespacedName: types.NamespacedName{
 								Name:      OperatorName,
 								Namespace: os.Getenv("POD_NAMESPACE"),
+							},
+						},
+					}
+				}
+				return nil
+			}),
+		).
+		Watches(&searchv1alpha1.CollectorConfig{}, handler.EnqueueRequestsFromMapFunc(
+			func(ctx context.Context, a client.Object) []reconcile.Request {
+				name := a.GetName()
+				// Skip operator-managed output to prevent reconcile loops.
+				if name == mergedCollectorConfigName {
+					return nil
+				}
+				// Trigger on user config (by name) or any integration team config (by label).
+				if name == userCollectorConfigName ||
+					a.GetLabels()[searchv1alpha1.IntegrationTeamLabel] == searchv1alpha1.IntegrationTeamLabelValue {
+					return []reconcile.Request{
+						{
+							NamespacedName: types.NamespacedName{
+								Name:      OperatorName,
+								Namespace: a.GetNamespace(),
 							},
 						},
 					}

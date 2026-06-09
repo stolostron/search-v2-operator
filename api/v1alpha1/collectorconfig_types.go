@@ -33,6 +33,13 @@ const (
 // was applied successfully. When False, the Message field describes which rules were skipped and why.
 const CollectorConfigConditionApplied = "Applied"
 
+// IntegrationTeamLabel is the label key that integration teams apply to their CollectorConfig CRs
+// so the operator discovers and merges them into the merged-collector-config.
+const IntegrationTeamLabel = "search.open-cluster-management.io/config-type"
+
+// IntegrationTeamLabelValue is the expected value for IntegrationTeamLabel.
+const IntegrationTeamLabelValue = "integration"
+
 // Reason constants for the CollectorConfig Applied condition.
 const (
 	// CollectorConfigReasonApplied means all rules were processed and applied successfully.
