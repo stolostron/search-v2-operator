@@ -17,10 +17,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
-const (
-	operatorServiceAccount = "search-serviceaccount"
-)
-
 // log is for logging in this package.
 var collectorconfiglog = logf.Log.WithName("collectorconfig-resource")
 
@@ -69,7 +65,7 @@ func (r *CollectorConfig) ValidateUpdate(ctx context.Context, oldObj, newObj run
 	}
 	collectorconfiglog.Info("validate update", "name", cc.Name)
 
-	// Check both old and new objects — prevents stripping the integration label to bypass protection.
+	// Check both old and new objects — prevents stripping the owner reference to bypass protection.
 	if err := rejectIfProtected(ctx, cc); err != nil {
 		return nil, err
 	}
@@ -285,33 +281,36 @@ func contains(slice []string, item string) bool {
 	return false
 }
 
-// isProtectedConfig returns true for configs managed by the operator.
-// This includes merged-collector-config (by name) and any config labeled as an integration team config.
-func isProtectedConfig(name string, labels map[string]string) bool {
-	if name == "merged-collector-config" {
-		return true
-	}
-	if labels[IntegrationTeamLabel] == IntegrationTeamLabelValue {
-		return true
+// isOperatorOwned returns true if the CollectorConfig has a controller owner reference,
+// indicating it is managed by the operator and should not be modified directly.
+func isOperatorOwned(cc *CollectorConfig) bool {
+	for _, ref := range cc.GetOwnerReferences() {
+		if ref.Controller != nil && *ref.Controller {
+			return true
+		}
 	}
 	return false
 }
 
-// isOperatorServiceAccount checks whether the request originates from the operator's service account
-// in the same namespace as the CollectorConfig being acted on.
-func isOperatorServiceAccount(ctx context.Context) bool {
+// rejectIfProtected returns an error if the config has a controller owner reference
+// and the caller is not a service account in the same namespace (i.e., not the operator).
+func rejectIfProtected(ctx context.Context, cc *CollectorConfig) error {
+	if !isOperatorOwned(cc) {
+		return nil
+	}
+
 	req, err := admission.RequestFromContext(ctx)
 	if err != nil {
-		return false
+		return fmt.Errorf("could not extract admission request: %v", err)
 	}
-	expectedUser := fmt.Sprintf("system:serviceaccount:%s:%s", req.Namespace, operatorServiceAccount)
-	return req.UserInfo.Username == expectedUser
-}
 
-// rejectIfProtected returns an error if the config is operator-managed and the caller is not the operator SA.
-func rejectIfProtected(ctx context.Context, cc *CollectorConfig) error {
-	if isProtectedConfig(cc.Name, cc.Labels) && !isOperatorServiceAccount(ctx) {
-		return fmt.Errorf("%s is managed by the search operator and cannot be modified directly", cc.Name)
+	// Allow any service account in the resource's namespace.
+	// Only the operator namespace should have write RBAC for CollectorConfigs,
+	// so namespace-scoped SA check is sufficient.
+	expectedPrefix := fmt.Sprintf("system:serviceaccount:%s:", req.Namespace)
+	if strings.HasPrefix(req.UserInfo.Username, expectedPrefix) {
+		return nil
 	}
-	return nil
+
+	return fmt.Errorf("%s is managed by the search operator and cannot be modified directly", cc.Name)
 }

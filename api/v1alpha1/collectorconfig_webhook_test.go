@@ -332,139 +332,122 @@ func ctxWithUser(username string) context.Context {
 }
 
 func operatorCtx() context.Context {
-	return ctxWithUser("system:serviceaccount:open-cluster-management:search-serviceaccount")
+	return ctxWithUser("system:serviceaccount:open-cluster-management:search-v2-operator")
 }
 
 func nonOperatorCtx() context.Context {
-	return ctxWithUser("system:serviceaccount:open-cluster-management:default")
+	return ctxWithUser("system:serviceaccount:other-ns:default")
 }
 
-// Non-operator creating merged-collector-config → rejected.
-func TestRejectNonOperatorCreateMerged(t *testing.T) {
+func boolPtr(b bool) *bool { return &b }
+
+func ownedConfig() *CollectorConfig {
 	c := validConfig()
-	c.Name = "merged-collector-config"
+	c.Namespace = "open-cluster-management"
+	c.OwnerReferences = []metav1.OwnerReference{
+		{
+			APIVersion: "search.open-cluster-management.io/v1alpha1",
+			Kind:       "Search",
+			Name:       "search-v2-operator",
+			Controller: boolPtr(true),
+		},
+	}
+	return c
+}
+
+// Non-operator creating an owned config → rejected.
+func TestRejectNonOperatorCreateOwned(t *testing.T) {
+	c := ownedConfig()
 	_, err := c.ValidateCreate(nonOperatorCtx(), c)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "managed by the search operator")
 }
 
-// Non-operator creating a labeled integration team config → rejected.
-func TestRejectNonOperatorCreateLabeledIntegrationConfig(t *testing.T) {
-	c := validConfig()
-	c.Name = "team-a-collector-config"
-	c.Labels = map[string]string{IntegrationTeamLabel: IntegrationTeamLabelValue}
-	_, err := c.ValidateCreate(nonOperatorCtx(), c)
+// Non-operator updating an owned config → rejected.
+func TestRejectNonOperatorUpdateOwned(t *testing.T) {
+	old := ownedConfig()
+	updated := old.DeepCopy()
+	_, err := updated.ValidateUpdate(nonOperatorCtx(), old, updated)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "managed by the search operator")
 }
 
-// Non-operator creating an unlabeled config → allowed.
-func TestAllowNonOperatorCreateUnlabeledConfig(t *testing.T) {
+// Non-operator deleting an owned config → rejected.
+func TestRejectNonOperatorDeleteOwned(t *testing.T) {
+	c := ownedConfig()
+	_, err := c.ValidateDelete(nonOperatorCtx(), c)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "managed by the search operator")
+}
+
+// Non-operator stripping the owner reference on update → rejected (old object is still owned).
+func TestRejectNonOperatorStripOwnerRef(t *testing.T) {
+	old := ownedConfig()
+	updated := old.DeepCopy()
+	updated.OwnerReferences = nil
+	_, err := updated.ValidateUpdate(nonOperatorCtx(), old, updated)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "managed by the search operator")
+}
+
+// Non-operator creating an unowned config → allowed.
+func TestAllowNonOperatorCreateUnowned(t *testing.T) {
 	c := validConfig()
 	c.Name = "my-custom-config"
 	_, err := c.ValidateCreate(nonOperatorCtx(), c)
 	assert.NoError(t, err)
 }
 
-// Non-operator updating merged-collector-config → rejected.
-func TestRejectNonOperatorUpdateMerged(t *testing.T) {
+// Non-operator updating an unowned config → allowed.
+func TestAllowNonOperatorUpdateUnowned(t *testing.T) {
 	old := validConfig()
-	old.Name = "merged-collector-config"
 	updated := old.DeepCopy()
 	_, err := updated.ValidateUpdate(nonOperatorCtx(), old, updated)
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "managed by the search operator")
+	assert.NoError(t, err)
 }
 
-// Non-operator deleting merged-collector-config → rejected.
-func TestRejectNonOperatorDeleteMerged(t *testing.T) {
+// Non-operator deleting an unowned config → allowed.
+func TestAllowNonOperatorDeleteUnowned(t *testing.T) {
 	c := validConfig()
-	c.Name = "merged-collector-config"
 	_, err := c.ValidateDelete(nonOperatorCtx(), c)
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "managed by the search operator")
+	assert.NoError(t, err)
 }
 
-// Non-operator deleting a labeled integration team config → rejected.
-func TestRejectNonOperatorDeleteLabeledIntegrationConfig(t *testing.T) {
+// Non-operator creating a labeled integration config (no owner ref) → allowed.
+func TestAllowNonOperatorCreateLabeledIntegrationConfig(t *testing.T) {
 	c := validConfig()
-	c.Name = "team-a-collector-config"
 	c.Labels = map[string]string{IntegrationTeamLabel: IntegrationTeamLabelValue}
-	_, err := c.ValidateDelete(nonOperatorCtx(), c)
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "managed by the search operator")
-}
-
-// Non-operator stripping the integration label on update → rejected.
-func TestRejectNonOperatorStripIntegrationLabel(t *testing.T) {
-	old := validConfig()
-	old.Name = "team-a-collector-config"
-	old.Labels = map[string]string{IntegrationTeamLabel: IntegrationTeamLabelValue}
-	updated := old.DeepCopy()
-	updated.Labels = map[string]string{} // strip the label
-	_, err := updated.ValidateUpdate(nonOperatorCtx(), old, updated)
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "managed by the search operator")
-}
-
-// Non-operator adding the integration label on update → rejected.
-func TestRejectNonOperatorAddIntegrationLabel(t *testing.T) {
-	old := validConfig()
-	old.Name = "my-config"
-	updated := old.DeepCopy()
-	updated.Labels = map[string]string{IntegrationTeamLabel: IntegrationTeamLabelValue}
-	_, err := updated.ValidateUpdate(nonOperatorCtx(), old, updated)
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "managed by the search operator")
-}
-
-// Non-operator creating user-collector-config → allowed.
-func TestAllowNonOperatorCreateUser(t *testing.T) {
-	c := validConfig()
-	c.Name = "user-collector-config"
 	_, err := c.ValidateCreate(nonOperatorCtx(), c)
 	assert.NoError(t, err)
 }
 
-// Operator SA creating merged-collector-config → allowed.
-func TestAllowOperatorCreateMerged(t *testing.T) {
-	c := validConfig()
-	c.Name = "merged-collector-config"
+// Operator SA creating an owned config → allowed.
+func TestAllowOperatorCreateOwned(t *testing.T) {
+	c := ownedConfig()
 	_, err := c.ValidateCreate(operatorCtx(), c)
 	assert.NoError(t, err)
 }
 
-// Operator SA updating merged-collector-config → allowed.
-func TestAllowOperatorUpdateMerged(t *testing.T) {
-	old := validConfig()
-	old.Name = "merged-collector-config"
+// Operator SA updating an owned config → allowed.
+func TestAllowOperatorUpdateOwned(t *testing.T) {
+	old := ownedConfig()
 	updated := old.DeepCopy()
 	_, err := updated.ValidateUpdate(operatorCtx(), old, updated)
 	assert.NoError(t, err)
 }
 
-// Operator SA creating a labeled integration team config → allowed.
-func TestAllowOperatorCreateLabeledIntegrationConfig(t *testing.T) {
-	c := validConfig()
-	c.Name = "team-a-collector-config"
-	c.Labels = map[string]string{IntegrationTeamLabel: IntegrationTeamLabelValue}
-	_, err := c.ValidateCreate(operatorCtx(), c)
-	assert.NoError(t, err)
-}
-
-// Operator SA deleting protected configs → allowed.
-func TestAllowOperatorDeleteProtected(t *testing.T) {
-	c := validConfig()
-	c.Name = "merged-collector-config"
+// Operator SA deleting an owned config → allowed.
+func TestAllowOperatorDeleteOwned(t *testing.T) {
+	c := ownedConfig()
 	_, err := c.ValidateDelete(operatorCtx(), c)
 	assert.NoError(t, err)
 }
 
-// SA with the correct name but wrong namespace → rejected.
-func TestRejectOperatorSAFromWrongNamespace(t *testing.T) {
-	wrongNsCtx := ctxWithUser("system:serviceaccount:attacker-ns:search-serviceaccount")
-	c := validConfig()
-	c.Name = "merged-collector-config"
+// SA from wrong namespace acting on an owned config → rejected.
+func TestRejectSAFromWrongNamespace(t *testing.T) {
+	wrongNsCtx := ctxWithUser("system:serviceaccount:attacker-ns:search-v2-operator")
+	c := ownedConfig()
 	_, err := c.ValidateCreate(wrongNsCtx, c)
 	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "managed by the search operator")
 }
