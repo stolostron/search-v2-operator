@@ -151,7 +151,7 @@ type CollectionRule struct {
 	// Specifies to collect additionalPrinterColumns from the CRD with priority up to and including
 	// the specified value. Priority 0 collects only the most important columns; higher values include
 	// progressively more columns.
-	// For example, if collectAdditionalPrinterColumns is 5 for a specified CRD, additionalPrinterColumns of
+	// For example, if collectAdditionalPrinterColumnsPriority is 5 for a specified CRD, additionalPrinterColumns of
 	// priority 0 through 5 will be collected.
 	CollectAdditionalPrinterColumnsPriority *int `json:"collectAdditionalPrinterColumnsPriority,omitempty"`
 }
