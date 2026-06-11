@@ -33,7 +33,8 @@ func (r *CollectorConfig) SetupWebhookWithManager(mgr ctrl.Manager) error {
 		Complete()
 }
 
-//+kubebuilder:webhook:path=/validate-search-open-cluster-management-io-v1alpha1-collectorconfig,mutating=false,failurePolicy=fail,sideEffects=None,groups=search.open-cluster-management.io,resources=collectorconfigs,verbs=create;update;delete,versions=v1alpha1,name=vcollectorconfig.kb.io,admissionReviewVersions=v1
+//+kubebuilder:webhookconfiguration:mutating=false,name=search-v2-operator-validating-webhook-configuration
+//+kubebuilder:webhook:path=/validate-search-open-cluster-management-io-v1alpha1-collectorconfig,mutating=false,failurePolicy=fail,sideEffects=None,groups=search.open-cluster-management.io,resources=collectorconfigs,verbs=create;update;delete,versions=v1alpha1,name=vcollectorconfig.kb.io,admissionReviewVersions=v1,serviceName=search-v2-operator-webhook-service
 
 var _ webhook.CustomValidator = &CollectorConfig{}
 
