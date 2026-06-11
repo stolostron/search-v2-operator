@@ -35,7 +35,7 @@ export API_IMAGE=<from cluster>
 export INDEXER_IMAGE=<from cluster>
 ```
 
-`make setup` prints the exact `kubectl` commands to extract these from a live cluster.
+`make setup` prints ready-to-run `export` statements with the resolved image values (it uses `$(shell kubectl ...)` substitution, not raw kubectl commands).
 
 ## Non-obvious conventions
 
@@ -47,6 +47,10 @@ export INDEXER_IMAGE=<from cluster>
 - **`make manifests` and `make generate` are separate** — one regenerates CRD/RBAC YAML, the other regenerates Go DeepCopy methods. Both are needed after API type changes.
 - **`docs/RBAC.md`** documents the RBAC roles and bindings created by the operator.
 
+## Fleet Engineering Skills
+
+All skills are available as slash commands. See the [Fleet Engineering skills catalog](https://github.com/OpenShift-Fleet/agentic-sdlc/blob/main/skills/README.md) for the full list with when-to-use guidance.
+
 ## Personal configuration
 
 Read personal config at the start of any task that needs an assignee, email, or project key.
@@ -55,6 +59,3 @@ Use the tool-aware fallback chain: `~/.config/opencode/user.local.md` (OpenCode)
 If none exist, fall back to agent memory (`user-config`), then placeholders.
 Run `make personalize` to generate all three files (if this repo uses Fleet Engineering tooling).
 
-## Fleet Engineering Skills
-
-All skills are available as slash commands. See the [Fleet Engineering skills catalog](https://github.com/OpenShift-Fleet/agentic-sdlc/blob/main/skills/README.md) for the full list with when-to-use guidance.

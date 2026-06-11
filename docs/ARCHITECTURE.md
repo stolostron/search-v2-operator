@@ -46,9 +46,9 @@ Key spec fields:
 
 Allows integration teams and users to customize search-collector behaviour (resource limits, collection intervals, excluded resources). The operator merges all `CollectorConfig` objects into a single authoritative config that drives the collector deployment.
 
-- User config: CR named by `userCollectorConfigName` constant
-- Integration team configs: CRs with label `search.open-cluster-management.io/integration-team: true`
-- Operator-managed output: CR named `mergedCollectorConfigName` (skip-reconcile guard prevents loops)
+- Integration team configs: CRs with label `search.open-cluster-management.io/config-type: integration`, merged first (sorted by name)
+- User config: CR named `user-collector-config` (`userCollectorConfigName`), overlaid last
+- Operator-managed output: CR named `merged-collector-config` (`mergedCollectorConfigName`) — the controller watch skips this name to prevent reconcile loops
 
 The webhook (`api/v1alpha1/collectorconfig_webhook.go`) sets defaults and validates on admission.
 
@@ -85,15 +85,15 @@ The controller re-queues on changes from multiple sources:
 | `Pod` | Has search labels | Status-only reconcile |
 | `ClusterRole` | Matches search role name | Full reconcile |
 | `ManagedCluster` | Is a managed hub (has `hub.open-cluster-management.io` cluster claim) | Full reconcile (global search setup) |
-| `CollectorConfig` | Named `userCollectorConfigName` or has integration team label | Full reconcile |
+| `CollectorConfig` | Named `user-collector-config` or has label `search.open-cluster-management.io/config-type: integration` | Full reconcile |
 
 ## Feature configurations
 
 Three optional setup passes run during each reconcile:
 
-- **Global search** (`reconcileGlobalSearch`): When a `MulticlusterGlobalHub` or managed-hub `ManagedCluster` is detected, wires up federated search config for `search-v2-api`.
-- **Fine-grained RBAC** (`reconcileFineGrainedRBACConfiguration`): Configures `ManagedServiceAccount` and `ClusterPermission` resources to enable per-resource-type RBAC enforcement in the API.
-- **Virtual machine integration** (`reconcileVirtualMachineConfiguration`): Enables VM-specific resource collection and display when KubeVirt / CNV is detected.
+- **Global search** (`reconcileGlobalSearch`): Gated by the `global-search-preview` feature. Detects managed-hub clusters via `ManagedCluster.status.clusterClaims` and toggles `FEATURE_FEDERATED_SEARCH` on the search-api deployment accordingly.
+- **Fine-grained RBAC** (`reconcileFineGrainedRBACConfiguration`): Toggles `FEATURE_FINE_GRAINED_RBAC` on the search-api deployment and updates a status condition. Does not create `ManagedServiceAccount` or `ClusterPermission` resources.
+- **Virtual machine integration** (`reconcileVirtualMachineConfiguration`): Gated by the `virtual-machine-preview` feature. Creates `ManagedServiceAccount` and `ClusterPermission` resources for all managed clusters to enable VM resource access. KubeVirt/CNV detection is not yet implemented (noted as `FUTURE` in the code).
 
 ## Code generation
 
