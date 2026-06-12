@@ -338,6 +338,49 @@ func TestRejectCollectConditionsWithoutApiGroups(t *testing.T) {
 	assert.Contains(t, err.Error(), "must specify at least one apiGroup")
 }
 
+// Accept collectAdditionalPrinterColumnsPriority with a specific kind and no fields.
+func TestAcceptCollectPrinterColumnsWithKind(t *testing.T) {
+	priority := 0
+	c := validConfig()
+	c.Spec.CollectionRules[0].CollectAdditionalPrinterColumnsPriority = &priority
+	c.Spec.CollectionRules[0].Fields = nil
+	_, err := c.ValidateCreate(context.Background(), c)
+	assert.NoError(t, err)
+}
+
+// Accept collectAdditionalPrinterColumnsPriority with wildcard kind.
+func TestAcceptCollectPrinterColumnsWithWildcardKind(t *testing.T) {
+	priority := 5
+	c := validConfig()
+	c.Spec.CollectionRules[0].CollectAdditionalPrinterColumnsPriority = &priority
+	c.Spec.CollectionRules[0].ResourceSelector.Kinds = []string{"*"}
+	c.Spec.CollectionRules[0].Fields = nil
+	_, err := c.ValidateCreate(context.Background(), c)
+	assert.NoError(t, err)
+}
+
+// Accept collectAdditionalPrinterColumnsPriority combined with fields and collectConditions.
+func TestAcceptCollectPrinterColumnsWithFieldsAndConditions(t *testing.T) {
+	priority := 1
+	collectConditions := true
+	c := validConfig()
+	c.Spec.CollectionRules[0].CollectAdditionalPrinterColumnsPriority = &priority
+	c.Spec.CollectionRules[0].CollectConditions = &collectConditions
+	_, err := c.ValidateCreate(context.Background(), c)
+	assert.NoError(t, err)
+}
+
+// Reject negative collectAdditionalPrinterColumnsPriority.
+func TestRejectCollectPrinterColumnsNegative(t *testing.T) {
+	priority := -1
+	c := validConfig()
+	c.Spec.CollectionRules[0].CollectAdditionalPrinterColumnsPriority = &priority
+	c.Spec.CollectionRules[0].Fields = nil
+	_, err := c.ValidateCreate(context.Background(), c)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "must be >= 0")
+}
+
 // --- Webhook protection tests ---
 
 func ctxWithUser(username string) context.Context {

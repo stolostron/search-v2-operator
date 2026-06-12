@@ -158,6 +158,15 @@ func (r *CollectorConfig) validateCollectorConfig() error {
 			}
 		}
 
+		// Validate CollectAdditionalPrinterColumnsPriority if present
+		if rule.CollectAdditionalPrinterColumnsPriority != nil && *rule.CollectAdditionalPrinterColumnsPriority < 0 {
+			allErrs = append(allErrs, field.Invalid(
+				rulePath.Child("collectAdditionalPrinterColumnsPriority"),
+				*rule.CollectAdditionalPrinterColumnsPriority,
+				"must be >= 0",
+			))
+		}
+
 		// Validate FieldSuffix if present
 		if rule.FieldSuffix != "" {
 			if !isValidFieldSuffix(rule.FieldSuffix) {
