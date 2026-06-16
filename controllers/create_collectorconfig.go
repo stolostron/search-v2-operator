@@ -16,6 +16,47 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
+// ensureCollectorConfigsBackupLabel ensures that all user-managed CollectorConfig CRs in the
+// operator namespace carry the ACM backup label so they survive a hub backup/restore cycle.
+//
+// The search.open-cluster-management.io API group is excluded from the automatic resources
+// backup (backup.go excludedAPIGroups). Resources labeled with BackupLabel are picked up by
+// the acm-resources-generic-schedule backup instead.
+//
+// merged-collector-config is intentionally skipped — it is operator-managed and rebuilt
+// on every reconcile, so persisting it through backup would be redundant and confusing.
+func (r *SearchReconciler) ensureCollectorConfigsBackupLabel(
+	ctx context.Context,
+	namespace string,
+) (*reconcile.Result, error) {
+	ccList := &searchv1alpha1.CollectorConfigList{}
+	if err := r.List(ctx, ccList, client.InNamespace(namespace)); err != nil {
+		log.Error(err, "Could not list CollectorConfigs for backup label check")
+		return &reconcile.Result{}, err
+	}
+
+	for i := range ccList.Items {
+		cc := &ccList.Items[i]
+		if cc.Name == mergedCollectorConfigName {
+			continue
+		}
+		if _, hasLabel := cc.Labels[searchv1alpha1.BackupLabel]; hasLabel {
+			continue
+		}
+		patch := client.MergeFrom(cc.DeepCopy())
+		if cc.Labels == nil {
+			cc.Labels = map[string]string{}
+		}
+		cc.Labels[searchv1alpha1.BackupLabel] = ""
+		if err := r.Patch(ctx, cc, patch); err != nil {
+			log.Error(err, "Could not add backup label to CollectorConfig", "name", cc.Name)
+			return &reconcile.Result{}, err
+		}
+		log.V(2).Info("Added backup label to CollectorConfig", "name", cc.Name)
+	}
+	return nil, nil
+}
+
 const (
 	userCollectorConfigName   = "user-collector-config"
 	mergedCollectorConfigName = "merged-collector-config"

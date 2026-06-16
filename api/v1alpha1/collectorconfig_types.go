@@ -40,6 +40,11 @@ const IntegrationTeamLabel = "search.open-cluster-management.io/config-type"
 // IntegrationTeamLabelValue is the expected value for IntegrationTeamLabel.
 const IntegrationTeamLabelValue = "integration"
 
+// BackupLabel is the label applied to CollectorConfig CRs so they are included in ACM hub backups.
+// The search.open-cluster-management.io API group is excluded from the automatic resources backup,
+// but resources carrying this label are picked up by the acm-resources-generic-schedule backup.
+const BackupLabel = "cluster.open-cluster-management.io/backup"
+
 // Reason constants for the CollectorConfig Applied condition.
 const (
 	// CollectorConfigReasonApplied means all rules were processed and applied successfully.

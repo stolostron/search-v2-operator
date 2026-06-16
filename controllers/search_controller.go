@@ -176,6 +176,11 @@ func (r *SearchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		log.Error(err, "Merged CollectorConfig setup failed")
 		return *result, err
 	}
+	result, err = r.ensureCollectorConfigsBackupLabel(ctx, instance.GetNamespace())
+	if result != nil {
+		log.Error(err, "CollectorConfig backup label setup failed")
+		return *result, err
+	}
 	result, err = r.createSecret(ctx, r.PGSecret(instance))
 	if result != nil {
 		log.Error(err, "Postgres Secret setup failed")
