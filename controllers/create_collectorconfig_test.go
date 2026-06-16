@@ -459,8 +459,9 @@ func TestBackupLabel_UserConfig_GetsLabeled(t *testing.T) {
 	assert.Nil(t, result)
 
 	updated := &searchv1alpha1.CollectorConfig{}
-	assert.Nil(t, r.Get(context.TODO(), types.NamespacedName{Name: userCollectorConfigName, Namespace: testNamespace}, updated))
-	_, hasLabel := updated.Labels[searchv1alpha1.BackupLabel]
+	nn := types.NamespacedName{Name: userCollectorConfigName, Namespace: testNamespace}
+	assert.Nil(t, r.Get(context.TODO(), nn, updated))
+	_, hasLabel := updated.Labels[backupLabel]
 	assert.True(t, hasLabel, "user-collector-config should have the backup label")
 }
 
@@ -474,8 +475,9 @@ func TestBackupLabel_IntegrationTeamConfig_GetsLabeled(t *testing.T) {
 	assert.Nil(t, result)
 
 	updated := &searchv1alpha1.CollectorConfig{}
-	assert.Nil(t, r.Get(context.TODO(), types.NamespacedName{Name: "team-a-config", Namespace: testNamespace}, updated))
-	_, hasLabel := updated.Labels[searchv1alpha1.BackupLabel]
+	nn := types.NamespacedName{Name: "team-a-config", Namespace: testNamespace}
+	assert.Nil(t, r.Get(context.TODO(), nn, updated))
+	_, hasLabel := updated.Labels[backupLabel]
 	assert.True(t, hasLabel, "integration team config should have the backup label")
 }
 
@@ -489,15 +491,16 @@ func TestBackupLabel_MergedConfig_Skipped(t *testing.T) {
 	assert.Nil(t, result)
 
 	updated := &searchv1alpha1.CollectorConfig{}
-	assert.Nil(t, r.Get(context.TODO(), types.NamespacedName{Name: mergedCollectorConfigName, Namespace: testNamespace}, updated))
-	_, hasLabel := updated.Labels[searchv1alpha1.BackupLabel]
+	nn := types.NamespacedName{Name: mergedCollectorConfigName, Namespace: testNamespace}
+	assert.Nil(t, r.Get(context.TODO(), nn, updated))
+	_, hasLabel := updated.Labels[backupLabel]
 	assert.False(t, hasLabel, "merged-collector-config should NOT have the backup label")
 }
 
 // A CollectorConfig that already has the backup label is not patched again.
 func TestBackupLabel_AlreadyLabeled_NotPatched(t *testing.T) {
 	userCC := newCollectorConfig(userCollectorConfigName, searchv1alpha1.CollectorConfigSpec{})
-	userCC.Labels = map[string]string{searchv1alpha1.BackupLabel: ""}
+	userCC.Labels = map[string]string{backupLabel: ""}
 	userCC.ResourceVersion = "original"
 	r := setupReconciler(userCC)
 
@@ -506,7 +509,8 @@ func TestBackupLabel_AlreadyLabeled_NotPatched(t *testing.T) {
 	assert.Nil(t, result)
 
 	updated := &searchv1alpha1.CollectorConfig{}
-	assert.Nil(t, r.Get(context.TODO(), types.NamespacedName{Name: userCollectorConfigName, Namespace: testNamespace}, updated))
+	nn := types.NamespacedName{Name: userCollectorConfigName, Namespace: testNamespace}
+	assert.Nil(t, r.Get(context.TODO(), nn, updated))
 	assert.Equal(t, "original", updated.ResourceVersion, "ResourceVersion should be unchanged — no patch was applied")
 }
 
@@ -523,13 +527,15 @@ func TestBackupLabel_MultipleConfigs(t *testing.T) {
 
 	for _, name := range []string{userCollectorConfigName, "team-a-config"} {
 		cc := &searchv1alpha1.CollectorConfig{}
-		assert.Nil(t, r.Get(context.TODO(), types.NamespacedName{Name: name, Namespace: testNamespace}, cc))
-		_, hasLabel := cc.Labels[searchv1alpha1.BackupLabel]
+		nn := types.NamespacedName{Name: name, Namespace: testNamespace}
+		assert.Nil(t, r.Get(context.TODO(), nn, cc))
+		_, hasLabel := cc.Labels[backupLabel]
 		assert.True(t, hasLabel, "%s should have the backup label", name)
 	}
 
 	mergedResult := &searchv1alpha1.CollectorConfig{}
-	assert.Nil(t, r.Get(context.TODO(), types.NamespacedName{Name: mergedCollectorConfigName, Namespace: testNamespace}, mergedResult))
-	_, hasLabel := mergedResult.Labels[searchv1alpha1.BackupLabel]
+	nn := types.NamespacedName{Name: mergedCollectorConfigName, Namespace: testNamespace}
+	assert.Nil(t, r.Get(context.TODO(), nn, mergedResult))
+	_, hasLabel := mergedResult.Labels[backupLabel]
 	assert.False(t, hasLabel, "merged-collector-config should NOT have the backup label")
 }

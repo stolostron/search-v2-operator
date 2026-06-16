@@ -40,14 +40,14 @@ func (r *SearchReconciler) ensureCollectorConfigsBackupLabel(
 		if cc.Name == mergedCollectorConfigName {
 			continue
 		}
-		if _, hasLabel := cc.Labels[searchv1alpha1.BackupLabel]; hasLabel {
+		if _, hasLabel := cc.Labels[backupLabel]; hasLabel {
 			continue
 		}
 		patch := client.MergeFrom(cc.DeepCopy())
 		if cc.Labels == nil {
 			cc.Labels = map[string]string{}
 		}
-		cc.Labels[searchv1alpha1.BackupLabel] = ""
+		cc.Labels[backupLabel] = ""
 		if err := r.Patch(ctx, cc, patch); err != nil {
 			log.Error(err, "Could not add backup label to CollectorConfig", "name", cc.Name)
 			return &reconcile.Result{}, err
@@ -60,6 +60,12 @@ func (r *SearchReconciler) ensureCollectorConfigsBackupLabel(
 const (
 	userCollectorConfigName   = "user-collector-config"
 	mergedCollectorConfigName = "merged-collector-config"
+
+	// backupLabel is the ACM backup label that causes a resource to be included
+	// in the acm-resources-generic-schedule backup. The search.open-cluster-management.io
+	// API group is excluded from automatic backups, so CollectorConfig CRs need this
+	// label to survive a hub backup/restore cycle.
+	backupLabel = "cluster.open-cluster-management.io/backup"
 )
 
 // createOrUpdateMergedCollectorConfig discovers all integration team CollectorConfig CRs (by label)
