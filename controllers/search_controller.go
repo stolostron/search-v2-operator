@@ -85,6 +85,7 @@ var cleanOnce sync.Once
 //+kubebuilder:rbac:groups=search.open-cluster-management.io,resources=searches,verbs=get;list;watch;update;patch
 //+kubebuilder:rbac:groups=search.open-cluster-management.io,resources=searches/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=search.open-cluster-management.io,resources=searches/finalizers,verbs=update
+//+kubebuilder:rbac:groups=admissionregistration.k8s.io,resources=validatingwebhookconfigurations,verbs=get;update;patch
 //+kubebuilder:rbac:groups=search.open-cluster-management.io,resources=collectorconfigs,verbs=get;list;watch;create;update;patch
 //+kubebuilder:rbac:groups=search.open-cluster-management.io,resources=collectorconfigs/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=work.open-cluster-management.io,resources=manifestworks,verbs=create;delete;get;list;patch
@@ -170,6 +171,10 @@ func (r *SearchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	if result != nil {
 		log.Error(err, "ClusterRoleBinding setup failed")
 		return *result, err
+	}
+	if err := r.ensureWebhookCAInjection(ctx); err != nil {
+		log.Error(err, "Failed to ensure webhook CA injection annotation")
+		// Non-fatal — continue reconciliation, the webhook may already have the annotation.
 	}
 	result, err = r.createOrUpdateMergedCollectorConfig(ctx, instance)
 	if result != nil {

@@ -103,6 +103,14 @@ spec:
           - patch
           - update
         - apiGroups:
+          - admissionregistration.k8s.io
+          resources:
+          - validatingwebhookconfigurations
+          verbs:
+          - get
+          - patch
+          - update
+        - apiGroups:
           - apps
           resources:
           - deployments
