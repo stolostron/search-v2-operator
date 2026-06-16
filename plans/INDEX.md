@@ -4,6 +4,6 @@ sessions:
   title: "[search-mcp] SAR-09: Plan for creating and using a read-only PostgreSQL user"
   jira: "ACM-35503"
   jira_url: "https://redhat.atlassian.net/browse/ACM-35503"
-  pr: ~
+  pr: "https://github.com/stolostron/search-v2-operator/pull/737"
   plan: "plans/ACM-32474-readonly-postgres-user-plan.md"
-  summary: "Plan search-v2-operator changes to provision dedicated read-only PostgreSQL roles for both search-v2-api and search-mcp-server, eliminating their use of the shared read-write searchuser credential"
+  summary: "Implemented search_api_ro and search_mcp_ro PostgreSQL roles provisioned by the operator at database startup, with new create-only Secrets and the NOTIFY trigger moved from search-v2-api into postgresql.sql"
