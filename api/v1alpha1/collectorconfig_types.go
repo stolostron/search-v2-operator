@@ -40,7 +40,6 @@ const IntegrationTeamLabel = "search.open-cluster-management.io/config-type"
 // IntegrationTeamLabelValue is the expected value for IntegrationTeamLabel.
 const IntegrationTeamLabelValue = "integration"
 
-
 // Reason constants for the CollectorConfig Applied condition.
 const (
 	// CollectorConfigReasonApplied means all rules were processed and applied successfully.
