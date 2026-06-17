@@ -16,48 +16,27 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
-// ensureCollectorConfigsBackupLabel ensures that all source CollectorConfig CRs in the
-// operator namespace carry the ACM backup label so they survive a hub backup/restore cycle.
-//
+// addBackupLabel patches the backup label onto a CollectorConfig if it is missing.
 // The search.open-cluster-management.io API group is excluded from the automatic resources
 // backup (backup.go excludedAPIGroups). Resources labeled with backupLabel are picked up by
-// the acm-resources-generic-schedule backup instead.
-//
-// The only CollectorConfig excluded is merged-collector-config: it is operator-managed and
-// fully derived from the source configs on every reconcile, so backing it up would restore
-// a stale snapshot rather than the sources. All other CollectorConfigs — user-collector-config,
-// integration team configs, and any future per-cluster override configs — are source configs
-// that users expect to survive a backup/restore and should always be labeled.
-func (r *SearchReconciler) ensureCollectorConfigsBackupLabel(
-	ctx context.Context,
-	namespace string,
-) (*reconcile.Result, error) {
-	ccList := &searchv1alpha1.CollectorConfigList{}
-	if err := r.List(ctx, ccList, client.InNamespace(namespace)); err != nil {
-		log.Error(err, "Could not list CollectorConfigs for backup label check")
-		return &reconcile.Result{}, err
+// the acm-resources-generic-schedule backup instead. All source CollectorConfigs — integration
+// team configs, user-collector-config, and any future per-cluster override configs — should
+// carry this label so they survive a hub backup/restore cycle.
+func (r *SearchReconciler) addBackupLabel(ctx context.Context, cc *searchv1alpha1.CollectorConfig) error {
+	if _, hasLabel := cc.Labels[backupLabel]; hasLabel {
+		return nil
 	}
-
-	for i := range ccList.Items {
-		cc := &ccList.Items[i]
-		if cc.Name == mergedCollectorConfigName {
-			continue
-		}
-		if _, hasLabel := cc.Labels[backupLabel]; hasLabel {
-			continue
-		}
-		patch := client.MergeFrom(cc.DeepCopy())
-		if cc.Labels == nil {
-			cc.Labels = map[string]string{}
-		}
-		cc.Labels[backupLabel] = ""
-		if err := r.Patch(ctx, cc, patch); err != nil {
-			log.Error(err, "Could not add backup label to CollectorConfig", "name", cc.Name)
-			return &reconcile.Result{}, err
-		}
-		log.V(2).Info("Added backup label to CollectorConfig", "name", cc.Name)
+	patch := client.MergeFrom(cc.DeepCopy())
+	if cc.Labels == nil {
+		cc.Labels = map[string]string{}
 	}
-	return nil, nil
+	cc.Labels[backupLabel] = ""
+	if err := r.Patch(ctx, cc, patch); err != nil {
+		log.Error(err, "Could not add backup label to CollectorConfig", "name", cc.Name)
+		return err
+	}
+	log.V(2).Info("Added backup label to CollectorConfig", "name", cc.Name)
+	return nil
 }
 
 const (
@@ -93,9 +72,14 @@ func (r *SearchReconciler) createOrUpdateMergedCollectorConfig(
 	// FUTURE: detect and handle rule collisions between integration team configs.
 
 	// Build merged spec: integration team rules first, then user rules.
+	// Also ensure each source config carries the backup label so it survives hub backup/restore.
 	mergedSpec := searchv1alpha1.CollectorConfigSpec{}
-	for _, tc := range teamConfigs.Items {
+	for i := range teamConfigs.Items {
+		tc := &teamConfigs.Items[i]
 		mergedSpec.CollectionRules = append(mergedSpec.CollectionRules, tc.Spec.CollectionRules...)
+		if err := r.addBackupLabel(ctx, tc); err != nil {
+			return &reconcile.Result{}, err
+		}
 	}
 
 	// Get user-collector-config. Not found is fine, user may not have created one.
@@ -111,6 +95,9 @@ func (r *SearchReconciler) createOrUpdateMergedCollectorConfig(
 		mergedSpec.CollectionRules = append(mergedSpec.CollectionRules, userCC.Spec.CollectionRules...)
 		if userCC.Spec.CollectNamespaces != nil {
 			mergedSpec.CollectNamespaces = userCC.Spec.CollectNamespaces.DeepCopy()
+		}
+		if err := r.addBackupLabel(ctx, userCC); err != nil {
+			return &reconcile.Result{}, err
 		}
 	}
 

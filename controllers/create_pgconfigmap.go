@@ -17,9 +17,9 @@ func (r *SearchReconciler) PostgresConfigmap(instance *searchv1alpha1.Search) *c
 	ns := instance.GetNamespace()
 	cm := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
-		Labels: map[string]string{
-			backupLabel: "",
-		},
+			Labels: map[string]string{
+				backupLabel: "",
+			},
 			Name:      postgresConfigmapName,
 			Namespace: ns,
 		},
