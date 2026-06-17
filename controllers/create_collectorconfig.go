@@ -34,6 +34,10 @@ func (r *SearchReconciler) ensureWebhookCAInjection(ctx context.Context) error {
 	vwc := &admissionregistrationv1.ValidatingWebhookConfiguration{}
 	err := r.Get(ctx, types.NamespacedName{Name: webhookConfigName}, vwc)
 	if err != nil {
+		if errors.IsNotFound(err) {
+			log.V(2).Info("ValidatingWebhookConfiguration not found, skipping CA injection annotation")
+			return nil
+		}
 		return err
 	}
 
