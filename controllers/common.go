@@ -478,8 +478,9 @@ func (r *SearchReconciler) createOrUpdateConfigMap(ctx context.Context, cm *core
 			UpdatePostgresConfigmap(found, cm)
 		}
 
-		_, backupLabelPresent := found.Labels[backupLabel]
-		if !equality.Semantic.DeepEqual(found.Data, cm.Data) || !backupLabelPresent {
+		_, cmWantsLabel := cm.Labels[backupLabel]
+		_, foundHasLabel := found.Labels[backupLabel]
+		if !equality.Semantic.DeepEqual(found.Data, cm.Data) || (cmWantsLabel && !foundHasLabel) {
 			err = r.Update(ctx, cm)
 			if err != nil {
 				log.Error(err, "Could not update configmap")
