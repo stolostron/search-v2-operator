@@ -139,7 +139,8 @@ type CollectionRule struct {
 	FieldSuffix string `json:"fieldSuffix,omitempty"`
 
 	// +optional
-	// [NOT IMPLEMENTED] Specifies to collect annotations for the resource.
+	// Specifies to collect annotations for the resource.
+	// Annotations with values over 64 characters aren't included in collection.
 	CollectAnnotations *bool `json:"collectAnnotations,omitempty"`
 
 	// +optional
