@@ -45,6 +45,11 @@ const (
 	AnnotationPrometheusAlertMaxIndexerCountOver30m  = "search.open-cluster-management.io/max-indexer-count-over-30m"
 	// Annotation to disable the Search PVC critical alert entirely
 	AnnotationPrometheusAlertSearchPVCCriticalDisable = "search.open-cluster-management.io/disable-pvc-critical-alert"
+
+	// backupLabel is the ACM backup label that causes a resource to be included in the
+	// acm-resources-generic-schedule backup. The search.open-cluster-management.io API group
+	// is excluded from automatic backups, so resources needing backup must carry this label.
+	backupLabel = "cluster.open-cluster-management.io/backup"
 )
 
 var (
@@ -473,8 +478,9 @@ func (r *SearchReconciler) createOrUpdateConfigMap(ctx context.Context, cm *core
 			UpdatePostgresConfigmap(found, cm)
 		}
 
-		_, backupLabelPresent := found.Labels["cluster.open-cluster-management.io/backup"]
-		if !equality.Semantic.DeepEqual(found.Data, cm.Data) || !backupLabelPresent {
+		_, cmWantsLabel := cm.Labels[backupLabel]
+		_, foundHasLabel := found.Labels[backupLabel]
+		if !equality.Semantic.DeepEqual(found.Data, cm.Data) || (cmWantsLabel && !foundHasLabel) {
 			err = r.Update(ctx, cm)
 			if err != nil {
 				log.Error(err, "Could not update configmap")

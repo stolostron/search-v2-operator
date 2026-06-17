@@ -16,6 +16,29 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
+// addBackupLabel patches the backup label onto a CollectorConfig if it is missing.
+// The search.open-cluster-management.io API group is excluded from the automatic resources
+// backup (backup.go excludedAPIGroups). Resources labeled with backupLabel are picked up by
+// the acm-resources-generic-schedule backup instead. All source CollectorConfigs — integration
+// team configs, user-collector-config, and any future per-cluster override configs — should
+// carry this label so they survive a hub backup/restore cycle.
+func (r *SearchReconciler) addBackupLabel(ctx context.Context, cc *searchv1alpha1.CollectorConfig) error {
+	if _, hasLabel := cc.Labels[backupLabel]; hasLabel {
+		return nil
+	}
+	patch := client.MergeFrom(cc.DeepCopy())
+	if cc.Labels == nil {
+		cc.Labels = map[string]string{}
+	}
+	cc.Labels[backupLabel] = ""
+	if err := r.Patch(ctx, cc, patch); err != nil {
+		log.Error(err, "Could not add backup label to CollectorConfig", "name", cc.Name)
+		return err
+	}
+	log.V(2).Info("Added backup label to CollectorConfig", "name", cc.Name)
+	return nil
+}
+
 const (
 	userCollectorConfigName   = "user-collector-config"
 	mergedCollectorConfigName = "merged-collector-config"
@@ -49,9 +72,14 @@ func (r *SearchReconciler) createOrUpdateMergedCollectorConfig(
 	// FUTURE: detect and handle rule collisions between integration team configs.
 
 	// Build merged spec: integration team rules first, then user rules.
+	// Also ensure each source config carries the backup label so it survives hub backup/restore.
 	mergedSpec := searchv1alpha1.CollectorConfigSpec{}
-	for _, tc := range teamConfigs.Items {
+	for i := range teamConfigs.Items {
+		tc := &teamConfigs.Items[i]
 		mergedSpec.CollectionRules = append(mergedSpec.CollectionRules, tc.Spec.CollectionRules...)
+		if err := r.addBackupLabel(ctx, tc); err != nil {
+			return &reconcile.Result{}, err
+		}
 	}
 
 	// Get user-collector-config. Not found is fine, user may not have created one.
@@ -67,6 +95,9 @@ func (r *SearchReconciler) createOrUpdateMergedCollectorConfig(
 		mergedSpec.CollectionRules = append(mergedSpec.CollectionRules, userCC.Spec.CollectionRules...)
 		if userCC.Spec.CollectNamespaces != nil {
 			mergedSpec.CollectNamespaces = userCC.Spec.CollectNamespaces.DeepCopy()
+		}
+		if err := r.addBackupLabel(ctx, userCC); err != nil {
+			return &reconcile.Result{}, err
 		}
 	}
 

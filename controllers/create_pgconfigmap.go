@@ -18,7 +18,7 @@ func (r *SearchReconciler) PostgresConfigmap(instance *searchv1alpha1.Search) *c
 	cm := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels: map[string]string{
-				"cluster.open-cluster-management.io/backup": "",
+				backupLabel: "",
 			},
 			Name:      postgresConfigmapName,
 			Namespace: ns,
