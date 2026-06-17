@@ -16,15 +16,18 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
-// ensureCollectorConfigsBackupLabel ensures that all user-managed CollectorConfig CRs in the
+// ensureCollectorConfigsBackupLabel ensures that all source CollectorConfig CRs in the
 // operator namespace carry the ACM backup label so they survive a hub backup/restore cycle.
 //
 // The search.open-cluster-management.io API group is excluded from the automatic resources
-// backup (backup.go excludedAPIGroups). Resources labeled with BackupLabel are picked up by
+// backup (backup.go excludedAPIGroups). Resources labeled with backupLabel are picked up by
 // the acm-resources-generic-schedule backup instead.
 //
-// merged-collector-config is intentionally skipped — it is operator-managed and rebuilt
-// on every reconcile, so persisting it through backup would be redundant and confusing.
+// The only CollectorConfig excluded is merged-collector-config: it is operator-managed and
+// fully derived from the source configs on every reconcile, so backing it up would restore
+// a stale snapshot rather than the sources. All other CollectorConfigs — user-collector-config,
+// integration team configs, and any future per-cluster override configs — are source configs
+// that users expect to survive a backup/restore and should always be labeled.
 func (r *SearchReconciler) ensureCollectorConfigsBackupLabel(
 	ctx context.Context,
 	namespace string,
