@@ -177,6 +177,11 @@ func (r *CollectorConfig) validateCollectorConfig() error {
 				))
 			}
 		}
+
+		// Validate exclude-specific constraints
+		if rule.Action == ActionExclude {
+			allErrs = append(allErrs, validateExcludeRule(&rule, rulePath)...)
+		}
 	}
 
 	if len(allErrs) == 0 {
@@ -184,6 +189,64 @@ func (r *CollectorConfig) validateCollectorConfig() error {
 	}
 
 	return allErrs.ToAggregate()
+}
+
+// protectedKinds lists resource types the search RBAC engine depends on.
+// Excluding them would break per-cluster and namespace-scoped access control.
+var protectedKinds = map[string]string{
+	"ManagedCluster": "cluster.open-cluster-management.io",
+	"Namespace":      "", // core group
+}
+
+// validateExcludeRule enforces constraints specific to exclude rules:
+//   - Cannot target ManagedCluster or Namespace (search RBAC engine depends on them)
+//   - Cannot specify fields, collectConditions, or fieldSuffix (meaningless on an exclude)
+func validateExcludeRule(rule *CollectionRule, path *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+
+	// Reject fields, collectConditions, and fieldSuffix on exclude rules.
+	if len(rule.Fields) > 0 {
+		allErrs = append(allErrs, field.Invalid(
+			path.Child("fields"),
+			rule.Fields,
+			"fields cannot be specified on an exclude rule",
+		))
+	}
+	if rule.CollectConditions != nil && *rule.CollectConditions {
+		allErrs = append(allErrs, field.Invalid(
+			path.Child("collectConditions"),
+			*rule.CollectConditions,
+			"collectConditions cannot be set on an exclude rule",
+		))
+	}
+	if rule.FieldSuffix != "" {
+		allErrs = append(allErrs, field.Invalid(
+			path.Child("fieldSuffix"),
+			rule.FieldSuffix,
+			"fieldSuffix cannot be specified on an exclude rule",
+		))
+	}
+
+	// Reject exclusion of protected resource types.
+	for _, kind := range rule.ResourceSelector.Kinds {
+		if kind == "*" {
+			continue // wildcard is allowed; the collector handles protected types at runtime
+		}
+		if protectedGroup, protected := protectedKinds[kind]; protected {
+			for _, apiGroup := range rule.ResourceSelector.APIGroups {
+				if apiGroup == protectedGroup || apiGroup == "*" {
+					allErrs = append(allErrs, field.Invalid(
+						path.Child("resourceSelector", "kinds"),
+						kind,
+						"cannot exclude "+kind+" — search depends on it for RBAC and cluster-scoped queries",
+					))
+					break
+				}
+			}
+		}
+	}
+
+	return allErrs
 }
 
 // validateResourceSelector validates the ResourceSelector fields

@@ -522,3 +522,127 @@ func TestRejectSAFromWrongNamespace(t *testing.T) {
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "managed by the search operator")
 }
+
+// --- Exclude rule tests ---
+
+// Accept a valid exclude rule with no fields/conditions.
+func TestAcceptExcludeRule(t *testing.T) {
+	c := validConfig()
+	c.Spec.CollectionRules[0] = CollectionRule{
+		Action: ActionExclude,
+		ResourceSelector: ResourceSelector{
+			APIGroups: []string{"coordination.k8s.io"},
+			Kinds:     []string{"Lease"},
+		},
+	}
+	_, err := c.ValidateCreate(context.Background(), c)
+	assert.NoError(t, err)
+}
+
+// Accept exclude with wildcard kind.
+func TestAcceptExcludeWildcardKind(t *testing.T) {
+	c := validConfig()
+	c.Spec.CollectionRules[0] = CollectionRule{
+		Action: ActionExclude,
+		ResourceSelector: ResourceSelector{
+			APIGroups: []string{"coordination.k8s.io"},
+			Kinds:     []string{"*"},
+		},
+	}
+	_, err := c.ValidateCreate(context.Background(), c)
+	assert.NoError(t, err)
+}
+
+// Reject exclude rule that also specifies fields.
+func TestRejectExcludeWithFields(t *testing.T) {
+	c := validConfig()
+	c.Spec.CollectionRules[0] = CollectionRule{
+		Action: ActionExclude,
+		ResourceSelector: ResourceSelector{
+			APIGroups: []string{"apps"},
+			Kinds:     []string{"Deployment"},
+		},
+		Fields: []Field{{Name: "replicas", JSONPath: "{.spec.replicas}"}},
+	}
+	_, err := c.ValidateCreate(context.Background(), c)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "fields cannot be specified on an exclude rule")
+}
+
+// Reject exclude rule that sets collectConditions.
+func TestRejectExcludeWithCollectConditions(t *testing.T) {
+	collectConditions := true
+	c := validConfig()
+	c.Spec.CollectionRules[0] = CollectionRule{
+		Action: ActionExclude,
+		ResourceSelector: ResourceSelector{
+			APIGroups: []string{"apps"},
+			Kinds:     []string{"Deployment"},
+		},
+		CollectConditions: &collectConditions,
+	}
+	_, err := c.ValidateCreate(context.Background(), c)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "collectConditions cannot be set on an exclude rule")
+}
+
+// Reject exclude targeting ManagedCluster.
+func TestRejectExcludeManagedCluster(t *testing.T) {
+	c := validConfig()
+	c.Spec.CollectionRules[0] = CollectionRule{
+		Action: ActionExclude,
+		ResourceSelector: ResourceSelector{
+			APIGroups: []string{"cluster.open-cluster-management.io"},
+			Kinds:     []string{"ManagedCluster"},
+		},
+	}
+	_, err := c.ValidateCreate(context.Background(), c)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "cannot exclude ManagedCluster")
+}
+
+// Reject exclude targeting Namespace.
+func TestRejectExcludeNamespace(t *testing.T) {
+	c := validConfig()
+	c.Spec.CollectionRules[0] = CollectionRule{
+		Action: ActionExclude,
+		ResourceSelector: ResourceSelector{
+			APIGroups: []string{""},
+			Kinds:     []string{"Namespace"},
+		},
+	}
+	_, err := c.ValidateCreate(context.Background(), c)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "cannot exclude Namespace")
+}
+
+// Reject exclude rule that sets fieldSuffix.
+func TestRejectExcludeWithFieldSuffix(t *testing.T) {
+	c := validConfig()
+	c.Spec.CollectionRules[0] = CollectionRule{
+		Action: ActionExclude,
+		ResourceSelector: ResourceSelector{
+			APIGroups: []string{"apps"},
+			Kinds:     []string{"Deployment"},
+		},
+		FieldSuffix: "myteam",
+	}
+	_, err := c.ValidateCreate(context.Background(), c)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "fieldSuffix cannot be specified on an exclude rule")
+}
+
+// Accept exclude that uses wildcard kind even if ManagedCluster exists in the cluster
+// — the wildcard protection is at the collector level, not webhook level.
+func TestAcceptExcludeWildcardNotBlocked(t *testing.T) {
+	c := validConfig()
+	c.Spec.CollectionRules[0] = CollectionRule{
+		Action: ActionExclude,
+		ResourceSelector: ResourceSelector{
+			APIGroups: []string{"cluster.open-cluster-management.io"},
+			Kinds:     []string{"*"},
+		},
+	}
+	_, err := c.ValidateCreate(context.Background(), c)
+	assert.NoError(t, err)
+}

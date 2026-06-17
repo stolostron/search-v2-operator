@@ -78,6 +78,51 @@ func (r *SearchReconciler) ensureWebhookCAInjection(ctx context.Context) error {
 	return r.Update(ctx, vwc, &client.UpdateOptions{})
 }
 
+// excludeOverlapsIntegrationIncludes reports whether a user exclude rule targets
+// resources that any integration team include rule also covers.
+// Two rules overlap when their apiGroups and kinds are not disjoint — i.e. there
+// exists at least one resource matched by both selectors (wildcards "*" match all).
+// When overlap is detected, the integration team include takes precedence and the
+// user exclude is dropped from the merged spec.
+func excludeOverlapsIntegrationIncludes(
+	excludeRule searchv1alpha1.CollectionRule,
+	teamConfigs []searchv1alpha1.CollectorConfig,
+) bool {
+	for _, tc := range teamConfigs {
+		for _, teamRule := range tc.Spec.CollectionRules {
+			if teamRule.Action != searchv1alpha1.ActionInclude {
+				continue
+			}
+			if rulesOverlap(excludeRule.ResourceSelector, teamRule.ResourceSelector) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// rulesOverlap returns true when two ResourceSelectors could match the same resource.
+// Wildcards ("*") in either selector match all values on the other side.
+func rulesOverlap(a, b searchv1alpha1.ResourceSelector) bool {
+	if !setsIntersect(a.APIGroups, b.APIGroups) {
+		return false
+	}
+	return setsIntersect(a.Kinds, b.Kinds)
+}
+
+// setsIntersect returns true when two string slices share at least one element,
+// treating "*" as a universal match for all values on the other side.
+func setsIntersect(a, b []string) bool {
+	for _, x := range a {
+		for _, y := range b {
+			if x == "*" || y == "*" || x == y {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // createOrUpdateMergedCollectorConfig discovers all integration team CollectorConfig CRs (by label)
 // and the user-collector-config (by name), merges their CollectionRules, and writes the result
 // to merged-collector-config.
@@ -126,7 +171,18 @@ func (r *SearchReconciler) createOrUpdateMergedCollectorConfig(
 		return &reconcile.Result{}, err
 	}
 	if err == nil {
-		mergedSpec.CollectionRules = append(mergedSpec.CollectionRules, userCC.Spec.CollectionRules...)
+		for _, rule := range userCC.Spec.CollectionRules {
+			// Integration team wins: drop user exclude rules that overlap with any
+			// integration team include so they cannot suppress integration-required collection.
+			if rule.Action == searchv1alpha1.ActionExclude &&
+				excludeOverlapsIntegrationIncludes(rule, teamConfigs.Items) {
+				log.V(2).Info("Skipping user exclude rule — integration team has include for same resource",
+					"kinds", rule.ResourceSelector.Kinds,
+					"apiGroups", rule.ResourceSelector.APIGroups)
+				continue
+			}
+			mergedSpec.CollectionRules = append(mergedSpec.CollectionRules, rule)
+		}
 		if userCC.Spec.CollectNamespaces != nil {
 			mergedSpec.CollectNamespaces = userCC.Spec.CollectNamespaces.DeepCopy()
 		}
