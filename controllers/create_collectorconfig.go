@@ -7,6 +7,7 @@ import (
 	"sort"
 
 	searchv1alpha1 "github.com/stolostron/search-v2-operator/api/v1alpha1"
+	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -19,7 +20,36 @@ import (
 const (
 	userCollectorConfigName   = "user-collector-config"
 	mergedCollectorConfigName = "merged-collector-config"
+
+	webhookConfigName     = "search-v2-operator-validating-webhook-configuration"
+	caInjectionAnnotation = "service.beta.openshift.io/inject-cabundle"
 )
+
+// ensureWebhookCAInjection ensures the ValidatingWebhookConfiguration has the
+// OpenShift service-ca CA injection annotation. OLM creates the VWC from the
+// CSV webhookdefinitions, which doesn't support custom annotations. Without
+// this annotation, the service-ca controller won't inject the CA bundle and
+// the webhook TLS handshake will fail.
+func (r *SearchReconciler) ensureWebhookCAInjection(ctx context.Context) error {
+	vwc := &admissionregistrationv1.ValidatingWebhookConfiguration{}
+	err := r.Get(ctx, types.NamespacedName{Name: webhookConfigName}, vwc)
+	if err != nil {
+		return err
+	}
+
+	if vwc.Annotations[caInjectionAnnotation] == "true" {
+		log.V(2).Info("Webhook CA injection annotation already present")
+		return nil
+	}
+
+	if vwc.Annotations == nil {
+		vwc.Annotations = map[string]string{}
+	}
+	vwc.Annotations[caInjectionAnnotation] = "true"
+
+	log.Info("Adding webhook CA injection annotation to ValidatingWebhookConfiguration")
+	return r.Update(ctx, vwc, &client.UpdateOptions{})
+}
 
 // createOrUpdateMergedCollectorConfig discovers all integration team CollectorConfig CRs (by label)
 // and the user-collector-config (by name), merges their CollectionRules, and writes the result
