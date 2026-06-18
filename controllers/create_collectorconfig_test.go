@@ -658,9 +658,9 @@ func TestMerge_UserExcludeDropped_StatusConditionSet(t *testing.T) {
 	assert.Nil(t, r.Get(context.TODO(), nn, updated))
 	require.Len(t, updated.Status.Conditions, 1)
 	cond := updated.Status.Conditions[0]
-	assert.Equal(t, "Applied", cond.Type)
-	assert.Equal(t, "False", string(cond.Status))
-	assert.Equal(t, "RulesSkipped", cond.Reason)
+	assert.Equal(t, searchv1alpha1.CollectorConfigConditionApplied, cond.Type)
+	assert.Equal(t, metav1.ConditionFalse, cond.Status)
+	assert.Equal(t, searchv1alpha1.CollectorConfigReasonRulesSkipped, cond.Reason)
 	assert.Contains(t, cond.Message, "Deployment")
 }
 
