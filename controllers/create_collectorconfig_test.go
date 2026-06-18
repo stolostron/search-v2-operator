@@ -7,6 +7,7 @@ import (
 
 	searchv1alpha1 "github.com/stolostron/search-v2-operator/api/v1alpha1"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -50,7 +51,10 @@ func newIntegrationTeamConfig(name string, spec searchv1alpha1.CollectorConfigSp
 func setupReconciler(objs ...runtime.Object) *SearchReconciler {
 	s := scheme.Scheme
 	_ = searchv1alpha1.SchemeBuilder.AddToScheme(s)
-	cl := fake.NewClientBuilder().WithRuntimeObjects(objs...).Build()
+	cl := fake.NewClientBuilder().
+		WithRuntimeObjects(objs...).
+		WithStatusSubresource(&searchv1alpha1.CollectorConfig{}).
+		Build()
 	return &SearchReconciler{Client: cl, Scheme: s}
 }
 
@@ -620,6 +624,45 @@ func TestBackupLabel_MultipleConfigs(t *testing.T) {
 }
 
 // --- Exclude merge protection tests ---
+
+// When a user exclude is dropped due to integration team protection, user-collector-config
+// gets Applied=False/RulesSkipped so the user can discover why their rule had no effect.
+func TestMerge_UserExcludeDropped_StatusConditionSet(t *testing.T) {
+	instance := newSearchInstance()
+	teamCC := newIntegrationTeamConfig("team-a", searchv1alpha1.CollectorConfigSpec{
+		CollectionRules: []searchv1alpha1.CollectionRule{
+			{
+				Action:           searchv1alpha1.ActionInclude,
+				ResourceSelector: searchv1alpha1.ResourceSelector{APIGroups: []string{"apps"}, Kinds: []string{"Deployment"}},
+				Fields:           []searchv1alpha1.Field{{Name: "replicas", JSONPath: "{.spec.replicas}"}},
+			},
+		},
+	})
+	userCC := newCollectorConfig(userCollectorConfigName, searchv1alpha1.CollectorConfigSpec{
+		CollectionRules: []searchv1alpha1.CollectionRule{
+			{
+				Action:           searchv1alpha1.ActionExclude,
+				ResourceSelector: searchv1alpha1.ResourceSelector{APIGroups: []string{"apps"}, Kinds: []string{"Deployment"}},
+			},
+		},
+	})
+	r := setupReconciler(instance, teamCC, userCC)
+
+	result, err := r.createOrUpdateMergedCollectorConfig(context.TODO(), instance)
+	assert.Nil(t, err)
+	assert.Nil(t, result)
+
+	// Verify the status condition on user-collector-config reflects the dropped rule
+	updated := &searchv1alpha1.CollectorConfig{}
+	nn := types.NamespacedName{Name: userCollectorConfigName, Namespace: testNamespace}
+	assert.Nil(t, r.Get(context.TODO(), nn, updated))
+	require.Len(t, updated.Status.Conditions, 1)
+	cond := updated.Status.Conditions[0]
+	assert.Equal(t, "Applied", cond.Type)
+	assert.Equal(t, "False", string(cond.Status))
+	assert.Equal(t, "RulesSkipped", cond.Reason)
+	assert.Contains(t, cond.Message, "Deployment")
+}
 
 // User exclude rule is dropped when integration team has an include for same kind.
 func TestMerge_UserExcludeDroppedWhenIntegrationIncludes(t *testing.T) {

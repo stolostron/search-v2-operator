@@ -4,12 +4,15 @@ package controllers
 
 import (
 	"context"
+	"fmt"
 	"sort"
+	"strings"
 
 	searchv1alpha1 "github.com/stolostron/search-v2-operator/api/v1alpha1"
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
+	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -123,6 +126,45 @@ func setsIntersect(a, b []string) bool {
 	return false
 }
 
+// updateUserCCStatus writes an Applied status condition on user-collector-config to surface
+// any exclude rules that were silently dropped during the merge because integration team
+// include rules take precedence. When no rules were dropped the condition is set to True.
+func (r *SearchReconciler) updateUserCCStatus(
+	ctx context.Context,
+	userCC *searchv1alpha1.CollectorConfig,
+	droppedMessages []string,
+) error {
+	conditionStatus := metav1.ConditionTrue
+	reason := searchv1alpha1.CollectorConfigReasonApplied
+	message := "Configuration merged successfully."
+
+	if len(droppedMessages) > 0 {
+		conditionStatus = metav1.ConditionFalse
+		reason = searchv1alpha1.CollectorConfigReasonRulesSkipped
+		message = strings.Join(droppedMessages, "; ")
+	}
+
+	newCondition := metav1.Condition{
+		Type:               searchv1alpha1.CollectorConfigConditionApplied,
+		Status:             conditionStatus,
+		Reason:             reason,
+		Message:            message,
+		LastTransitionTime: metav1.Now(),
+	}
+
+	existing := apimeta.FindStatusCondition(userCC.Status.Conditions, searchv1alpha1.CollectorConfigConditionApplied)
+	if existing != nil && existing.Status == conditionStatus {
+		newCondition.LastTransitionTime = existing.LastTransitionTime
+	}
+
+	apimeta.SetStatusCondition(&userCC.Status.Conditions, newCondition)
+
+	if err := r.Status().Update(ctx, userCC); err != nil {
+		return err
+	}
+	return nil
+}
+
 // createOrUpdateMergedCollectorConfig discovers all integration team CollectorConfig CRs (by label)
 // and the user-collector-config (by name), merges their CollectionRules, and writes the result
 // to merged-collector-config.
@@ -171,14 +213,18 @@ func (r *SearchReconciler) createOrUpdateMergedCollectorConfig(
 		return &reconcile.Result{}, err
 	}
 	if err == nil {
+		var droppedRuleMessages []string
 		for _, rule := range userCC.Spec.CollectionRules {
 			// Integration team wins: drop user exclude rules that overlap with any
 			// integration team include so they cannot suppress integration-required collection.
 			if rule.Action == searchv1alpha1.ActionExclude &&
 				excludeOverlapsIntegrationIncludes(rule, teamConfigs.Items) {
+				msg := fmt.Sprintf("exclude rule for kinds %v (apiGroups %v) was dropped — integration team has include for the same resource",
+					rule.ResourceSelector.Kinds, rule.ResourceSelector.APIGroups)
 				log.Info("Skipping user exclude rule — integration team has include for same resource",
 					"kinds", rule.ResourceSelector.Kinds,
 					"apiGroups", rule.ResourceSelector.APIGroups)
+				droppedRuleMessages = append(droppedRuleMessages, msg)
 				continue
 			}
 			mergedSpec.CollectionRules = append(mergedSpec.CollectionRules, rule)
@@ -188,6 +234,10 @@ func (r *SearchReconciler) createOrUpdateMergedCollectorConfig(
 		}
 		if err := r.addBackupLabel(ctx, userCC); err != nil {
 			return &reconcile.Result{}, err
+		}
+		// Surface dropped rules to the user via the Applied status condition on user-collector-config.
+		if err := r.updateUserCCStatus(ctx, userCC, droppedRuleMessages); err != nil {
+			log.Error(err, "Could not update user-collector-config status after dropping rules")
 		}
 	}
 
