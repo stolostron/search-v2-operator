@@ -118,15 +118,18 @@ func (r *CollectorConfig) validateCollectorConfig() error {
 
 		hasFields := len(rule.Fields) > 0
 
-		// Validate wildcard kind "*": cannot be used with fields
-		for _, k := range rule.ResourceSelector.Kinds {
-			if k == "*" && hasFields {
-				allErrs = append(allErrs, field.Invalid(
-					rulePath.Child("resourceSelector", "kinds"),
-					rule.ResourceSelector.Kinds,
-					"wildcard kind \"*\" cannot be used with fields",
-				))
-				break
+		// Validate wildcard kind "*": cannot be used with fields (include only —
+		// exclude rules handle this separately in validateExcludeRule).
+		if rule.Action == ActionInclude {
+			for _, k := range rule.ResourceSelector.Kinds {
+				if k == "*" && hasFields {
+					allErrs = append(allErrs, field.Invalid(
+						rulePath.Child("resourceSelector", "kinds"),
+						rule.ResourceSelector.Kinds,
+						"wildcard kind \"*\" cannot be used with fields",
+					))
+					break
+				}
 			}
 		}
 
@@ -167,8 +170,9 @@ func (r *CollectorConfig) validateCollectorConfig() error {
 			))
 		}
 
-		// Validate FieldSuffix if present
-		if rule.FieldSuffix != "" {
+		// Validate FieldSuffix format if present (include only — exclude rules reject
+		// fieldSuffix entirely in validateExcludeRule, avoiding duplicate errors).
+		if rule.Action == ActionInclude && rule.FieldSuffix != "" {
 			if !isValidFieldSuffix(rule.FieldSuffix) {
 				allErrs = append(allErrs, field.Invalid(
 					rulePath.Child("fieldSuffix"),
@@ -192,7 +196,12 @@ func (r *CollectorConfig) validateCollectorConfig() error {
 }
 
 // protectedKinds lists resource types the search RBAC engine depends on.
-// Excluding them would break per-cluster and namespace-scoped access control.
+// Excluding them would break per-cluster and namespace-scoped access control:
+//   - ManagedCluster: used to scope search results to clusters a user can access
+//   - Namespace: used to scope search results to namespaces a user can access
+//
+// ManagedClusterSet and ManagedClusterSetBinding are NOT listed here because the
+// RBAC engine does not query them directly — they are used by placement/policy, not search.
 var protectedKinds = map[string]string{
 	"ManagedCluster": "cluster.open-cluster-management.io",
 	"Namespace":      "", // core group
@@ -212,7 +221,7 @@ func validateExcludeRule(rule *CollectionRule, path *field.Path) field.ErrorList
 			"fields cannot be specified on an exclude rule",
 		))
 	}
-	if rule.CollectConditions != nil && *rule.CollectConditions {
+	if rule.CollectConditions != nil {
 		allErrs = append(allErrs, field.Invalid(
 			path.Child("collectConditions"),
 			*rule.CollectConditions,

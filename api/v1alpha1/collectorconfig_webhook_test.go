@@ -632,6 +632,38 @@ func TestRejectExcludeWithFieldSuffix(t *testing.T) {
 	assert.Contains(t, err.Error(), "fieldSuffix cannot be specified on an exclude rule")
 }
 
+// Reject exclude targeting ManagedCluster via wildcard apiGroup.
+func TestRejectExcludeManagedClusterViaWildcardAPIGroup(t *testing.T) {
+	c := validConfig()
+	c.Spec.CollectionRules[0] = CollectionRule{
+		Action: ActionExclude,
+		ResourceSelector: ResourceSelector{
+			APIGroups: []string{"*"},
+			Kinds:     []string{"ManagedCluster"},
+		},
+	}
+	_, err := c.ValidateCreate(context.Background(), c)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "cannot exclude ManagedCluster")
+}
+
+// Reject exclude with collectConditions: false explicitly set (not just omitted).
+func TestRejectExcludeWithCollectConditionsFalse(t *testing.T) {
+	collectConditionsFalse := false
+	c := validConfig()
+	c.Spec.CollectionRules[0] = CollectionRule{
+		Action: ActionExclude,
+		ResourceSelector: ResourceSelector{
+			APIGroups: []string{"apps"},
+			Kinds:     []string{"Deployment"},
+		},
+		CollectConditions: &collectConditionsFalse,
+	}
+	_, err := c.ValidateCreate(context.Background(), c)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "collectConditions cannot be set on an exclude rule")
+}
+
 // Accept exclude that uses wildcard kind even if ManagedCluster exists in the cluster
 // — the wildcard protection is at the collector level, not webhook level.
 func TestAcceptExcludeWildcardNotBlocked(t *testing.T) {

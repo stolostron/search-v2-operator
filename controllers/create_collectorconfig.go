@@ -176,7 +176,7 @@ func (r *SearchReconciler) createOrUpdateMergedCollectorConfig(
 			// integration team include so they cannot suppress integration-required collection.
 			if rule.Action == searchv1alpha1.ActionExclude &&
 				excludeOverlapsIntegrationIncludes(rule, teamConfigs.Items) {
-				log.V(2).Info("Skipping user exclude rule — integration team has include for same resource",
+				log.Info("Skipping user exclude rule — integration team has include for same resource",
 					"kinds", rule.ResourceSelector.Kinds,
 					"apiGroups", rule.ResourceSelector.APIGroups)
 				continue
