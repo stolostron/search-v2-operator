@@ -668,8 +668,11 @@ func TestMerge_UserExcludeKeptWhenNoIntegrationOverlap(t *testing.T) {
 	userCC := newCollectorConfig(userCollectorConfigName, searchv1alpha1.CollectorConfigSpec{
 		CollectionRules: []searchv1alpha1.CollectionRule{
 			{
-				Action:           searchv1alpha1.ActionExclude,
-				ResourceSelector: searchv1alpha1.ResourceSelector{APIGroups: []string{"coordination.k8s.io"}, Kinds: []string{"Lease"}},
+				Action: searchv1alpha1.ActionExclude,
+				ResourceSelector: searchv1alpha1.ResourceSelector{
+					APIGroups: []string{"coordination.k8s.io"},
+					Kinds:     []string{"Lease"},
+				},
 			},
 		},
 	})
