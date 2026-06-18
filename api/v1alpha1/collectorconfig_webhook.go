@@ -213,7 +213,7 @@ var protectedKinds = map[string]string{
 func validateExcludeRule(rule *CollectionRule, path *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 
-	// Reject fields, collectConditions, and fieldSuffix on exclude rules.
+	// Reject fields, collectConditions, collectAnnotations, and fieldSuffix on exclude rules.
 	if len(rule.Fields) > 0 {
 		allErrs = append(allErrs, field.Invalid(
 			path.Child("fields"),
@@ -226,6 +226,13 @@ func validateExcludeRule(rule *CollectionRule, path *field.Path) field.ErrorList
 			path.Child("collectConditions"),
 			*rule.CollectConditions,
 			"collectConditions cannot be set on an exclude rule",
+		))
+	}
+	if rule.CollectAnnotations != nil {
+		allErrs = append(allErrs, field.Invalid(
+			path.Child("collectAnnotations"),
+			*rule.CollectAnnotations,
+			"collectAnnotations cannot be set on an exclude rule",
 		))
 	}
 	if rule.FieldSuffix != "" {

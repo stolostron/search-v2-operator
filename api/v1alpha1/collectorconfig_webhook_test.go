@@ -569,6 +569,23 @@ func TestRejectExcludeWithFields(t *testing.T) {
 	assert.Contains(t, err.Error(), "fields cannot be specified on an exclude rule")
 }
 
+// Reject exclude rule that sets collectAnnotations.
+func TestRejectExcludeWithCollectAnnotations(t *testing.T) {
+	collectAnnotations := true
+	c := validConfig()
+	c.Spec.CollectionRules[0] = CollectionRule{
+		Action: ActionExclude,
+		ResourceSelector: ResourceSelector{
+			APIGroups: []string{"apps"},
+			Kinds:     []string{"Deployment"},
+		},
+		CollectAnnotations: &collectAnnotations,
+	}
+	_, err := c.ValidateCreate(context.Background(), c)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "collectAnnotations cannot be set on an exclude rule")
+}
+
 // Reject exclude rule that sets collectConditions.
 func TestRejectExcludeWithCollectConditions(t *testing.T) {
 	collectConditions := true
