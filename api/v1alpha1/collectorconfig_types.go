@@ -153,7 +153,7 @@ type CollectionRule struct {
 	// progressively more columns.
 	// For example, if collectAdditionalPrinterColumnsPriority is 5 for a specified CRD, additionalPrinterColumns of
 	// priority 0 through 5 will be collected.
-	// Set to -1 to disable additionalPrinterColumns collection for the matched resources.
+	// Omitting this field or setting to -1 after having been set will disable collection for the matched resource.
 	CollectAdditionalPrinterColumnsPriority *int `json:"collectAdditionalPrinterColumnsPriority,omitempty"`
 }
 
