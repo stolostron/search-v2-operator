@@ -130,7 +130,8 @@ spec:
                         progressively more columns.
                         For example, if collectAdditionalPrinterColumnsPriority is 5 for a specified CRD, additionalPrinterColumns of
                         priority 0 through 5 will be collected.
-                      minimum: 0
+                        Set to -1 to disable additionalPrinterColumns collection for the matched resources.
+                      minimum: -1
                       type: integer
                     collectAnnotations:
                       description: '[NOT IMPLEMENTED] Specifies to collect annotations

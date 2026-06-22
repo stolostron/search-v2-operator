@@ -370,15 +370,25 @@ func TestAcceptCollectPrinterColumnsWithFieldsAndConditions(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-// Reject negative collectAdditionalPrinterColumnsPriority.
-func TestRejectCollectPrinterColumnsNegative(t *testing.T) {
+// Accept collectAdditionalPrinterColumnsPriority of -1 (disables collection).
+func TestAcceptCollectPrinterColumnsDisabled(t *testing.T) {
 	priority := -1
 	c := validConfig()
 	c.Spec.CollectionRules[0].CollectAdditionalPrinterColumnsPriority = &priority
 	c.Spec.CollectionRules[0].Fields = nil
 	_, err := c.ValidateCreate(context.Background(), c)
+	assert.NoError(t, err)
+}
+
+// Reject collectAdditionalPrinterColumnsPriority below -1.
+func TestRejectCollectPrinterColumnsBelowNegativeOne(t *testing.T) {
+	priority := -2
+	c := validConfig()
+	c.Spec.CollectionRules[0].CollectAdditionalPrinterColumnsPriority = &priority
+	c.Spec.CollectionRules[0].Fields = nil
+	_, err := c.ValidateCreate(context.Background(), c)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "must be >= 0")
+	assert.Contains(t, err.Error(), "must be >= -1 (-1 disables collection)")
 }
 
 // --- Webhook protection tests ---

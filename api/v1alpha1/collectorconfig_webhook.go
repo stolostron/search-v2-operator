@@ -158,11 +158,11 @@ func (r *CollectorConfig) validateCollectorConfig() error {
 		}
 
 		// Validate CollectAdditionalPrinterColumnsPriority if present
-		if rule.CollectAdditionalPrinterColumnsPriority != nil && *rule.CollectAdditionalPrinterColumnsPriority < 0 {
+		if rule.CollectAdditionalPrinterColumnsPriority != nil && *rule.CollectAdditionalPrinterColumnsPriority < -1 {
 			allErrs = append(allErrs, field.Invalid(
 				rulePath.Child("collectAdditionalPrinterColumnsPriority"),
 				*rule.CollectAdditionalPrinterColumnsPriority,
-				"must be >= 0",
+				"must be >= -1 (-1 disables collection)",
 			))
 		}
 
