@@ -148,7 +148,13 @@ type CollectionRule struct {
 	CollectConditions *bool `json:"collectConditions,omitempty"`
 
 	// +optional
-	// [NOT IMPLEMENTED] Specifies to collect additionalPrinterColumns from the CRD with the specified priority or higher.
+	// +kubebuilder:validation:Minimum=-1
+	// Specifies to collect additionalPrinterColumns from the CRD with priority up to and including
+	// the specified value. Priority 0 collects only the most important columns; higher values include
+	// progressively more columns.
+	// For example, if collectAdditionalPrinterColumnsPriority is 5 for a specified CRD, additionalPrinterColumns of
+	// priority 0 through 5 will be collected.
+	// Omitting this field or setting to -1 after having been set will disable collection for the matched resource.
 	CollectAdditionalPrinterColumnsPriority *int `json:"collectAdditionalPrinterColumnsPriority,omitempty"`
 }
 

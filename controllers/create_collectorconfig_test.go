@@ -432,6 +432,80 @@ func TestMerge_UserDeleted(t *testing.T) {
 	assert.Nil(t, merged.Spec.CollectNamespaces)
 }
 
+func TestMerge_CollectAdditionalPrinterColumnsPropagated(t *testing.T) {
+	priority := 5
+	instance := newSearchInstance()
+	teamA := newIntegrationTeamConfig("team-a-config", searchv1alpha1.CollectorConfigSpec{
+		CollectionRules: []searchv1alpha1.CollectionRule{
+			{
+				Action:                                  searchv1alpha1.ActionInclude,
+				ResourceSelector:                        searchv1alpha1.ResourceSelector{APIGroups: []string{"monitoring.coreos.com"}, Kinds: []string{"*"}},
+				CollectAdditionalPrinterColumnsPriority: &priority,
+			},
+		},
+	})
+	userCC := newCollectorConfig(userCollectorConfigName, searchv1alpha1.CollectorConfigSpec{
+		CollectionRules: []searchv1alpha1.CollectionRule{
+			{
+				Action:           searchv1alpha1.ActionExclude,
+				ResourceSelector: searchv1alpha1.ResourceSelector{APIGroups: []string{""}, Kinds: []string{"Secret"}},
+			},
+		},
+	})
+	r := setupReconciler(instance, teamA, userCC)
+
+	result, err := r.createOrUpdateMergedCollectorConfig(context.TODO(), instance)
+	assert.Nil(t, err)
+	assert.Nil(t, result)
+
+	merged, err := getMergedConfig(r)
+	assert.Nil(t, err)
+	assert.Len(t, merged.Spec.CollectionRules, 2)
+	// Integration rule with printer columns priority is propagated.
+	assert.NotNil(t, merged.Spec.CollectionRules[0].CollectAdditionalPrinterColumnsPriority)
+	assert.Equal(t, 5, *merged.Spec.CollectionRules[0].CollectAdditionalPrinterColumnsPriority)
+	// User rule has no printer columns priority.
+	assert.Nil(t, merged.Spec.CollectionRules[1].CollectAdditionalPrinterColumnsPriority)
+}
+
+func TestMerge_CollectAdditionalPrinterColumnsPriorityCollision(t *testing.T) {
+	teamPriority := 10
+	userPriority := 0
+	instance := newSearchInstance()
+	teamA := newIntegrationTeamConfig("team-a-config", searchv1alpha1.CollectorConfigSpec{
+		CollectionRules: []searchv1alpha1.CollectionRule{
+			{
+				Action:                                  searchv1alpha1.ActionInclude,
+				ResourceSelector:                        searchv1alpha1.ResourceSelector{APIGroups: []string{"monitoring.coreos.com"}, Kinds: []string{"Alertmanager"}},
+				CollectAdditionalPrinterColumnsPriority: &teamPriority,
+			},
+		},
+	})
+	userCC := newCollectorConfig(userCollectorConfigName, searchv1alpha1.CollectorConfigSpec{
+		CollectionRules: []searchv1alpha1.CollectionRule{
+			{
+				Action:                                  searchv1alpha1.ActionInclude,
+				ResourceSelector:                        searchv1alpha1.ResourceSelector{APIGroups: []string{"monitoring.coreos.com"}, Kinds: []string{"Alertmanager"}},
+				CollectAdditionalPrinterColumnsPriority: &userPriority,
+			},
+		},
+	})
+	r := setupReconciler(instance, teamA, userCC)
+
+	result, err := r.createOrUpdateMergedCollectorConfig(context.TODO(), instance)
+	assert.Nil(t, err)
+	assert.Nil(t, result)
+
+	merged, err := getMergedConfig(r)
+	assert.Nil(t, err)
+	// Both rules are preserved — integration first, user second.
+	assert.Len(t, merged.Spec.CollectionRules, 2)
+	assert.Equal(t, 10, *merged.Spec.CollectionRules[0].CollectAdditionalPrinterColumnsPriority,
+		"Integration team rule should have priority 10")
+	assert.Equal(t, 0, *merged.Spec.CollectionRules[1].CollectAdditionalPrinterColumnsPriority,
+		"User rule should have priority 0")
+}
+
 func TestMerge_OwnerReference(t *testing.T) {
 	instance := newSearchInstance()
 	r := setupReconciler(instance)
