@@ -93,7 +93,7 @@ func (r *SearchReconciler) ServiceMonitor(instance *searchv1alpha1.Search,
 					Scheme:          "https",
 					ScrapeTimeout:   "10s",
 					Interval:        "60s",
-					BearerTokenFile: "/var/run/secrets/kubernetes.io/serviceaccount/token",
+					BearerTokenFile: "/var/run/secrets/kubernetes.io/serviceaccount/token", // #nosec G101
 					TLSConfig: &monitorv1.TLSConfig{
 						SafeTLSConfig: monitorv1.SafeTLSConfig{InsecureSkipVerify: true}},
 				},
