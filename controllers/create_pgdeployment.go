@@ -31,6 +31,8 @@ func (r *SearchReconciler) PGDeployment(instance *searchv1alpha1.Search) *appsv1
 			newSecretEnvVar("POSTGRESQL_USER", "database-user", "search-postgres"),
 			newSecretEnvVar("POSTGRESQL_PASSWORD", "database-password", "search-postgres"),
 			newSecretEnvVar("POSTGRESQL_DATABASE", "database-name", "search-postgres"),
+			newSecretEnvVar("READONLY_API_PASSWORD", "database-password", apiReadonlySecretName),
+			newSecretEnvVar("READONLY_MCP_PASSWORD", "database-password", mcpReadonlySecretName),
 		},
 		VolumeMounts: []corev1.VolumeMount{
 			{
