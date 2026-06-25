@@ -259,38 +259,60 @@ func validateExcludeRule(rule *CollectionRule, path *field.Path) field.ErrorList
 	// Reject exclusion of protected resource types.
 	// Check both specific kind names and wildcard kinds — apiGroups:["cluster.open-cluster-management.io"]
 	// kinds:["*"] would exclude ManagedCluster just as effectively as naming it explicitly.
+	allErrs = append(allErrs, validateProtectedKinds(rule, path)...)
+	return allErrs
+}
+
+// validateProtectedKinds checks that an exclude rule does not target ManagedCluster or Namespace,
+// either by name or via a wildcard kind on their apiGroup.
+func validateProtectedKinds(rule *CollectionRule, path *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
 	for _, kind := range rule.ResourceSelector.Kinds {
 		if kind == "*" {
-			// Wildcard kind: reject if any targeted apiGroup contains a protected kind.
-			for protectedKind, protectedGroup := range protectedKinds {
-				for _, apiGroup := range rule.ResourceSelector.APIGroups {
-					if apiGroup == "*" || apiGroup == protectedGroup {
-						allErrs = append(allErrs, field.Invalid(
-							path.Child("resourceSelector", "apiGroups"),
-							apiGroup,
-							"cannot exclude all kinds in this apiGroup — it contains "+
-								protectedKind+", which search depends on for RBAC and cluster-scoped queries",
-						))
-						break
-					}
-				}
-			}
+			allErrs = append(allErrs, validateWildcardKindAgainstProtected(rule.ResourceSelector.APIGroups, path)...)
 			continue
 		}
 		if protectedGroup, protected := protectedKinds[kind]; protected {
-			for _, apiGroup := range rule.ResourceSelector.APIGroups {
-				if apiGroup == protectedGroup || apiGroup == "*" {
-					allErrs = append(allErrs, field.Invalid(
-						path.Child("resourceSelector", "kinds"),
-						kind,
-						"cannot exclude "+kind+" — search depends on it for RBAC and cluster-scoped queries",
-					))
-					break
-				}
+			allErrs = append(allErrs, validateSpecificKindAgainstProtected(kind, protectedGroup, rule.ResourceSelector.APIGroups, path)...)
+		}
+	}
+	return allErrs
+}
+
+// validateWildcardKindAgainstProtected rejects kinds:["*"] when the rule's apiGroups contain
+// a group that holds a protected kind (e.g. cluster.open-cluster-management.io → ManagedCluster).
+func validateWildcardKindAgainstProtected(apiGroups []string, path *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	for protectedKind, protectedGroup := range protectedKinds {
+		for _, apiGroup := range apiGroups {
+			if apiGroup == "*" || apiGroup == protectedGroup {
+				allErrs = append(allErrs, field.Invalid(
+					path.Child("resourceSelector", "apiGroups"),
+					apiGroup,
+					"cannot exclude all kinds in this apiGroup — it contains "+
+						protectedKind+", which search depends on for RBAC and cluster-scoped queries",
+				))
+				break
 			}
 		}
 	}
+	return allErrs
+}
 
+// validateSpecificKindAgainstProtected rejects a specific protected kind when the rule's
+// apiGroups match the kind's group (including the global wildcard "*").
+func validateSpecificKindAgainstProtected(kind, protectedGroup string, apiGroups []string, path *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	for _, apiGroup := range apiGroups {
+		if apiGroup == protectedGroup || apiGroup == "*" {
+			allErrs = append(allErrs, field.Invalid(
+				path.Child("resourceSelector", "kinds"),
+				kind,
+				"cannot exclude "+kind+" — search depends on it for RBAC and cluster-scoped queries",
+			))
+			break
+		}
+	}
 	return allErrs
 }
 
