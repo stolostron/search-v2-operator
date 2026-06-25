@@ -12,6 +12,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
@@ -20,6 +21,11 @@ import (
 // log is for logging in this package.
 var collectorconfiglog = logf.Log.WithName("collectorconfig-resource")
 
+// webhookClient is the Kubernetes client used to list integration team CollectorConfigs
+// during admission. Set once in SetupWebhookWithManager; nil in unit tests that don't
+// register a manager (the integration-config check is skipped when nil).
+var webhookClient client.Client
+
 // Precompiled validation patterns.
 var (
 	fieldNamePattern   = regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9\-_.]*$`)
@@ -27,6 +33,7 @@ var (
 )
 
 func (r *CollectorConfig) SetupWebhookWithManager(mgr ctrl.Manager) error {
+	webhookClient = mgr.GetClient()
 	return ctrl.NewWebhookManagedBy(mgr).
 		For(r).
 		WithValidator(r).
@@ -50,8 +57,11 @@ func (r *CollectorConfig) ValidateCreate(ctx context.Context, obj runtime.Object
 		return nil, err
 	}
 
-	err := cc.validateCollectorConfig()
-	return nil, err
+	if err := cc.validateCollectorConfig(); err != nil {
+		return nil, err
+	}
+
+	return nil, validateExcludeAgainstIntegrationConfigs(ctx, cc)
 }
 
 // ValidateUpdate implements webhook.CustomValidator so a webhook will be registered for the type
@@ -74,8 +84,11 @@ func (r *CollectorConfig) ValidateUpdate(ctx context.Context, oldObj, newObj run
 		return nil, err
 	}
 
-	err := cc.validateCollectorConfig()
-	return nil, err
+	if err := cc.validateCollectorConfig(); err != nil {
+		return nil, err
+	}
+
+	return nil, validateExcludeAgainstIntegrationConfigs(ctx, cc)
 }
 
 // ValidateDelete implements webhook.CustomValidator so a webhook will be registered for the type
@@ -244,9 +257,25 @@ func validateExcludeRule(rule *CollectionRule, path *field.Path) field.ErrorList
 	}
 
 	// Reject exclusion of protected resource types.
+	// Check both specific kind names and wildcard kinds — apiGroups:["cluster.open-cluster-management.io"]
+	// kinds:["*"] would exclude ManagedCluster just as effectively as naming it explicitly.
 	for _, kind := range rule.ResourceSelector.Kinds {
 		if kind == "*" {
-			continue // wildcard is allowed; the collector handles protected types at runtime
+			// Wildcard kind: reject if any targeted apiGroup contains a protected kind.
+			for protectedKind, protectedGroup := range protectedKinds {
+				for _, apiGroup := range rule.ResourceSelector.APIGroups {
+					if apiGroup == "*" || apiGroup == protectedGroup {
+						allErrs = append(allErrs, field.Invalid(
+							path.Child("resourceSelector", "apiGroups"),
+							apiGroup,
+							"cannot exclude all kinds in this apiGroup — it contains "+
+								protectedKind+", which search depends on for RBAC and cluster-scoped queries",
+						))
+						break
+					}
+				}
+			}
+			continue
 		}
 		if protectedGroup, protected := protectedKinds[kind]; protected {
 			for _, apiGroup := range rule.ResourceSelector.APIGroups {
@@ -406,4 +435,89 @@ func rejectIfProtected(ctx context.Context, cc *CollectorConfig) error {
 	}
 
 	return fmt.Errorf("%s is managed by the search operator and cannot be modified directly", cc.Name)
+}
+
+// validateExcludeAgainstIntegrationConfigs rejects exclude rules on non-integration
+// CollectorConfigs that would conflict with an integration team's include rules.
+// This mirrors the merge-time protection in the operator (excludeOverlapsIntegrationIncludes)
+// but surfaces the error at admission time for an immediate feedback.
+//
+// The check is skipped when:
+//   - webhookClient is nil (unit tests without a registered manager)
+//   - the submitted CollectorConfig is itself an integration team config
+//   - the CollectorConfig has no exclude rules
+func validateExcludeAgainstIntegrationConfigs(ctx context.Context, cc *CollectorConfig) error {
+	if webhookClient == nil {
+		return nil
+	}
+	// Integration team configs are allowed to exclude — they own their own rules.
+	if cc.Labels[IntegrationTeamLabel] == IntegrationTeamLabelValue {
+		return nil
+	}
+
+	// Collect exclude rules from the submitted config.
+	var excludeRules []CollectionRule
+	for _, rule := range cc.Spec.CollectionRules {
+		if rule.Action == ActionExclude {
+			excludeRules = append(excludeRules, rule)
+		}
+	}
+	if len(excludeRules) == 0 {
+		return nil
+	}
+
+	// List integration team CollectorConfigs.
+	integrationList := &CollectorConfigList{}
+	if err := webhookClient.List(ctx, integrationList,
+		client.InNamespace(cc.Namespace),
+		client.MatchingLabels{IntegrationTeamLabel: IntegrationTeamLabelValue},
+	); err != nil {
+		// Log and allow — a list failure should not block valid CRD operations.
+		collectorconfiglog.Error(err, "could not list integration team CollectorConfigs; skipping overlap check")
+		return nil
+	}
+
+	// Reject any exclude that overlaps an integration include.
+	var allErrs field.ErrorList
+	rulesPath := field.NewPath("spec", "collectionRules")
+	for i, excludeRule := range cc.Spec.CollectionRules {
+		if excludeRule.Action != ActionExclude {
+			continue
+		}
+		for _, ic := range integrationList.Items {
+			for _, teamRule := range ic.Spec.CollectionRules {
+				if teamRule.Action != ActionInclude {
+					continue
+				}
+				if webhookSetsIntersect(excludeRule.ResourceSelector.APIGroups, teamRule.ResourceSelector.APIGroups) &&
+					webhookSetsIntersect(excludeRule.ResourceSelector.Kinds, teamRule.ResourceSelector.Kinds) {
+					allErrs = append(allErrs, field.Invalid(
+						rulesPath.Index(i).Child("resourceSelector"),
+						excludeRule.ResourceSelector,
+						"cannot exclude these resources — they are necessary for system functionality",
+					))
+				}
+			}
+		}
+	}
+
+	if len(allErrs) == 0 {
+		return nil
+	}
+	return allErrs.ToAggregate()
+}
+
+// webhookSetsIntersect returns true when two string slices share at least one element,
+// treating "*" as a universal match for all values on the other side.
+// This mirrors controllers.setsIntersect but is local to the webhook package to
+// avoid an import cycle.
+func webhookSetsIntersect(a, b []string) bool {
+	for _, x := range a {
+		for _, y := range b {
+			if x == "*" || y == "*" || x == y {
+				return true
+			}
+		}
+	}
+	return false
 }

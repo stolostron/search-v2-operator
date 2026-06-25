@@ -10,6 +10,8 @@ import (
 	admissionv1 "k8s.io/api/admission/v1"
 	authenticationv1 "k8s.io/api/authentication/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
@@ -681,9 +683,10 @@ func TestRejectExcludeWithCollectConditionsFalse(t *testing.T) {
 	assert.Contains(t, err.Error(), "collectConditions cannot be set on an exclude rule")
 }
 
-// Accept exclude that uses wildcard kind even if ManagedCluster exists in the cluster
-// — the wildcard protection is at the collector level, not webhook level.
-func TestAcceptExcludeWildcardNotBlocked(t *testing.T) {
+// Reject exclude with wildcard kinds when the apiGroup contains a protected resource.
+// e.g. kinds:["*"] apiGroups:["cluster.open-cluster-management.io"] would exclude
+// ManagedCluster which search depends on for RBAC.
+func TestRejectExcludeWildcardKindOnProtectedAPIGroup(t *testing.T) {
 	c := validConfig()
 	c.Spec.CollectionRules[0] = CollectionRule{
 		Action: ActionExclude,
@@ -693,5 +696,141 @@ func TestAcceptExcludeWildcardNotBlocked(t *testing.T) {
 		},
 	}
 	_, err := c.ValidateCreate(context.Background(), c)
-	assert.NoError(t, err)
+	assert.Error(t, err, "wildcard kind on a protected apiGroup must be rejected")
+}
+
+// Reject global wildcard exclude (kinds:["*"] apiGroups:["*"]) — covers all protected resources.
+func TestRejectExcludeGlobalWildcard(t *testing.T) {
+	c := validConfig()
+	c.Spec.CollectionRules[0] = CollectionRule{
+		Action: ActionExclude,
+		ResourceSelector: ResourceSelector{
+			APIGroups: []string{"*"},
+			Kinds:     []string{"*"},
+		},
+	}
+	_, err := c.ValidateCreate(context.Background(), c)
+	assert.Error(t, err, "global wildcard exclude must be rejected — covers protected resources")
+}
+
+// Accept wildcard kind exclude when the apiGroup does not contain any protected resource.
+func TestAcceptExcludeWildcardKindOnSafeAPIGroup(t *testing.T) {
+	c := validConfig()
+	c.Spec.CollectionRules[0] = CollectionRule{
+		Action: ActionExclude,
+		ResourceSelector: ResourceSelector{
+			APIGroups: []string{"apps"},
+			Kinds:     []string{"*"},
+		},
+	}
+	_, err := c.ValidateCreate(context.Background(), c)
+	assert.NoError(t, err, "wildcard kind on a non-protected apiGroup (apps) should be accepted")
+}
+
+// --- Integration config overlap checks ---
+
+// buildFakeWebhookClient registers the scheme and returns a fake client pre-populated
+// with the given objects. It also sets webhookClient for the duration of the test,
+// restoring nil on cleanup.
+func buildFakeWebhookClient(t *testing.T, objs ...runtime.Object) {
+	t.Helper()
+	scheme := runtime.NewScheme()
+	_ = AddToScheme(scheme)
+	builder := fake.NewClientBuilder().WithScheme(scheme)
+	for _, o := range objs {
+		builder = builder.WithRuntimeObjects(o)
+	}
+	webhookClient = builder.Build()
+	t.Cleanup(func() { webhookClient = nil })
+}
+
+func integrationCC(name, namespace, apiGroup string, kinds []string) *CollectorConfig {
+	return &CollectorConfig{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+			Labels:    map[string]string{IntegrationTeamLabel: IntegrationTeamLabelValue},
+		},
+		Spec: CollectorConfigSpec{
+			CollectionRules: []CollectionRule{
+				{
+					Action: ActionInclude,
+					ResourceSelector: ResourceSelector{
+						APIGroups: []string{apiGroup},
+						Kinds:     kinds,
+					},
+					Fields: []Field{
+						{Name: "field1", JSONPath: ".spec.field1"},
+					},
+				},
+			},
+		},
+	}
+}
+
+// Reject user exclude that overlaps an integration team include.
+func TestRejectExcludeOverlapsIntegrationInclude(t *testing.T) {
+	buildFakeWebhookClient(t,
+		integrationCC("grc-config", "default", "policy.open-cluster-management.io", []string{"Policy"}),
+	)
+	c := validConfig()
+	c.Namespace = "default"
+	c.Spec.CollectionRules[0] = CollectionRule{
+		Action: ActionExclude,
+		ResourceSelector: ResourceSelector{
+			APIGroups: []string{"policy.open-cluster-management.io"},
+			Kinds:     []string{"Policy"},
+		},
+	}
+	_, err := c.ValidateCreate(context.Background(), c)
+	assert.Error(t, err, "exclude overlapping integration include must be rejected")
+	assert.Contains(t, err.Error(), "necessary for system functionality")
+}
+
+// Accept user exclude that does NOT overlap any integration include.
+func TestAcceptExcludeNoIntegrationOverlap(t *testing.T) {
+	buildFakeWebhookClient(t,
+		integrationCC("grc-config", "default", "policy.open-cluster-management.io", []string{"Policy"}),
+	)
+	c := validConfig()
+	c.Namespace = "default"
+	c.Spec.CollectionRules[0] = CollectionRule{
+		Action: ActionExclude,
+		ResourceSelector: ResourceSelector{
+			APIGroups: []string{"coordination.k8s.io"},
+			Kinds:     []string{"Lease"},
+		},
+	}
+	_, err := c.ValidateCreate(context.Background(), c)
+	assert.NoError(t, err, "exclude not overlapping any integration include should be accepted")
+}
+
+// Integration team configs are allowed to have exclude rules — they own their own rules.
+func TestAllowIntegrationConfigWithExcludeRule(t *testing.T) {
+	c := validConfig()
+	c.Labels = map[string]string{IntegrationTeamLabel: IntegrationTeamLabelValue}
+	c.Spec.CollectionRules[0] = CollectionRule{
+		Action: ActionExclude,
+		ResourceSelector: ResourceSelector{
+			APIGroups: []string{"apps"},
+			Kinds:     []string{"Deployment"},
+		},
+	}
+	_, err := c.ValidateCreate(context.Background(), c)
+	assert.NoError(t, err, "integration team configs may contain exclude rules")
+}
+
+// When webhookClient is nil (unit test without manager), the overlap check is skipped.
+func TestExcludeIntegrationCheckSkippedWhenClientNil(t *testing.T) {
+	webhookClient = nil
+	c := validConfig()
+	c.Spec.CollectionRules[0] = CollectionRule{
+		Action: ActionExclude,
+		ResourceSelector: ResourceSelector{
+			APIGroups: []string{"policy.open-cluster-management.io"},
+			Kinds:     []string{"Policy"},
+		},
+	}
+	_, err := c.ValidateCreate(context.Background(), c)
+	assert.NoError(t, err, "overlap check should be skipped when webhookClient is nil")
 }

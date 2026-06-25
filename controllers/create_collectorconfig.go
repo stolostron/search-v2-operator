@@ -220,9 +220,10 @@ func (r *SearchReconciler) createOrUpdateMergedCollectorConfig(
 			if rule.Action == searchv1alpha1.ActionExclude &&
 				excludeOverlapsIntegrationIncludes(rule, teamConfigs.Items) {
 				msg := fmt.Sprintf(
-					"exclude rule for kinds %v (apiGroups %v) was dropped — integration team has include for the same resource",
+					"exclude rule for kinds %v (apiGroups %v) was not applied — "+
+						"resource is necessary for system functionality",
 					rule.ResourceSelector.Kinds, rule.ResourceSelector.APIGroups)
-				log.Info("Skipping user exclude rule — integration team has include for same resource",
+				log.Info("Skipping user exclude rule — resource necessary for system functionality",
 					"kinds", rule.ResourceSelector.Kinds,
 					"apiGroups", rule.ResourceSelector.APIGroups)
 				droppedRuleMessages = append(droppedRuleMessages, msg)
