@@ -19,7 +19,7 @@ COPY addon/ addon/
 # Build
 RUN go mod vendor
 RUN CGO_ENABLED=1 go build -a -o manager main.go
-FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
+FROM registry.access.redhat.com/hi/core-runtime:latest-openssl-fips
 
 ENV USER_UID=1001 \
     USER_NAME=search-v2-operator
