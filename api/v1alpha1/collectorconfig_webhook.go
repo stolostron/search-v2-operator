@@ -273,7 +273,8 @@ func validateProtectedKinds(rule *CollectionRule, path *field.Path) field.ErrorL
 			continue
 		}
 		if protectedGroup, protected := protectedKinds[kind]; protected {
-			allErrs = append(allErrs, validateSpecificKindAgainstProtected(kind, protectedGroup, rule.ResourceSelector.APIGroups, path)...)
+			errs := validateSpecificKindAgainstProtected(kind, protectedGroup, rule.ResourceSelector.APIGroups, path)
+			allErrs = append(allErrs, errs...)
 		}
 	}
 	return allErrs
@@ -301,7 +302,9 @@ func validateWildcardKindAgainstProtected(apiGroups []string, path *field.Path) 
 
 // validateSpecificKindAgainstProtected rejects a specific protected kind when the rule's
 // apiGroups match the kind's group (including the global wildcard "*").
-func validateSpecificKindAgainstProtected(kind, protectedGroup string, apiGroups []string, path *field.Path) field.ErrorList {
+func validateSpecificKindAgainstProtected(
+	kind, protectedGroup string, apiGroups []string, path *field.Path,
+) field.ErrorList {
 	var allErrs field.ErrorList
 	for _, apiGroup := range apiGroups {
 		if apiGroup == protectedGroup || apiGroup == "*" {
