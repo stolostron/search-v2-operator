@@ -651,6 +651,22 @@ func TestRejectExcludeWithFieldSuffix(t *testing.T) {
 	assert.Contains(t, err.Error(), "fieldSuffix cannot be specified on an exclude rule")
 }
 
+func TestRejectExcludeWithCollectAdditionalPrinterColumnsPriority(t *testing.T) {
+	priority := 0
+	c := validConfig()
+	c.Spec.CollectionRules[0] = CollectionRule{
+		Action: ActionExclude,
+		ResourceSelector: ResourceSelector{
+			APIGroups: []string{"apps"},
+			Kinds:     []string{"Deployment"},
+		},
+		CollectAdditionalPrinterColumnsPriority: &priority,
+	}
+	_, err := c.ValidateCreate(context.Background(), c)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "collectAdditionalPrinterColumnsPriority cannot be set on an exclude rule")
+}
+
 // Reject exclude targeting ManagedCluster via wildcard apiGroup.
 func TestRejectExcludeManagedClusterViaWildcardAPIGroup(t *testing.T) {
 	c := validConfig()
@@ -784,6 +800,25 @@ func TestRejectExcludeOverlapsIntegrationInclude(t *testing.T) {
 	}
 	_, err := c.ValidateCreate(context.Background(), c)
 	assert.Error(t, err, "exclude overlapping integration include must be rejected")
+	assert.Contains(t, err.Error(), "necessary for system functionality")
+}
+
+// Reject user wildcard kinds exclude that overlaps an integration team include.
+func TestRejectWildcardKindsExcludeOverlapsIntegrationInclude(t *testing.T) {
+	buildFakeWebhookClient(t,
+		integrationCC("grc-config", "default", "policy.open-cluster-management.io", []string{"Policy"}),
+	)
+	c := validConfig()
+	c.Namespace = "default"
+	c.Spec.CollectionRules[0] = CollectionRule{
+		Action: ActionExclude,
+		ResourceSelector: ResourceSelector{
+			APIGroups: []string{"policy.open-cluster-management.io"},
+			Kinds:     []string{"*"},
+		},
+	}
+	_, err := c.ValidateCreate(context.Background(), c)
+	assert.Error(t, err, "exclude wildcard kinds overlapping integration include must be rejected")
 	assert.Contains(t, err.Error(), "necessary for system functionality")
 }
 

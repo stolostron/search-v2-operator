@@ -255,6 +255,13 @@ func validateExcludeRule(rule *CollectionRule, path *field.Path) field.ErrorList
 			"fieldSuffix cannot be specified on an exclude rule",
 		))
 	}
+	if rule.CollectAdditionalPrinterColumnsPriority != nil {
+		allErrs = append(allErrs, field.Invalid(
+			path.Child("collectAdditionalPrinterColumnsPriority"),
+			*rule.CollectAdditionalPrinterColumnsPriority,
+			"collectAdditionalPrinterColumnsPriority cannot be set on an exclude rule",
+		))
+	}
 
 	// Reject exclusion of protected resource types.
 	// Check both specific kind names and wildcard kinds — apiGroups:["cluster.open-cluster-management.io"]
