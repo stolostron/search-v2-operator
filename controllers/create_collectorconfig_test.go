@@ -7,6 +7,7 @@ import (
 
 	searchv1alpha1 "github.com/stolostron/search-v2-operator/api/v1alpha1"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -50,7 +51,10 @@ func newIntegrationTeamConfig(name string, spec searchv1alpha1.CollectorConfigSp
 func setupReconciler(objs ...runtime.Object) *SearchReconciler {
 	s := scheme.Scheme
 	_ = searchv1alpha1.SchemeBuilder.AddToScheme(s)
-	cl := fake.NewClientBuilder().WithRuntimeObjects(objs...).Build()
+	cl := fake.NewClientBuilder().
+		WithRuntimeObjects(objs...).
+		WithStatusSubresource(&searchv1alpha1.CollectorConfig{}).
+		Build()
 	return &SearchReconciler{Client: cl, Scheme: s}
 }
 
@@ -617,4 +621,208 @@ func TestBackupLabel_MultipleConfigs(t *testing.T) {
 	assert.Nil(t, r.Get(context.TODO(), nn, merged))
 	_, hasLabel := merged.Labels[backupLabel]
 	assert.False(t, hasLabel, "merged-collector-config should NOT have the backup label")
+}
+
+// --- Exclude merge protection tests ---
+
+// When a user exclude is dropped due to integration team protection, user-collector-config
+// gets Applied=False/RulesSkipped so the user can discover why their rule had no effect.
+func TestMerge_UserExcludeDropped_StatusConditionSet(t *testing.T) {
+	instance := newSearchInstance()
+	teamCC := newIntegrationTeamConfig("team-a", searchv1alpha1.CollectorConfigSpec{
+		CollectionRules: []searchv1alpha1.CollectionRule{
+			{
+				Action:           searchv1alpha1.ActionInclude,
+				ResourceSelector: searchv1alpha1.ResourceSelector{APIGroups: []string{"apps"}, Kinds: []string{"Deployment"}},
+				Fields:           []searchv1alpha1.Field{{Name: "replicas", JSONPath: "{.spec.replicas}"}},
+			},
+		},
+	})
+	userCC := newCollectorConfig(userCollectorConfigName, searchv1alpha1.CollectorConfigSpec{
+		CollectionRules: []searchv1alpha1.CollectionRule{
+			{
+				Action:           searchv1alpha1.ActionExclude,
+				ResourceSelector: searchv1alpha1.ResourceSelector{APIGroups: []string{"apps"}, Kinds: []string{"Deployment"}},
+			},
+		},
+	})
+	r := setupReconciler(instance, teamCC, userCC)
+
+	result, err := r.createOrUpdateMergedCollectorConfig(context.TODO(), instance)
+	assert.Nil(t, err)
+	assert.Nil(t, result)
+
+	// Verify the status condition on user-collector-config reflects the dropped rule
+	updated := &searchv1alpha1.CollectorConfig{}
+	nn := types.NamespacedName{Name: userCollectorConfigName, Namespace: testNamespace}
+	assert.Nil(t, r.Get(context.TODO(), nn, updated))
+	require.Len(t, updated.Status.Conditions, 1)
+	cond := updated.Status.Conditions[0]
+	assert.Equal(t, searchv1alpha1.CollectorConfigConditionApplied, cond.Type)
+	assert.Equal(t, metav1.ConditionFalse, cond.Status)
+	assert.Equal(t, searchv1alpha1.CollectorConfigReasonRulesSkipped, cond.Reason)
+	assert.Contains(t, cond.Message, "Deployment")
+}
+
+// User exclude rule is dropped when integration team has an include for same kind.
+func TestMerge_UserExcludeDroppedWhenIntegrationIncludes(t *testing.T) {
+	instance := newSearchInstance()
+	teamCC := newIntegrationTeamConfig("team-a", searchv1alpha1.CollectorConfigSpec{
+		CollectionRules: []searchv1alpha1.CollectionRule{
+			{
+				Action:           searchv1alpha1.ActionInclude,
+				ResourceSelector: searchv1alpha1.ResourceSelector{APIGroups: []string{"apps"}, Kinds: []string{"Deployment"}},
+				Fields:           []searchv1alpha1.Field{{Name: "replicas", JSONPath: "{.spec.replicas}"}},
+			},
+		},
+	})
+	userCC := newCollectorConfig(userCollectorConfigName, searchv1alpha1.CollectorConfigSpec{
+		CollectionRules: []searchv1alpha1.CollectionRule{
+			{
+				Action:           searchv1alpha1.ActionExclude,
+				ResourceSelector: searchv1alpha1.ResourceSelector{APIGroups: []string{"apps"}, Kinds: []string{"Deployment"}},
+			},
+		},
+	})
+	r := setupReconciler(instance, teamCC, userCC)
+
+	result, err := r.createOrUpdateMergedCollectorConfig(context.TODO(), instance)
+	assert.Nil(t, err)
+	assert.Nil(t, result)
+
+	merged, err := getMergedConfig(r)
+	assert.Nil(t, err)
+	assert.Len(t, merged.Spec.CollectionRules, 1)
+	assert.Equal(t, searchv1alpha1.ActionInclude, merged.Spec.CollectionRules[0].Action)
+}
+
+// User exclude rule passes through when no integration team covers same kind.
+func TestMerge_UserExcludeKeptWhenNoIntegrationOverlap(t *testing.T) {
+	instance := newSearchInstance()
+	teamCC := newIntegrationTeamConfig("team-a", searchv1alpha1.CollectorConfigSpec{
+		CollectionRules: []searchv1alpha1.CollectionRule{
+			{
+				Action:           searchv1alpha1.ActionInclude,
+				ResourceSelector: searchv1alpha1.ResourceSelector{APIGroups: []string{"apps"}, Kinds: []string{"Deployment"}},
+				Fields:           []searchv1alpha1.Field{{Name: "replicas", JSONPath: "{.spec.replicas}"}},
+			},
+		},
+	})
+	userCC := newCollectorConfig(userCollectorConfigName, searchv1alpha1.CollectorConfigSpec{
+		CollectionRules: []searchv1alpha1.CollectionRule{
+			{
+				Action: searchv1alpha1.ActionExclude,
+				ResourceSelector: searchv1alpha1.ResourceSelector{
+					APIGroups: []string{"coordination.k8s.io"},
+					Kinds:     []string{"Lease"},
+				},
+			},
+		},
+	})
+	r := setupReconciler(instance, teamCC, userCC)
+
+	result, err := r.createOrUpdateMergedCollectorConfig(context.TODO(), instance)
+	assert.Nil(t, err)
+	assert.Nil(t, result)
+
+	merged, err := getMergedConfig(r)
+	assert.Nil(t, err)
+	assert.Len(t, merged.Spec.CollectionRules, 2, "Both team include and user exclude should be in merged")
+	assert.Equal(t, searchv1alpha1.ActionExclude, merged.Spec.CollectionRules[1].Action)
+}
+
+// User exclude with wildcard kind is dropped when integration team includes any kind in same group.
+func TestMerge_UserWildcardExcludeDroppedWhenIntegrationIncludesInGroup(t *testing.T) {
+	instance := newSearchInstance()
+	teamCC := newIntegrationTeamConfig("team-a", searchv1alpha1.CollectorConfigSpec{
+		CollectionRules: []searchv1alpha1.CollectionRule{
+			{
+				Action:           searchv1alpha1.ActionInclude,
+				ResourceSelector: searchv1alpha1.ResourceSelector{APIGroups: []string{"apps"}, Kinds: []string{"Deployment"}},
+				Fields:           []searchv1alpha1.Field{{Name: "replicas", JSONPath: "{.spec.replicas}"}},
+			},
+		},
+	})
+	userCC := newCollectorConfig(userCollectorConfigName, searchv1alpha1.CollectorConfigSpec{
+		CollectionRules: []searchv1alpha1.CollectionRule{
+			{
+				Action:           searchv1alpha1.ActionExclude,
+				ResourceSelector: searchv1alpha1.ResourceSelector{APIGroups: []string{"apps"}, Kinds: []string{"*"}},
+			},
+		},
+	})
+	r := setupReconciler(instance, teamCC, userCC)
+
+	result, err := r.createOrUpdateMergedCollectorConfig(context.TODO(), instance)
+	assert.Nil(t, err)
+	assert.Nil(t, result)
+
+	merged, err := getMergedConfig(r)
+	assert.Nil(t, err)
+	assert.Len(t, merged.Spec.CollectionRules, 1, "User wildcard exclude overlapping team include should be dropped")
+	assert.Equal(t, searchv1alpha1.ActionInclude, merged.Spec.CollectionRules[0].Action)
+}
+
+// Integration team wildcard include blocks specific user exclude.
+func TestMerge_IntegrationWildcardIncludeBlocksSpecificUserExclude(t *testing.T) {
+	instance := newSearchInstance()
+	teamCC := newIntegrationTeamConfig("team-a", searchv1alpha1.CollectorConfigSpec{
+		CollectionRules: []searchv1alpha1.CollectionRule{
+			{
+				Action:           searchv1alpha1.ActionInclude,
+				ResourceSelector: searchv1alpha1.ResourceSelector{APIGroups: []string{"apps"}, Kinds: []string{"*"}},
+			},
+		},
+	})
+	userCC := newCollectorConfig(userCollectorConfigName, searchv1alpha1.CollectorConfigSpec{
+		CollectionRules: []searchv1alpha1.CollectionRule{
+			{
+				Action:           searchv1alpha1.ActionExclude,
+				ResourceSelector: searchv1alpha1.ResourceSelector{APIGroups: []string{"apps"}, Kinds: []string{"Deployment"}},
+			},
+		},
+	})
+	r := setupReconciler(instance, teamCC, userCC)
+
+	result, err := r.createOrUpdateMergedCollectorConfig(context.TODO(), instance)
+	assert.Nil(t, err)
+	assert.Nil(t, result)
+
+	merged, err := getMergedConfig(r)
+	assert.Nil(t, err)
+	assert.Len(t, merged.Spec.CollectionRules, 1,
+		"User exclude of Deployment should be dropped — integration team includes all apps resources")
+	assert.Equal(t, searchv1alpha1.ActionInclude, merged.Spec.CollectionRules[0].Action)
+}
+
+// User include rules are always passed through unchanged.
+func TestMerge_UserIncludeNotAffectedByExcludeProtection(t *testing.T) {
+	instance := newSearchInstance()
+	teamCC := newIntegrationTeamConfig("team-a", searchv1alpha1.CollectorConfigSpec{
+		CollectionRules: []searchv1alpha1.CollectionRule{
+			{
+				Action:           searchv1alpha1.ActionInclude,
+				ResourceSelector: searchv1alpha1.ResourceSelector{APIGroups: []string{"apps"}, Kinds: []string{"Deployment"}},
+				Fields:           []searchv1alpha1.Field{{Name: "replicas", JSONPath: "{.spec.replicas}"}},
+			},
+		},
+	})
+	userCC := newCollectorConfig(userCollectorConfigName, searchv1alpha1.CollectorConfigSpec{
+		CollectionRules: []searchv1alpha1.CollectionRule{
+			{
+				Action:           searchv1alpha1.ActionInclude,
+				ResourceSelector: searchv1alpha1.ResourceSelector{APIGroups: []string{"apps"}, Kinds: []string{"Deployment"}},
+				Fields:           []searchv1alpha1.Field{{Name: "strategy", JSONPath: "{.spec.strategy.type}"}},
+			},
+		},
+	})
+	r := setupReconciler(instance, teamCC, userCC)
+
+	result, err := r.createOrUpdateMergedCollectorConfig(context.TODO(), instance)
+	assert.Nil(t, err)
+	assert.Nil(t, result)
+
+	merged, err := getMergedConfig(r)
+	assert.Nil(t, err)
+	assert.Len(t, merged.Spec.CollectionRules, 2, "Both include rules should be in merged — include is never filtered")
 }

@@ -10,6 +10,8 @@ import (
 	admissionv1 "k8s.io/api/admission/v1"
 	authenticationv1 "k8s.io/api/authentication/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
@@ -230,11 +232,12 @@ func TestAcceptEmptyCollectionRules(t *testing.T) {
 // Accept a config with multiple valid rules.
 func TestAcceptMultipleValidRules(t *testing.T) {
 	c := validConfig()
+	// Use coordination.k8s.io — not in protectedAPIGroups, valid for user exclusion
 	c.Spec.CollectionRules = append(c.Spec.CollectionRules, CollectionRule{
 		Action: ActionExclude,
 		ResourceSelector: ResourceSelector{
-			APIGroups: []string{""},
-			Kinds:     []string{"Secret", "ConfigMap"},
+			APIGroups: []string{"coordination.k8s.io"},
+			Kinds:     []string{"Lease"},
 		},
 	})
 	_, err := c.ValidateCreate(context.Background(), c)
@@ -521,4 +524,351 @@ func TestRejectSAFromWrongNamespace(t *testing.T) {
 	_, err := c.ValidateCreate(wrongNsCtx, c)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "managed by the search operator")
+}
+
+// --- Exclude rule tests ---
+
+// Accept a valid exclude rule with no fields/conditions.
+func TestAcceptExcludeRule(t *testing.T) {
+	c := validConfig()
+	c.Spec.CollectionRules[0] = CollectionRule{
+		Action: ActionExclude,
+		ResourceSelector: ResourceSelector{
+			APIGroups: []string{"coordination.k8s.io"},
+			Kinds:     []string{"Lease"},
+		},
+	}
+	_, err := c.ValidateCreate(context.Background(), c)
+	assert.NoError(t, err)
+}
+
+// Accept exclude with wildcard kind.
+func TestAcceptExcludeWildcardKind(t *testing.T) {
+	c := validConfig()
+	c.Spec.CollectionRules[0] = CollectionRule{
+		Action: ActionExclude,
+		ResourceSelector: ResourceSelector{
+			APIGroups: []string{"coordination.k8s.io"},
+			Kinds:     []string{"*"},
+		},
+	}
+	_, err := c.ValidateCreate(context.Background(), c)
+	assert.NoError(t, err)
+}
+
+// Reject exclude rule that also specifies fields.
+func TestRejectExcludeWithFields(t *testing.T) {
+	c := validConfig()
+	c.Spec.CollectionRules[0] = CollectionRule{
+		Action: ActionExclude,
+		ResourceSelector: ResourceSelector{
+			APIGroups: []string{"apps"},
+			Kinds:     []string{"Deployment"},
+		},
+		Fields: []Field{{Name: "replicas", JSONPath: "{.spec.replicas}"}},
+	}
+	_, err := c.ValidateCreate(context.Background(), c)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "fields cannot be specified on an exclude rule")
+}
+
+// Reject exclude rule that sets collectAnnotations.
+func TestRejectExcludeWithCollectAnnotations(t *testing.T) {
+	collectAnnotations := true
+	c := validConfig()
+	c.Spec.CollectionRules[0] = CollectionRule{
+		Action: ActionExclude,
+		ResourceSelector: ResourceSelector{
+			APIGroups: []string{"apps"},
+			Kinds:     []string{"Deployment"},
+		},
+		CollectAnnotations: &collectAnnotations,
+	}
+	_, err := c.ValidateCreate(context.Background(), c)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "collectAnnotations cannot be set on an exclude rule")
+}
+
+// Reject exclude rule that sets collectConditions.
+func TestRejectExcludeWithCollectConditions(t *testing.T) {
+	collectConditions := true
+	c := validConfig()
+	c.Spec.CollectionRules[0] = CollectionRule{
+		Action: ActionExclude,
+		ResourceSelector: ResourceSelector{
+			APIGroups: []string{"apps"},
+			Kinds:     []string{"Deployment"},
+		},
+		CollectConditions: &collectConditions,
+	}
+	_, err := c.ValidateCreate(context.Background(), c)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "collectConditions cannot be set on an exclude rule")
+}
+
+// Reject exclude targeting ManagedCluster.
+func TestRejectExcludeManagedCluster(t *testing.T) {
+	c := validConfig()
+	c.Spec.CollectionRules[0] = CollectionRule{
+		Action: ActionExclude,
+		ResourceSelector: ResourceSelector{
+			APIGroups: []string{"cluster.open-cluster-management.io"},
+			Kinds:     []string{"ManagedCluster"},
+		},
+	}
+	_, err := c.ValidateCreate(context.Background(), c)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "cannot exclude ManagedCluster")
+}
+
+// Reject exclude targeting Namespace.
+func TestRejectExcludeNamespace(t *testing.T) {
+	c := validConfig()
+	c.Spec.CollectionRules[0] = CollectionRule{
+		Action: ActionExclude,
+		ResourceSelector: ResourceSelector{
+			APIGroups: []string{""},
+			Kinds:     []string{"Namespace"},
+		},
+	}
+	_, err := c.ValidateCreate(context.Background(), c)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "cannot exclude Namespace")
+}
+
+// Reject exclude rule that sets fieldSuffix.
+func TestRejectExcludeWithFieldSuffix(t *testing.T) {
+	c := validConfig()
+	c.Spec.CollectionRules[0] = CollectionRule{
+		Action: ActionExclude,
+		ResourceSelector: ResourceSelector{
+			APIGroups: []string{"apps"},
+			Kinds:     []string{"Deployment"},
+		},
+		FieldSuffix: "myteam",
+	}
+	_, err := c.ValidateCreate(context.Background(), c)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "fieldSuffix cannot be specified on an exclude rule")
+}
+
+func TestRejectExcludeWithCollectAdditionalPrinterColumnsPriority(t *testing.T) {
+	priority := 0
+	c := validConfig()
+	c.Spec.CollectionRules[0] = CollectionRule{
+		Action: ActionExclude,
+		ResourceSelector: ResourceSelector{
+			APIGroups: []string{"apps"},
+			Kinds:     []string{"Deployment"},
+		},
+		CollectAdditionalPrinterColumnsPriority: &priority,
+	}
+	_, err := c.ValidateCreate(context.Background(), c)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "collectAdditionalPrinterColumnsPriority cannot be set on an exclude rule")
+}
+
+// Reject exclude targeting ManagedCluster via wildcard apiGroup.
+func TestRejectExcludeManagedClusterViaWildcardAPIGroup(t *testing.T) {
+	c := validConfig()
+	c.Spec.CollectionRules[0] = CollectionRule{
+		Action: ActionExclude,
+		ResourceSelector: ResourceSelector{
+			APIGroups: []string{"*"},
+			Kinds:     []string{"ManagedCluster"},
+		},
+	}
+	_, err := c.ValidateCreate(context.Background(), c)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "cannot exclude ManagedCluster")
+}
+
+// Reject exclude with collectConditions: false explicitly set (not just omitted).
+func TestRejectExcludeWithCollectConditionsFalse(t *testing.T) {
+	collectConditionsFalse := false
+	c := validConfig()
+	c.Spec.CollectionRules[0] = CollectionRule{
+		Action: ActionExclude,
+		ResourceSelector: ResourceSelector{
+			APIGroups: []string{"apps"},
+			Kinds:     []string{"Deployment"},
+		},
+		CollectConditions: &collectConditionsFalse,
+	}
+	_, err := c.ValidateCreate(context.Background(), c)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "collectConditions cannot be set on an exclude rule")
+}
+
+// Reject exclude with wildcard kinds when the apiGroup contains a protected resource.
+// e.g. kinds:["*"] apiGroups:["cluster.open-cluster-management.io"] would exclude
+// ManagedCluster which search depends on for RBAC.
+func TestRejectExcludeWildcardKindOnProtectedAPIGroup(t *testing.T) {
+	c := validConfig()
+	c.Spec.CollectionRules[0] = CollectionRule{
+		Action: ActionExclude,
+		ResourceSelector: ResourceSelector{
+			APIGroups: []string{"cluster.open-cluster-management.io"},
+			Kinds:     []string{"*"},
+		},
+	}
+	_, err := c.ValidateCreate(context.Background(), c)
+	assert.Error(t, err, "wildcard kind on a protected apiGroup must be rejected")
+}
+
+// Reject global wildcard exclude (kinds:["*"] apiGroups:["*"]) — covers all protected resources.
+func TestRejectExcludeGlobalWildcard(t *testing.T) {
+	c := validConfig()
+	c.Spec.CollectionRules[0] = CollectionRule{
+		Action: ActionExclude,
+		ResourceSelector: ResourceSelector{
+			APIGroups: []string{"*"},
+			Kinds:     []string{"*"},
+		},
+	}
+	_, err := c.ValidateCreate(context.Background(), c)
+	assert.Error(t, err, "global wildcard exclude must be rejected — covers protected resources")
+}
+
+// Accept wildcard kind exclude when the apiGroup does not contain any protected resource.
+func TestAcceptExcludeWildcardKindOnSafeAPIGroup(t *testing.T) {
+	c := validConfig()
+	c.Spec.CollectionRules[0] = CollectionRule{
+		Action: ActionExclude,
+		ResourceSelector: ResourceSelector{
+			APIGroups: []string{"apps"},
+			Kinds:     []string{"*"},
+		},
+	}
+	_, err := c.ValidateCreate(context.Background(), c)
+	assert.NoError(t, err, "wildcard kind on a non-protected apiGroup (apps) should be accepted")
+}
+
+// --- Integration config overlap checks ---
+
+// buildFakeWebhookClient registers the scheme and returns a fake client pre-populated
+// with the given objects. It also sets webhookClient for the duration of the test,
+// restoring nil on cleanup.
+func buildFakeWebhookClient(t *testing.T, objs ...runtime.Object) {
+	t.Helper()
+	scheme := runtime.NewScheme()
+	_ = AddToScheme(scheme)
+	builder := fake.NewClientBuilder().WithScheme(scheme)
+	for _, o := range objs {
+		builder = builder.WithRuntimeObjects(o)
+	}
+	webhookClient = builder.Build()
+	t.Cleanup(func() { webhookClient = nil })
+}
+
+func integrationCC(name, namespace, apiGroup string, kinds []string) *CollectorConfig {
+	return &CollectorConfig{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+			Labels:    map[string]string{IntegrationTeamLabel: IntegrationTeamLabelValue},
+		},
+		Spec: CollectorConfigSpec{
+			CollectionRules: []CollectionRule{
+				{
+					Action: ActionInclude,
+					ResourceSelector: ResourceSelector{
+						APIGroups: []string{apiGroup},
+						Kinds:     kinds,
+					},
+					Fields: []Field{
+						{Name: "field1", JSONPath: ".spec.field1"},
+					},
+				},
+			},
+		},
+	}
+}
+
+// Reject user exclude that overlaps an integration team include.
+func TestRejectExcludeOverlapsIntegrationInclude(t *testing.T) {
+	buildFakeWebhookClient(t,
+		integrationCC("grc-config", "default", "policy.open-cluster-management.io", []string{"Policy"}),
+	)
+	c := validConfig()
+	c.Namespace = "default"
+	c.Spec.CollectionRules[0] = CollectionRule{
+		Action: ActionExclude,
+		ResourceSelector: ResourceSelector{
+			APIGroups: []string{"policy.open-cluster-management.io"},
+			Kinds:     []string{"Policy"},
+		},
+	}
+	_, err := c.ValidateCreate(context.Background(), c)
+	assert.Error(t, err, "exclude overlapping integration include must be rejected")
+	assert.Contains(t, err.Error(), "necessary for system functionality")
+}
+
+// Reject user wildcard kinds exclude that overlaps an integration team include.
+func TestRejectWildcardKindsExcludeOverlapsIntegrationInclude(t *testing.T) {
+	buildFakeWebhookClient(t,
+		integrationCC("grc-config", "default", "policy.open-cluster-management.io", []string{"Policy"}),
+	)
+	c := validConfig()
+	c.Namespace = "default"
+	c.Spec.CollectionRules[0] = CollectionRule{
+		Action: ActionExclude,
+		ResourceSelector: ResourceSelector{
+			APIGroups: []string{"policy.open-cluster-management.io"},
+			Kinds:     []string{"*"},
+		},
+	}
+	_, err := c.ValidateCreate(context.Background(), c)
+	assert.Error(t, err, "exclude wildcard kinds overlapping integration include must be rejected")
+	assert.Contains(t, err.Error(), "necessary for system functionality")
+}
+
+// Accept user exclude that does NOT overlap any integration include.
+func TestAcceptExcludeNoIntegrationOverlap(t *testing.T) {
+	buildFakeWebhookClient(t,
+		integrationCC("grc-config", "default", "policy.open-cluster-management.io", []string{"Policy"}),
+	)
+	c := validConfig()
+	c.Namespace = "default"
+	c.Spec.CollectionRules[0] = CollectionRule{
+		Action: ActionExclude,
+		ResourceSelector: ResourceSelector{
+			APIGroups: []string{"coordination.k8s.io"},
+			Kinds:     []string{"Lease"},
+		},
+	}
+	_, err := c.ValidateCreate(context.Background(), c)
+	assert.NoError(t, err, "exclude not overlapping any integration include should be accepted")
+}
+
+// Integration team configs are allowed to have exclude rules — they own their own rules.
+func TestAllowIntegrationConfigWithExcludeRule(t *testing.T) {
+	c := validConfig()
+	c.Labels = map[string]string{IntegrationTeamLabel: IntegrationTeamLabelValue}
+	c.Spec.CollectionRules[0] = CollectionRule{
+		Action: ActionExclude,
+		ResourceSelector: ResourceSelector{
+			APIGroups: []string{"apps"},
+			Kinds:     []string{"Deployment"},
+		},
+	}
+	_, err := c.ValidateCreate(context.Background(), c)
+	assert.NoError(t, err, "integration team configs may contain exclude rules")
+}
+
+// When webhookClient is nil (unit test without manager), the dynamic integration
+// config overlap check is skipped. Uses coordination.k8s.io which is not in
+// protectedAPIGroups so only the dynamic check is relevant here.
+func TestExcludeIntegrationCheckSkippedWhenClientNil(t *testing.T) {
+	webhookClient = nil
+	c := validConfig()
+	c.Spec.CollectionRules[0] = CollectionRule{
+		Action: ActionExclude,
+		ResourceSelector: ResourceSelector{
+			APIGroups: []string{"coordination.k8s.io"},
+			Kinds:     []string{"Lease"},
+		},
+	}
+	_, err := c.ValidateCreate(context.Background(), c)
+	assert.NoError(t, err, "dynamic overlap check should be skipped when webhookClient is nil")
 }

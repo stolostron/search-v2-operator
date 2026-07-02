@@ -12,6 +12,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
@@ -20,6 +21,11 @@ import (
 // log is for logging in this package.
 var collectorconfiglog = logf.Log.WithName("collectorconfig-resource")
 
+// webhookClient is the Kubernetes client used to list integration team CollectorConfigs
+// during admission. Set once in SetupWebhookWithManager; nil in unit tests that don't
+// register a manager (the integration-config check is skipped when nil).
+var webhookClient client.Client
+
 // Precompiled validation patterns.
 var (
 	fieldNamePattern   = regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9\-_.]*$`)
@@ -27,6 +33,7 @@ var (
 )
 
 func (r *CollectorConfig) SetupWebhookWithManager(mgr ctrl.Manager) error {
+	webhookClient = mgr.GetClient()
 	return ctrl.NewWebhookManagedBy(mgr).
 		For(r).
 		WithValidator(r).
@@ -50,8 +57,11 @@ func (r *CollectorConfig) ValidateCreate(ctx context.Context, obj runtime.Object
 		return nil, err
 	}
 
-	err := cc.validateCollectorConfig()
-	return nil, err
+	if err := cc.validateCollectorConfig(); err != nil {
+		return nil, err
+	}
+
+	return nil, validateExcludeAgainstIntegrationConfigs(ctx, cc)
 }
 
 // ValidateUpdate implements webhook.CustomValidator so a webhook will be registered for the type
@@ -74,8 +84,11 @@ func (r *CollectorConfig) ValidateUpdate(ctx context.Context, oldObj, newObj run
 		return nil, err
 	}
 
-	err := cc.validateCollectorConfig()
-	return nil, err
+	if err := cc.validateCollectorConfig(); err != nil {
+		return nil, err
+	}
+
+	return nil, validateExcludeAgainstIntegrationConfigs(ctx, cc)
 }
 
 // ValidateDelete implements webhook.CustomValidator so a webhook will be registered for the type
@@ -118,15 +131,18 @@ func (r *CollectorConfig) validateCollectorConfig() error {
 
 		hasFields := len(rule.Fields) > 0
 
-		// Validate wildcard kind "*": cannot be used with fields
-		for _, k := range rule.ResourceSelector.Kinds {
-			if k == "*" && hasFields {
-				allErrs = append(allErrs, field.Invalid(
-					rulePath.Child("resourceSelector", "kinds"),
-					rule.ResourceSelector.Kinds,
-					"wildcard kind \"*\" cannot be used with fields",
-				))
-				break
+		// Validate wildcard kind "*": cannot be used with fields (include only —
+		// exclude rules handle this separately in validateExcludeRule).
+		if rule.Action == ActionInclude {
+			for _, k := range rule.ResourceSelector.Kinds {
+				if k == "*" && hasFields {
+					allErrs = append(allErrs, field.Invalid(
+						rulePath.Child("resourceSelector", "kinds"),
+						rule.ResourceSelector.Kinds,
+						"wildcard kind \"*\" cannot be used with fields",
+					))
+					break
+				}
 			}
 		}
 
@@ -167,8 +183,9 @@ func (r *CollectorConfig) validateCollectorConfig() error {
 			))
 		}
 
-		// Validate FieldSuffix if present
-		if rule.FieldSuffix != "" {
+		// Validate FieldSuffix format if present (include only — exclude rules reject
+		// fieldSuffix entirely in validateExcludeRule, avoiding duplicate errors).
+		if rule.Action == ActionInclude && rule.FieldSuffix != "" {
 			if !isValidFieldSuffix(rule.FieldSuffix) {
 				allErrs = append(allErrs, field.Invalid(
 					rulePath.Child("fieldSuffix"),
@@ -177,6 +194,11 @@ func (r *CollectorConfig) validateCollectorConfig() error {
 				))
 			}
 		}
+
+		// Validate exclude-specific constraints
+		if rule.Action == ActionExclude {
+			allErrs = append(allErrs, validateExcludeRule(&rule, rulePath)...)
+		}
 	}
 
 	if len(allErrs) == 0 {
@@ -184,6 +206,196 @@ func (r *CollectorConfig) validateCollectorConfig() error {
 	}
 
 	return allErrs.ToAggregate()
+}
+
+// protectedKinds lists resource types the search RBAC engine depends on.
+// Excluding them would break per-cluster and namespace-scoped access control:
+//   - ManagedCluster: used to scope search results to clusters a user can access
+//   - Namespace: used to scope search results to namespaces a user can access
+//
+// ManagedClusterSet and ManagedClusterSetBinding are NOT listed here because the
+// RBAC engine does not query them directly — they are used by placement/policy, not search.
+var protectedKinds = map[string]string{
+	"ManagedCluster": "cluster.open-cluster-management.io",
+	"Namespace":      "", // core group
+}
+
+// protectedAPIGroups is a temporary list of API groups that must not be excluded.
+// These cover resources that integration teams (CNV, OLM, GRC, Argo, Kyverno, etc.)
+// and Search itself depend on. Once integration teams ship labeled CollectorConfig CRs
+// (search.open-cluster-management.io/config-type: integration), the dynamic webhook check
+// will replace this list. Until then this provides a safety net.
+//
+// Source: search-collector/pkg/transforms/genericResourceConfig.go plus ACM integration teams.
+// "" = core group (ConfigMap, Job, Node, Pod, PVC — needed by CNV, console, and others).
+var protectedAPIGroups = map[string]struct{}{
+	// Core group — ConfigMap, Job, Node, Pod, PVC needed by CNV / console
+	"": {},
+	// OLM
+	"operators.coreos.com": {},
+	// OpenShift cluster config
+	"config.openshift.io": {},
+	// CNV / KubeVirt family
+	"kubevirt.io":                              {},
+	"cdi.kubevirt.io":                          {},
+	"migrations.kubevirt.io":                   {},
+	"clone.kubevirt.io":                        {},
+	"instancetype.kubevirt.io":                 {},
+	"snapshot.kubevirt.io":                     {},
+	"networkaddonsoperator.network.kubevirt.io": {},
+	// Networking
+	"k8s.cni.cncf.io": {},
+	// Storage
+	"storage.k8s.io":       {},
+	"snapshot.storage.k8s.io":      {},
+	"snapshot.storage.kubevirt.io": {},
+	// OpenShift templates
+	"template.openshift.io": {},
+	// Admission / webhook configs
+	"admissionregistration.k8s.io": {},
+	// ACM hub operator
+	"operator.open-cluster-management.io": {},
+	// ACM Search itself
+	"search.open-cluster-management.io": {},
+	// ACM app lifecycle
+	"apps.open-cluster-management.io": {},
+	"app.k8s.io":                       {},
+	// GRC / Policy
+	"policy.open-cluster-management.io": {},
+	"wgpolicyk8s.io":                    {},
+	// Kyverno
+	"kyverno.io":          {},
+	"policies.kyverno.io": {},
+	// Gatekeeper
+	"constraints.gatekeeper.sh": {},
+	// Argo
+	"argoproj.io": {},
+}
+
+// validateExcludeRule enforces constraints specific to exclude rules:
+//   - Cannot target ManagedCluster or Namespace (search RBAC engine depends on them)
+//   - Cannot specify fields, collectConditions, or fieldSuffix (meaningless on an exclude)
+func validateExcludeRule(rule *CollectionRule, path *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+
+	// Reject fields, collectConditions, collectAnnotations, and fieldSuffix on exclude rules.
+	if len(rule.Fields) > 0 {
+		allErrs = append(allErrs, field.Invalid(
+			path.Child("fields"),
+			rule.Fields,
+			"fields cannot be specified on an exclude rule",
+		))
+	}
+	if rule.CollectConditions != nil {
+		allErrs = append(allErrs, field.Invalid(
+			path.Child("collectConditions"),
+			*rule.CollectConditions,
+			"collectConditions cannot be set on an exclude rule",
+		))
+	}
+	if rule.CollectAnnotations != nil {
+		allErrs = append(allErrs, field.Invalid(
+			path.Child("collectAnnotations"),
+			*rule.CollectAnnotations,
+			"collectAnnotations cannot be set on an exclude rule",
+		))
+	}
+	if rule.FieldSuffix != "" {
+		allErrs = append(allErrs, field.Invalid(
+			path.Child("fieldSuffix"),
+			rule.FieldSuffix,
+			"fieldSuffix cannot be specified on an exclude rule",
+		))
+	}
+	if rule.CollectAdditionalPrinterColumnsPriority != nil {
+		allErrs = append(allErrs, field.Invalid(
+			path.Child("collectAdditionalPrinterColumnsPriority"),
+			*rule.CollectAdditionalPrinterColumnsPriority,
+			"collectAdditionalPrinterColumnsPriority cannot be set on an exclude rule",
+		))
+	}
+
+	// Reject exclusion of RBAC-critical kinds (ManagedCluster, Namespace).
+	allErrs = append(allErrs, validateProtectedKinds(rule, path)...)
+
+	// Reject exclusion of integration-critical API groups.
+	// This is a temporary safety net until integration teams ship labeled CollectorConfigs.
+	for _, apiGroup := range rule.ResourceSelector.APIGroups {
+		if apiGroup == "*" {
+			allErrs = append(allErrs, field.Invalid(
+				path.Child("resourceSelector", "apiGroups"),
+				apiGroup,
+				"cannot exclude all apiGroups — "+
+					"resources in many groups are necessary for system functionality",
+			))
+			break
+		}
+		if _, protected := protectedAPIGroups[apiGroup]; protected {
+			allErrs = append(allErrs, field.Invalid(
+				path.Child("resourceSelector", "apiGroups"),
+				apiGroup,
+				"cannot exclude resources in apiGroup "+apiGroup+
+					" — these resources are necessary for system functionality",
+			))
+		}
+	}
+	return allErrs
+}
+
+// validateProtectedKinds checks that an exclude rule does not target ManagedCluster or Namespace,
+// either by name or via a wildcard kind on their apiGroup.
+func validateProtectedKinds(rule *CollectionRule, path *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	for _, kind := range rule.ResourceSelector.Kinds {
+		if kind == "*" {
+			allErrs = append(allErrs, validateWildcardKindAgainstProtected(rule.ResourceSelector.APIGroups, path)...)
+			continue
+		}
+		if protectedGroup, protected := protectedKinds[kind]; protected {
+			errs := validateSpecificKindAgainstProtected(kind, protectedGroup, rule.ResourceSelector.APIGroups, path)
+			allErrs = append(allErrs, errs...)
+		}
+	}
+	return allErrs
+}
+
+// validateWildcardKindAgainstProtected rejects kinds:["*"] when the rule's apiGroups contain
+// a group that holds a protected kind (e.g. cluster.open-cluster-management.io → ManagedCluster).
+func validateWildcardKindAgainstProtected(apiGroups []string, path *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	for protectedKind, protectedGroup := range protectedKinds {
+		for _, apiGroup := range apiGroups {
+			if apiGroup == "*" || apiGroup == protectedGroup {
+				allErrs = append(allErrs, field.Invalid(
+					path.Child("resourceSelector", "apiGroups"),
+					apiGroup,
+					"cannot exclude all kinds in this apiGroup — it contains "+
+						protectedKind+", which search depends on for RBAC and cluster-scoped queries",
+				))
+				break
+			}
+		}
+	}
+	return allErrs
+}
+
+// validateSpecificKindAgainstProtected rejects a specific protected kind when the rule's
+// apiGroups match the kind's group (including the global wildcard "*").
+func validateSpecificKindAgainstProtected(
+	kind, protectedGroup string, apiGroups []string, path *field.Path,
+) field.ErrorList {
+	var allErrs field.ErrorList
+	for _, apiGroup := range apiGroups {
+		if apiGroup == protectedGroup || apiGroup == "*" {
+			allErrs = append(allErrs, field.Invalid(
+				path.Child("resourceSelector", "kinds"),
+				kind,
+				"cannot exclude "+kind+" — search depends on it for RBAC and cluster-scoped queries",
+			))
+			break
+		}
+	}
+	return allErrs
 }
 
 // validateResourceSelector validates the ResourceSelector fields
@@ -327,4 +539,89 @@ func rejectIfProtected(ctx context.Context, cc *CollectorConfig) error {
 	}
 
 	return fmt.Errorf("%s is managed by the search operator and cannot be modified directly", cc.Name)
+}
+
+// validateExcludeAgainstIntegrationConfigs rejects exclude rules on non-integration
+// CollectorConfigs that would conflict with an integration team's include rules.
+// This mirrors the merge-time protection in the operator (excludeOverlapsIntegrationIncludes)
+// but surfaces the error at admission time for an immediate feedback.
+//
+// The check is skipped when:
+//   - webhookClient is nil (unit tests without a registered manager)
+//   - the submitted CollectorConfig is itself an integration team config
+//   - the CollectorConfig has no exclude rules
+func validateExcludeAgainstIntegrationConfigs(ctx context.Context, cc *CollectorConfig) error {
+	if webhookClient == nil {
+		return nil
+	}
+	// Integration team configs are allowed to exclude — they own their own rules.
+	if cc.Labels[IntegrationTeamLabel] == IntegrationTeamLabelValue {
+		return nil
+	}
+
+	// Collect exclude rules from the submitted config.
+	var excludeRules []CollectionRule
+	for _, rule := range cc.Spec.CollectionRules {
+		if rule.Action == ActionExclude {
+			excludeRules = append(excludeRules, rule)
+		}
+	}
+	if len(excludeRules) == 0 {
+		return nil
+	}
+
+	// List integration team CollectorConfigs.
+	integrationList := &CollectorConfigList{}
+	if err := webhookClient.List(ctx, integrationList,
+		client.InNamespace(cc.Namespace),
+		client.MatchingLabels{IntegrationTeamLabel: IntegrationTeamLabelValue},
+	); err != nil {
+		// Log and allow — a list failure should not block valid CRD operations.
+		collectorconfiglog.Error(err, "could not list integration team CollectorConfigs; skipping overlap check")
+		return nil
+	}
+
+	// Reject any exclude that overlaps an integration include.
+	var allErrs field.ErrorList
+	rulesPath := field.NewPath("spec", "collectionRules")
+	for i, excludeRule := range cc.Spec.CollectionRules {
+		if excludeRule.Action != ActionExclude {
+			continue
+		}
+		for _, ic := range integrationList.Items {
+			for _, teamRule := range ic.Spec.CollectionRules {
+				if teamRule.Action != ActionInclude {
+					continue
+				}
+				if webhookSetsIntersect(excludeRule.ResourceSelector.APIGroups, teamRule.ResourceSelector.APIGroups) &&
+					webhookSetsIntersect(excludeRule.ResourceSelector.Kinds, teamRule.ResourceSelector.Kinds) {
+					allErrs = append(allErrs, field.Invalid(
+						rulesPath.Index(i).Child("resourceSelector"),
+						excludeRule.ResourceSelector,
+						"cannot exclude these resources — they are necessary for system functionality",
+					))
+				}
+			}
+		}
+	}
+
+	if len(allErrs) == 0 {
+		return nil
+	}
+	return allErrs.ToAggregate()
+}
+
+// webhookSetsIntersect returns true when two string slices share at least one element,
+// treating "*" as a universal match for all values on the other side.
+// This mirrors controllers.setsIntersect but is local to the webhook package to
+// avoid an import cycle.
+func webhookSetsIntersect(a, b []string) bool {
+	for _, x := range a {
+		for _, y := range b {
+			if x == "*" || y == "*" || x == y {
+				return true
+			}
+		}
+	}
+	return false
 }
