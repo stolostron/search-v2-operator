@@ -232,11 +232,12 @@ func TestAcceptEmptyCollectionRules(t *testing.T) {
 // Accept a config with multiple valid rules.
 func TestAcceptMultipleValidRules(t *testing.T) {
 	c := validConfig()
+	// Use coordination.k8s.io — not in protectedAPIGroups, valid for user exclusion
 	c.Spec.CollectionRules = append(c.Spec.CollectionRules, CollectionRule{
 		Action: ActionExclude,
 		ResourceSelector: ResourceSelector{
-			APIGroups: []string{""},
-			Kinds:     []string{"Secret", "ConfigMap"},
+			APIGroups: []string{"coordination.k8s.io"},
+			Kinds:     []string{"Lease"},
 		},
 	})
 	_, err := c.ValidateCreate(context.Background(), c)
@@ -855,17 +856,19 @@ func TestAllowIntegrationConfigWithExcludeRule(t *testing.T) {
 	assert.NoError(t, err, "integration team configs may contain exclude rules")
 }
 
-// When webhookClient is nil (unit test without manager), the overlap check is skipped.
+// When webhookClient is nil (unit test without manager), the dynamic integration
+// config overlap check is skipped. Uses coordination.k8s.io which is not in
+// protectedAPIGroups so only the dynamic check is relevant here.
 func TestExcludeIntegrationCheckSkippedWhenClientNil(t *testing.T) {
 	webhookClient = nil
 	c := validConfig()
 	c.Spec.CollectionRules[0] = CollectionRule{
 		Action: ActionExclude,
 		ResourceSelector: ResourceSelector{
-			APIGroups: []string{"policy.open-cluster-management.io"},
-			Kinds:     []string{"Policy"},
+			APIGroups: []string{"coordination.k8s.io"},
+			Kinds:     []string{"Lease"},
 		},
 	}
 	_, err := c.ValidateCreate(context.Background(), c)
-	assert.NoError(t, err, "overlap check should be skipped when webhookClient is nil")
+	assert.NoError(t, err, "dynamic overlap check should be skipped when webhookClient is nil")
 }

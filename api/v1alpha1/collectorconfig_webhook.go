@@ -220,6 +220,58 @@ var protectedKinds = map[string]string{
 	"Namespace":      "", // core group
 }
 
+// protectedAPIGroups is a temporary list of API groups that must not be excluded.
+// These cover resources that integration teams (CNV, OLM, GRC, Argo, Kyverno, etc.)
+// and Search itself depend on. Once integration teams ship labeled CollectorConfig CRs
+// (search.open-cluster-management.io/config-type: integration), the dynamic webhook check
+// will replace this list. Until then this provides a safety net.
+//
+// Source: search-collector/pkg/transforms/genericResourceConfig.go plus ACM integration teams.
+// "" = core group (ConfigMap, Job, Node, Pod, PVC — needed by CNV, console, and others).
+var protectedAPIGroups = map[string]struct{}{
+	// Core group — ConfigMap, Job, Node, Pod, PVC needed by CNV / console
+	"": {},
+	// OLM
+	"operators.coreos.com": {},
+	// OpenShift cluster config
+	"config.openshift.io": {},
+	// CNV / KubeVirt family
+	"kubevirt.io":                              {},
+	"cdi.kubevirt.io":                          {},
+	"migrations.kubevirt.io":                   {},
+	"clone.kubevirt.io":                        {},
+	"instancetype.kubevirt.io":                 {},
+	"snapshot.kubevirt.io":                     {},
+	"networkaddonsoperator.network.kubevirt.io": {},
+	// Networking
+	"k8s.cni.cncf.io": {},
+	// Storage
+	"storage.k8s.io":       {},
+	"snapshot.storage.k8s.io":      {},
+	"snapshot.storage.kubevirt.io": {},
+	// OpenShift templates
+	"template.openshift.io": {},
+	// Admission / webhook configs
+	"admissionregistration.k8s.io": {},
+	// ACM hub operator
+	"operator.open-cluster-management.io": {},
+	// ACM Search itself
+	"search.open-cluster-management.io": {},
+	// ACM app lifecycle
+	"apps.open-cluster-management.io": {},
+	"app.k8s.io":                       {},
+	// GRC / Policy
+	"policy.open-cluster-management.io": {},
+	"wgpolicyk8s.io":                    {},
+	// Kyverno
+	"kyverno.io":          {},
+	"policies.kyverno.io": {},
+	// Gatekeeper
+	"constraints.gatekeeper.sh": {},
+	// Argo
+	"argoproj.io": {},
+}
+
 // validateExcludeRule enforces constraints specific to exclude rules:
 //   - Cannot target ManagedCluster or Namespace (search RBAC engine depends on them)
 //   - Cannot specify fields, collectConditions, or fieldSuffix (meaningless on an exclude)
@@ -263,10 +315,30 @@ func validateExcludeRule(rule *CollectionRule, path *field.Path) field.ErrorList
 		))
 	}
 
-	// Reject exclusion of protected resource types.
-	// Check both specific kind names and wildcard kinds — apiGroups:["cluster.open-cluster-management.io"]
-	// kinds:["*"] would exclude ManagedCluster just as effectively as naming it explicitly.
+	// Reject exclusion of RBAC-critical kinds (ManagedCluster, Namespace).
 	allErrs = append(allErrs, validateProtectedKinds(rule, path)...)
+
+	// Reject exclusion of integration-critical API groups.
+	// This is a temporary safety net until integration teams ship labeled CollectorConfigs.
+	for _, apiGroup := range rule.ResourceSelector.APIGroups {
+		if apiGroup == "*" {
+			allErrs = append(allErrs, field.Invalid(
+				path.Child("resourceSelector", "apiGroups"),
+				apiGroup,
+				"cannot exclude all apiGroups — "+
+					"resources in many groups are necessary for system functionality",
+			))
+			break
+		}
+		if _, protected := protectedAPIGroups[apiGroup]; protected {
+			allErrs = append(allErrs, field.Invalid(
+				path.Child("resourceSelector", "apiGroups"),
+				apiGroup,
+				"cannot exclude resources in apiGroup "+apiGroup+
+					" — these resources are necessary for system functionality",
+			))
+		}
+	}
 	return allErrs
 }
 
