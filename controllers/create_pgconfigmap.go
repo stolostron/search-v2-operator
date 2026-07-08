@@ -86,23 +86,26 @@ psql -d search -U searchuser -f /opt/app-root/src/postgresql-start/postgresql.sq
 	// Passwords are supplied via env vars mounted from the readonly Secrets.
 	// The psql -v flag passes them as psql variables (:'name') to avoid shell injection.
 	// Runs as the postgres superuser (peer auth) since CREATE ROLE requires elevated privilege.
+	// psql variable substitution (:'varname') works in plain SQL statements but NOT inside
+	// PL/pgSQL DO $$ blocks (the server receives the literal colon-prefixed string).
+	// Use \if / \else / \endif psql meta-commands with plain CREATE/ALTER ROLE statements
+	// so that :'varname' is substituted by the psql client before sending to the server.
 	data[startScript] = data[startScript] + `
 psql -d search -U postgres \
   -v "READONLY_API_PASSWORD=$READONLY_API_PASSWORD" \
   -v "READONLY_MCP_PASSWORD=$READONLY_MCP_PASSWORD" << 'EOSQL'
-DO $$
-BEGIN
-  IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'search_api_ro') THEN
-    CREATE ROLE search_api_ro WITH LOGIN PASSWORD :'READONLY_API_PASSWORD';
-  ELSE
-    ALTER ROLE search_api_ro WITH PASSWORD :'READONLY_API_PASSWORD';
-  END IF;
-  IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'search_mcp_ro') THEN
-    CREATE ROLE search_mcp_ro WITH LOGIN PASSWORD :'READONLY_MCP_PASSWORD';
-  ELSE
-    ALTER ROLE search_mcp_ro WITH PASSWORD :'READONLY_MCP_PASSWORD';
-  END IF;
-END $$;
+SELECT NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'search_api_ro') AS create_api_role \gset
+\if :create_api_role
+  CREATE ROLE search_api_ro WITH LOGIN PASSWORD :'READONLY_API_PASSWORD';
+\else
+  ALTER ROLE search_api_ro WITH PASSWORD :'READONLY_API_PASSWORD';
+\endif
+SELECT NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'search_mcp_ro') AS create_mcp_role \gset
+\if :create_mcp_role
+  CREATE ROLE search_mcp_ro WITH LOGIN PASSWORD :'READONLY_MCP_PASSWORD';
+\else
+  ALTER ROLE search_mcp_ro WITH PASSWORD :'READONLY_MCP_PASSWORD';
+\endif
 GRANT USAGE ON SCHEMA search TO search_api_ro, search_mcp_ro;
 GRANT SELECT ON search.resources TO search_api_ro, search_mcp_ro;
 DO $$
@@ -182,9 +185,8 @@ DECLARE
     new_data_size integer;
     old_data_size integer;
 BEGIN
-    new_data_size := OCTET_LENGTH(NEW.data::text);
-    old_data_size := OCTET_LENGTH(OLD.data::text);
     IF TG_OP = 'DELETE' THEN
+        old_data_size := OCTET_LENGTH(OLD.data::text);
         new_data_json := NULL;
         IF old_data_size < 7000 THEN
             old_data_json := OLD.data;
@@ -192,6 +194,7 @@ BEGIN
             old_data_json := NULL;
         END IF;
     ELSEIF TG_OP = 'INSERT' THEN
+        new_data_size := OCTET_LENGTH(NEW.data::text);
         IF new_data_size < 7000 THEN
             new_data_json := NEW.data;
         ELSE
@@ -199,6 +202,8 @@ BEGIN
         END IF;
         old_data_json := NULL;
     ELSEIF TG_OP = 'UPDATE' THEN
+        new_data_size := OCTET_LENGTH(NEW.data::text);
+        old_data_size := OCTET_LENGTH(OLD.data::text);
         IF (new_data_size + old_data_size) < 7000 THEN
             new_data_json := NEW.data;
             old_data_json := OLD.data;
