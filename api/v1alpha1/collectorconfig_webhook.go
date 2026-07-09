@@ -236,17 +236,17 @@ var protectedAPIGroups = map[string]struct{}{
 	// OpenShift cluster config
 	"config.openshift.io": {},
 	// CNV / KubeVirt family
-	"kubevirt.io":                              {},
-	"cdi.kubevirt.io":                          {},
-	"migrations.kubevirt.io":                   {},
-	"clone.kubevirt.io":                        {},
-	"instancetype.kubevirt.io":                 {},
-	"snapshot.kubevirt.io":                     {},
+	"kubevirt.io":                               {},
+	"cdi.kubevirt.io":                           {},
+	"migrations.kubevirt.io":                    {},
+	"clone.kubevirt.io":                         {},
+	"instancetype.kubevirt.io":                  {},
+	"snapshot.kubevirt.io":                      {},
 	"networkaddonsoperator.network.kubevirt.io": {},
 	// Networking
 	"k8s.cni.cncf.io": {},
 	// Storage
-	"storage.k8s.io":       {},
+	"storage.k8s.io":               {},
 	"snapshot.storage.k8s.io":      {},
 	"snapshot.storage.kubevirt.io": {},
 	// OpenShift templates
@@ -259,7 +259,7 @@ var protectedAPIGroups = map[string]struct{}{
 	"search.open-cluster-management.io": {},
 	// ACM app lifecycle
 	"apps.open-cluster-management.io": {},
-	"app.k8s.io":                       {},
+	"app.k8s.io":                      {},
 	// GRC / Policy
 	"policy.open-cluster-management.io": {},
 	"wgpolicyk8s.io":                    {},
@@ -445,10 +445,10 @@ func (r *CollectorConfig) validateField(customField *Field, path *field.Path) fi
 	if customField.Type != "" {
 		validTypes := []string{
 			string(DataTypeString),
-			string(DataTypeNumber),
+			string(DataTypeInteger),
+			string(DataTypeFloat),
 			string(DataTypeBytes),
-			string(DataTypeSlice),
-			string(DataTypeMapString),
+			string(DataTypeBoolean),
 		}
 		if !contains(validTypes, string(customField.Type)) {
 			allErrs = append(allErrs, field.NotSupported(
