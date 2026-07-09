@@ -136,7 +136,7 @@ func TestRejectInvalidJSONPathEmptyInner(t *testing.T) {
 // Reject a field with an unsupported type value.
 func TestRejectInvalidFieldType(t *testing.T) {
 	c := validConfig()
-	c.Spec.CollectionRules[0].Fields = []Field{{Name: "status", JSONPath: "{.status}", Type: "boolean"}}
+	c.Spec.CollectionRules[0].Fields = []Field{{Name: "status", JSONPath: "{.status}", Type: "invalid"}}
 	_, err := c.ValidateCreate(context.Background(), c)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "Unsupported value")
@@ -198,7 +198,7 @@ func TestAcceptValidFieldSuffix(t *testing.T) {
 func TestAcceptValidConfigWithFieldsAndSuffix(t *testing.T) {
 	c := validConfig()
 	c.Spec.CollectionRules[0].Fields = []Field{
-		{Name: "replicas", JSONPath: "{.status.replicas}", Type: DataTypeNumber},
+		{Name: "replicas", JSONPath: "{.status.replicas}", Type: DataTypeInteger},
 		{Name: "image-name", JSONPath: "{.spec.containers[0].image}", Type: DataTypeString},
 	}
 	c.Spec.CollectionRules[0].FieldSuffix = "custom"
