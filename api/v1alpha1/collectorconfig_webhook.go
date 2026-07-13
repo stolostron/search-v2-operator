@@ -538,6 +538,13 @@ func rejectIfProtected(ctx context.Context, cc *CollectorConfig) error {
 		return nil
 	}
 
+	// Allow the Kubernetes garbage collector to delete orphaned operator-owned configs.
+	// When the Search CR is deleted and recreated, the old merged-collector-config retains
+	// an ownerReference with the previous UID. The GC must be able to clean it up.
+	if req.UserInfo.Username == "system:serviceaccount:kube-system:generic-garbage-collector" {
+		return nil
+	}
+
 	return fmt.Errorf("%s is managed by the search operator and cannot be modified directly", cc.Name)
 }
 
