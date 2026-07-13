@@ -517,6 +517,14 @@ func TestAllowOperatorDeleteOwned(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+// Kubernetes garbage collector deleting an orphaned owned config → allowed.
+func TestAllowGarbageCollectorDeleteOwned(t *testing.T) {
+	gcCtx := ctxWithUser("system:serviceaccount:kube-system:generic-garbage-collector")
+	c := ownedConfig()
+	_, err := c.ValidateDelete(gcCtx, c)
+	assert.NoError(t, err)
+}
+
 // SA from wrong namespace acting on an owned config → rejected.
 func TestRejectSAFromWrongNamespace(t *testing.T) {
 	wrongNsCtx := ctxWithUser("system:serviceaccount:attacker-ns:search-v2-operator")

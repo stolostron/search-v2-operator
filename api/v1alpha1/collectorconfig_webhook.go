@@ -45,6 +45,14 @@ func (r *CollectorConfig) SetupWebhookWithManager(mgr ctrl.Manager) error {
 
 var _ webhook.CustomValidator = &CollectorConfig{}
 
+type WebhookOperation string
+
+const (
+	WebhookOperationCreate WebhookOperation = "CREATE"
+	WebhookOperationUpdate WebhookOperation = "UPDATE"
+	WebhookOperationDelete WebhookOperation = "DELETE"
+)
+
 // ValidateCreate implements webhook.CustomValidator so a webhook will be registered for the type
 func (r *CollectorConfig) ValidateCreate(ctx context.Context, obj runtime.Object) (admission.Warnings, error) {
 	cc, ok := obj.(*CollectorConfig)
@@ -53,7 +61,7 @@ func (r *CollectorConfig) ValidateCreate(ctx context.Context, obj runtime.Object
 	}
 	collectorconfiglog.Info("validate create", "name", cc.Name)
 
-	if err := rejectIfProtected(ctx, cc); err != nil {
+	if err := rejectIfProtected(ctx, cc, WebhookOperationCreate); err != nil {
 		return nil, err
 	}
 
@@ -77,10 +85,10 @@ func (r *CollectorConfig) ValidateUpdate(ctx context.Context, oldObj, newObj run
 	collectorconfiglog.Info("validate update", "name", cc.Name)
 
 	// Check both old and new objects — prevents stripping the owner reference to bypass protection.
-	if err := rejectIfProtected(ctx, cc); err != nil {
+	if err := rejectIfProtected(ctx, cc, WebhookOperationUpdate); err != nil {
 		return nil, err
 	}
-	if err := rejectIfProtected(ctx, oldCC); err != nil {
+	if err := rejectIfProtected(ctx, oldCC, WebhookOperationUpdate); err != nil {
 		return nil, err
 	}
 
@@ -99,7 +107,7 @@ func (r *CollectorConfig) ValidateDelete(ctx context.Context, obj runtime.Object
 	}
 	collectorconfiglog.Info("validate delete", "name", cc.Name)
 
-	if err := rejectIfProtected(ctx, cc); err != nil {
+	if err := rejectIfProtected(ctx, cc, WebhookOperationDelete); err != nil {
 		return nil, err
 	}
 
@@ -520,7 +528,7 @@ func isOperatorOwned(cc *CollectorConfig) bool {
 
 // rejectIfProtected returns an error if the config has a controller owner reference
 // and the caller is not a service account in the same namespace (i.e., not the operator).
-func rejectIfProtected(ctx context.Context, cc *CollectorConfig) error {
+func rejectIfProtected(ctx context.Context, cc *CollectorConfig, operation WebhookOperation) error {
 	if !isOperatorOwned(cc) {
 		return nil
 	}
@@ -528,6 +536,14 @@ func rejectIfProtected(ctx context.Context, cc *CollectorConfig) error {
 	req, err := admission.RequestFromContext(ctx)
 	if err != nil {
 		return fmt.Errorf("could not extract admission request: %v", err)
+	}
+
+	// Allow the Kubernetes garbage collector to delete orphaned operator-owned configs.
+	// When the Search CR is deleted and recreated, the old merged-collector-config retains
+	// an ownerReference with the previous UID. The GC must be able to clean it up.
+	if req.UserInfo.Username == "system:serviceaccount:kube-system:generic-garbage-collector" &&
+		operation == WebhookOperationDelete {
+		return nil
 	}
 
 	// Allow any service account in the resource's namespace.
