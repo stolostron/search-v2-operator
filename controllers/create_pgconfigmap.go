@@ -185,9 +185,8 @@ DECLARE
     new_data_size integer;
     old_data_size integer;
 BEGIN
-    new_data_size := OCTET_LENGTH(NEW.data::text);
-    old_data_size := OCTET_LENGTH(OLD.data::text);
     IF TG_OP = 'DELETE' THEN
+        old_data_size := OCTET_LENGTH(OLD.data::text);
         new_data_json := NULL;
         IF old_data_size < 7000 THEN
             old_data_json := OLD.data;
@@ -195,6 +194,7 @@ BEGIN
             old_data_json := NULL;
         END IF;
     ELSEIF TG_OP = 'INSERT' THEN
+        new_data_size := OCTET_LENGTH(NEW.data::text);
         IF new_data_size < 7000 THEN
             new_data_json := NEW.data;
         ELSE
@@ -202,6 +202,8 @@ BEGIN
         END IF;
         old_data_json := NULL;
     ELSEIF TG_OP = 'UPDATE' THEN
+        new_data_size := OCTET_LENGTH(NEW.data::text);
+        old_data_size := OCTET_LENGTH(OLD.data::text);
         IF (new_data_size + old_data_size) < 7000 THEN
             new_data_json := NEW.data;
             old_data_json := OLD.data;
