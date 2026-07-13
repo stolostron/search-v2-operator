@@ -21,7 +21,7 @@ func (r *SearchReconciler) APIDeployment(instance *searchv1alpha1.Search) *appsv
 		Env: []corev1.EnvVar{
 			newSecretEnvVar("DB_USER", "database-user", apiReadonlySecretName),
 			newSecretEnvVar("DB_PASS", "database-password", apiReadonlySecretName),
-			newSecretEnvVar("DB_NAME", "database-name", "search-postgres"),
+			newSecretEnvVar("DB_NAME", "database-name", apiReadonlySecretName),
 			newEnvVar("DB_HOST", "search-postgres."+instance.Namespace+".svc"),
 			newEnvVar("POD_NAMESPACE", instance.Namespace),
 		},
