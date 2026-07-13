@@ -186,6 +186,16 @@ func (r *SearchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		log.Error(err, "Postgres Secret setup failed")
 		return *result, err
 	}
+	result, err = r.createSecret(ctx, r.APIReadonlySecret(instance))
+	if result != nil {
+		log.Error(err, "Postgres API readonly Secret setup failed")
+		return *result, err
+	}
+	result, err = r.createSecret(ctx, r.MCPReadonlySecret(instance))
+	if result != nil {
+		log.Error(err, "Postgres MCP readonly Secret setup failed")
+		return *result, err
+	}
 	result, err = r.createService(ctx, r.PGService(instance))
 	if result != nil {
 		log.Error(err, "Postgres Service setup failed")
