@@ -538,19 +538,19 @@ func rejectIfProtected(ctx context.Context, cc *CollectorConfig, operation Webho
 		return fmt.Errorf("could not extract admission request: %v", err)
 	}
 
-	// Allow any service account in the resource's namespace.
-	// Only the operator namespace should have write RBAC for CollectorConfigs,
-	// so namespace-scoped SA check is sufficient.
-	expectedPrefix := fmt.Sprintf("system:serviceaccount:%s:", req.Namespace)
-	if strings.HasPrefix(req.UserInfo.Username, expectedPrefix) {
-		return nil
-	}
-
 	// Allow the Kubernetes garbage collector to delete orphaned operator-owned configs.
 	// When the Search CR is deleted and recreated, the old merged-collector-config retains
 	// an ownerReference with the previous UID. The GC must be able to clean it up.
 	if req.UserInfo.Username == "system:serviceaccount:kube-system:generic-garbage-collector" &&
 		operation == WebhookOperationDelete {
+		return nil
+	}
+
+	// Allow any service account in the resource's namespace.
+	// Only the operator namespace should have write RBAC for CollectorConfigs,
+	// so namespace-scoped SA check is sufficient.
+	expectedPrefix := fmt.Sprintf("system:serviceaccount:%s:", req.Namespace)
+	if strings.HasPrefix(req.UserInfo.Username, expectedPrefix) {
 		return nil
 	}
 
