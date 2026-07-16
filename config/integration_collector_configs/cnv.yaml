@@ -3,10 +3,11 @@
 # search-collector/pkg/transforms/genericResourceConfig.go and transformer.go before this
 # CollectorConfig existed. See ACM-37052.
 #
-# This config is created by the search-v2-operator if not already present on the cluster
-# (config-hash annotation tracks the shipped version — see docs/ARCHITECTURE.md). Once created,
-# CNV is free to edit it directly; the operator will only overwrite it again if a future
-# release ships an updated default AND this object hasn't been locally customized since.
+# This config is created by the search-v2-operator once per process, at startup, and reset to
+# this shipped default on every restart/upgrade — see docs/ARCHITECTURE.md. CNV can edit it
+# directly and the edit will persist until the next restart, but to make a change survive
+# restarts before it's officially shipped here, create a differently-named CollectorConfig
+# (e.g. cnv-integration-collector-config-2) instead — the operator only manages this exact name.
 apiVersion: search.open-cluster-management.io/v1alpha1
 kind: CollectorConfig
 metadata:

@@ -116,11 +116,19 @@ func applyOneIntegrationCollectorConfig(
 		return err
 	}
 
-	if equality.Semantic.DeepEqual(found.Spec, desired.Spec) {
-		// Already matches the currently shipped default — skip the write.
+	hasIntegrationLabel := found.Labels[searchv1alpha1.IntegrationTeamLabel] == searchv1alpha1.IntegrationTeamLabelValue
+	if hasIntegrationLabel && equality.Semantic.DeepEqual(found.Spec, desired.Spec) {
+		// Already matches the currently shipped default and correctly labeled — skip the write.
 		return nil
 	}
 	found.Spec = desired.Spec
+	if found.Labels == nil {
+		found.Labels = map[string]string{}
+	}
+	// Always (re-)set the label, even when only the spec differed — a pre-existing config found
+	// without it would otherwise be invisible to the webhook's integration-overlap check and to
+	// the merge step's label-based discovery, silently letting conflicting user excludes through.
+	found.Labels[searchv1alpha1.IntegrationTeamLabel] = searchv1alpha1.IntegrationTeamLabelValue
 	if err := c.Update(ctx, found); err != nil {
 		log.Error(err, "Could not overwrite integration CollectorConfig", "name", desired.Name)
 		return err

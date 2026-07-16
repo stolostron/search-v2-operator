@@ -54,10 +54,16 @@ func (s *IntegrationCollectorConfigSeeder) Start(ctx context.Context) error {
 	}
 	err := wait.PollUntilContextCancel(ctx, interval, true,
 		func(ctx context.Context) (bool, error) {
-			namespace, err := s.resolveNamespace(ctx)
+			namespace, paused, err := s.resolveSearch(ctx)
 			if err != nil {
 				log.Error(err, "Could not resolve namespace for integration CollectorConfig seeding, will retry")
 				return false, nil // keep polling — the Search CR may not exist yet on a fresh install.
+			}
+			if paused {
+				// search-pause: true must halt all operator-driven writes, including this one —
+				// keep polling (so seeding still happens promptly once unpaused) without writing.
+				log.V(2).Info("Search reconciliation is paused, deferring integration CollectorConfig seeding")
+				return false, nil
 			}
 			if err := applyIntegrationCollectorConfigs(ctx, s.Client, namespace); err != nil {
 				log.Error(err, "Could not apply built-in integration CollectorConfigs, will retry")
@@ -81,23 +87,39 @@ func (s *IntegrationCollectorConfigSeeder) NeedLeaderElection() bool {
 	return true
 }
 
-// resolveNamespace returns s.Namespace if explicitly set (used by tests), otherwise finds the
-// live Search CR (there is always exactly one, named OperatorName — see search_controller.go)
-// and returns its namespace. The rest of the reconciler already gets its namespace this way
-// (from the reconciled object itself, via a cluster-wide watch), not from an env var — the
-// manager's WATCH_NAMESPACE/POD_NAMESPACE env vars are not reliably set in real deployments.
-func (s *IntegrationCollectorConfigSeeder) resolveNamespace(ctx context.Context) (string, error) {
+// resolveSearch returns the namespace and search-pause state of the live Search CR. There is
+// always supposed to be exactly one, named OperatorName (see search_controller.go) — this
+// requires exactly one match rather than returning the first one found, so a duplicate CR (a bug
+// elsewhere) causes this to keep retrying with an error instead of silently seeding an arbitrary
+// namespace. If s.Namespace is explicitly set (used by tests), it's used as-is and paused is
+// always false, since there's no Search CR to check in that case.
+//
+// The rest of the reconciler already gets its namespace this way (from the reconciled object
+// itself, via a cluster-wide watch), not from an env var — WATCH_NAMESPACE/POD_NAMESPACE are not
+// reliably set in real deployments.
+func (s *IntegrationCollectorConfigSeeder) resolveSearch(
+	ctx context.Context,
+) (namespace string, paused bool, err error) {
 	if s.Namespace != "" {
-		return s.Namespace, nil
+		return s.Namespace, false, nil
 	}
 	list := &searchv1alpha1.SearchList{}
 	if err := s.Client.List(ctx, list); err != nil {
-		return "", err
+		return "", false, err
 	}
-	for _, item := range list.Items {
-		if item.Name == OperatorName {
-			return item.Namespace, nil
+	var match *searchv1alpha1.Search
+	for i := range list.Items {
+		if list.Items[i].Name == OperatorName {
+			if match != nil {
+				return "", false, fmt.Errorf(
+					"found multiple search CRs named %q (namespaces %q and %q) — refusing to guess which one to use",
+					OperatorName, match.Namespace, list.Items[i].Namespace)
+			}
+			match = &list.Items[i]
 		}
 	}
-	return "", fmt.Errorf("search CR %q not found in any namespace", OperatorName)
+	if match == nil {
+		return "", false, fmt.Errorf("search CR %q not found in any namespace", OperatorName)
+	}
+	return match.Namespace, IsPaused(match.GetAnnotations()), nil
 }
