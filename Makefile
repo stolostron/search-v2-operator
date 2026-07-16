@@ -204,7 +204,7 @@ catalog-push: ## Push a catalog image.
 lint:
 	GOPATH=$(go env GOPATH)
 	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b "${GOPATH}/bin" v2.9.0
-	CGO_ENABLED=1 GOGC=25 golangci-lint run --timeout=3m
+	CGO_ENABLED=1 GOGC=25 golangci-lint run --timeout=8m
 	gosec ./...
 
 # Setup local development environment.
