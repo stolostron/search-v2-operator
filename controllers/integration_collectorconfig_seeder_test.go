@@ -169,3 +169,71 @@ func TestIntegrationCollectorConfigSeeder_RetriesUntilSuccess(t *testing.T) {
 	}
 	assert.GreaterOrEqual(t, attempts.Load(), int32(2), "must have retried after the first failure")
 }
+
+// search-pause: true on the Search CR must halt seeding the same way it halts the rest of the
+// reconciler — Start must defer (no writes) while paused, then proceed once unpaused, without
+// needing a restart.
+func TestIntegrationCollectorConfigSeeder_HonorsSearchPause(t *testing.T) {
+	instance := newSearchInstance()
+	instance.Annotations = map[string]string{AnnotationSearchPause: "true"}
+	r := setupReconciler(instance)
+	seeder := &IntegrationCollectorConfigSeeder{Client: r.Client, RetryInterval: 20 * time.Millisecond}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	done := make(chan error, 1)
+	go func() { done <- seeder.Start(ctx) }()
+
+	// While paused, Start must not have created anything yet.
+	select {
+	case err := <-done:
+		t.Fatalf("Start should still be deferring while paused, got: %v", err)
+	case <-time.After(150 * time.Millisecond):
+		// Expected.
+	}
+	err := r.Get(context.TODO(), types.NamespacedName{
+		Name: "cnv-integration-collector-config", Namespace: testNamespace,
+	}, &searchv1alpha1.CollectorConfig{})
+	assert.Error(t, err, "nothing should be created while search-pause is true")
+
+	// Unpause; the next poll should proceed and succeed.
+	current := &searchv1alpha1.Search{}
+	require.NoError(t, r.Get(context.TODO(), types.NamespacedName{Name: OperatorName, Namespace: testNamespace}, current))
+	current.Annotations[AnnotationSearchPause] = "false"
+	require.NoError(t, r.Update(context.TODO(), current))
+
+	select {
+	case err := <-done:
+		require.NoError(t, err)
+	case <-time.After(3 * time.Second):
+		t.Fatal("Start did not proceed after search-pause was cleared")
+	}
+	require.NoError(t, r.Get(context.TODO(), types.NamespacedName{
+		Name: "cnv-integration-collector-config", Namespace: testNamespace,
+	}, &searchv1alpha1.CollectorConfig{}))
+}
+
+// If more than one Search CR named OperatorName somehow exists (a bug elsewhere), Start must not
+// silently guess which namespace to seed into — it should keep retrying with an error instead.
+func TestIntegrationCollectorConfigSeeder_RejectsAmbiguousSearchCR(t *testing.T) {
+	dup1 := newSearchInstance()
+	dup1.Namespace = "namespace-a"
+	dup2 := newSearchInstance()
+	dup2.Namespace = "namespace-b"
+	r := setupReconciler(dup1, dup2)
+	seeder := &IntegrationCollectorConfigSeeder{Client: r.Client, RetryInterval: 20 * time.Millisecond}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Millisecond)
+	defer cancel()
+	done := make(chan error, 1)
+	go func() { done <- seeder.Start(ctx) }()
+
+	<-done // Start always returns nil once ctx is done, whether paused, retrying, or ambiguous.
+
+	for _, ns := range []string{"namespace-a", "namespace-b"} {
+		err := r.Get(context.TODO(), types.NamespacedName{
+			Name: "cnv-integration-collector-config", Namespace: ns,
+		}, &searchv1alpha1.CollectorConfig{})
+		assert.Error(t, err, "must not have guessed either namespace")
+	}
+}

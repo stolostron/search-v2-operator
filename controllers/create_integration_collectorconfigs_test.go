@@ -94,6 +94,64 @@ func TestApplyIntegrationCollectorConfigs_OverwritesCustomizedCanonicalConfig(t 
 		"canonical config is reset to the shipped default on every seeder run, regardless of customization")
 }
 
+// If a canonical-named CollectorConfig exists without the integration label (e.g. pre-existing
+// state from before this feature, or a bug elsewhere), the label must be added even when the spec
+// already matches the shipped default — otherwise it stays invisible to the webhook's
+// integration-overlap check and to the merge step's label-based discovery, silently allowing a
+// conflicting user exclude through.
+func TestApplyIntegrationCollectorConfigs_AddsMissingLabelWhenSpecAlreadyMatches(t *testing.T) {
+	unlabeled := newCollectorConfig("cnv-integration-collector-config", searchv1alpha1.CollectorConfigSpec{
+		CollectionRules: []searchv1alpha1.CollectionRule{
+			{
+				Action: searchv1alpha1.ActionInclude,
+				ResourceSelector: searchv1alpha1.ResourceSelector{
+					APIGroups: []string{
+						"kubevirt.io", "cdi.kubevirt.io", "migrations.kubevirt.io", "clone.kubevirt.io",
+						"instancetype.kubevirt.io", "snapshot.kubevirt.io",
+						"networkaddonsoperator.network.kubevirt.io", "k8s.cni.cncf.io",
+						"storage.k8s.io", "snapshot.storage.k8s.io", "snapshot.storage.kubevirt.io",
+					},
+					Kinds: []string{"*"},
+				},
+			},
+		},
+	})
+	require.Empty(t, unlabeled.Labels, "test setup: must start with no labels at all")
+	r := setupReconciler(unlabeled)
+
+	require.NoError(t, applyIntegrationCollectorConfigs(context.TODO(), r.Client, testNamespace))
+
+	after := &searchv1alpha1.CollectorConfig{}
+	require.NoError(t, r.Get(context.TODO(), types.NamespacedName{
+		Name: "cnv-integration-collector-config", Namespace: testNamespace,
+	}, after))
+	assert.Equal(t, searchv1alpha1.IntegrationTeamLabelValue, after.Labels[searchv1alpha1.IntegrationTeamLabel],
+		"label must be added even though the spec already matched the shipped default")
+}
+
+// Same as above, but the spec also differs — both the spec and the label must be fixed together.
+func TestApplyIntegrationCollectorConfigs_AddsMissingLabelWhenSpecAlsoDiffers(t *testing.T) {
+	unlabeled := newCollectorConfig("cnv-integration-collector-config", searchv1alpha1.CollectorConfigSpec{
+		CollectionRules: []searchv1alpha1.CollectionRule{
+			{
+				Action:           searchv1alpha1.ActionInclude,
+				ResourceSelector: searchv1alpha1.ResourceSelector{APIGroups: []string{"stale.example.io"}, Kinds: []string{"*"}},
+			},
+		},
+	})
+	require.Empty(t, unlabeled.Labels)
+	r := setupReconciler(unlabeled)
+
+	require.NoError(t, applyIntegrationCollectorConfigs(context.TODO(), r.Client, testNamespace))
+
+	after := &searchv1alpha1.CollectorConfig{}
+	require.NoError(t, r.Get(context.TODO(), types.NamespacedName{
+		Name: "cnv-integration-collector-config", Namespace: testNamespace,
+	}, after))
+	assert.Equal(t, searchv1alpha1.IntegrationTeamLabelValue, after.Labels[searchv1alpha1.IntegrationTeamLabel])
+	assert.NotEqual(t, "stale.example.io", after.Spec.CollectionRules[0].ResourceSelector.APIGroups[0])
+}
+
 // A differently-named CollectorConfig (the escape hatch for mid-release testing/updates) is never
 // touched by applyIntegrationCollectorConfigs — it only knows about the fixed set of names in
 // config/integration_collector_configs/.
@@ -159,11 +217,13 @@ func TestApplyIntegrationCollectorConfigsFrom_SkipsSubdirectories(t *testing.T) 
 	require.NoError(t, err)
 
 	cc := &searchv1alpha1.CollectorConfig{}
-	require.NoError(t, r.Get(context.TODO(), types.NamespacedName{Name: "real-config", Namespace: testNamespace}, cc))
+	realConfigKey := types.NamespacedName{Name: "real-config", Namespace: testNamespace}
+	require.NoError(t, r.Get(context.TODO(), realConfigKey, cc))
 	// The nested file's config should NOT have been applied, since ReadDir on "configs" only
 	// lists immediate children ("a-real-file.yaml" and the "subdir" directory itself, not
 	// "subdir/nested.yaml"), and directories are skipped.
-	err = r.Get(context.TODO(), types.NamespacedName{Name: "nested-config", Namespace: testNamespace}, &searchv1alpha1.CollectorConfig{})
+	nestedConfigKey := types.NamespacedName{Name: "nested-config", Namespace: testNamespace}
+	err = r.Get(context.TODO(), nestedConfigKey, &searchv1alpha1.CollectorConfig{})
 	assert.True(t, apierrors.IsNotFound(err), "nested file must not be read directly out of a subdirectory")
 }
 
@@ -179,7 +239,8 @@ func TestApplyIntegrationCollectorConfigsFrom_StopsOnFirstFileError(t *testing.T
 
 	// Files are processed in sorted order, so "a-bad.yaml" (alphabetically first) fails before
 	// "z-good.yaml" is ever reached.
-	err = r.Get(context.TODO(), types.NamespacedName{Name: "good-config", Namespace: testNamespace}, &searchv1alpha1.CollectorConfig{})
+	goodConfigKey := types.NamespacedName{Name: "good-config", Namespace: testNamespace}
+	err = r.Get(context.TODO(), goodConfigKey, &searchv1alpha1.CollectorConfig{})
 	assert.True(t, apierrors.IsNotFound(err), "processing stops at the first error, later files are never applied")
 }
 
@@ -211,7 +272,9 @@ func TestApplyOneIntegrationCollectorConfig_MalformedYAMLReturnsError(t *testing
 func TestApplyOneIntegrationCollectorConfig_GetErrorOtherThanNotFound(t *testing.T) {
 	base := setupReconciler().Client.(client.WithWatch)
 	failingClient := interceptor.NewClient(base, interceptor.Funcs{
-		Get: func(ctx context.Context, c client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+		Get: func(
+			ctx context.Context, c client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption,
+		) error {
 			return errors.New("simulated API server error")
 		},
 	})

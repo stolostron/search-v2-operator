@@ -92,9 +92,19 @@ are not reliably set in real deployments — verified empty on a live ACM 5.0.0-
 testing, causing the seeder to fail with `"an empty namespace may not be set during creation"` on
 the first version of this code. The rest of the reconciler never has this problem because it
 gets its namespace from the reconciled `Search` object itself (the manager watches cluster-wide
-when `WATCH_NAMESPACE` is empty). `IntegrationCollectorConfigSeeder.resolveNamespace` fixes this
-the same way: it looks up the live `Search` CR (named `OperatorName` — there's always exactly one)
-and uses its namespace, retrying via the same poll loop if the CR doesn't exist yet.
+when `WATCH_NAMESPACE` is empty). `IntegrationCollectorConfigSeeder.resolveSearch` fixes this the
+same way: it looks up the live `Search` CR (named `OperatorName`) and uses its namespace, retrying
+via the same poll loop if the CR doesn't exist yet. It requires exactly one match rather than
+returning the first one found — `Search` is namespaced with no uniqueness webhook, so nothing at
+the API level actually prevents a duplicate — and it also carries back the CR's `search-pause`
+state, since the seeder writes cluster state just like `Reconcile` and must honor the same pause
+guarantee (checked the same way, via `IsPaused`, before any write).
+
+The same startup race also means a canonical config can already exist without
+`IntegrationTeamLabel` (e.g. state left over from before this label existed). `applyOneIntegrationCollectorConfig`
+treats a missing label the same as a spec mismatch — it's not just cosmetic: both the webhook's
+exclude-overlap check and the merge step discover integration configs by this label, so an
+unlabeled canonical config would silently stop being protected and stop being merged.
 
 As each apiGroup gets covered by a real integration config, it's removed from the temporary
 `protectedAPIGroups` safety net in the webhook (see below) — the dynamic
