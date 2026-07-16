@@ -1,0 +1,19 @@
+# Integration CollectorConfig for Kyverno. Populated from resources already hard-coded in
+# search-collector/pkg/transforms/kyverno.go and transformer.go before this CollectorConfig
+# existed. See ACM-37052.
+apiVersion: search.open-cluster-management.io/v1alpha1
+kind: CollectorConfig
+metadata:
+  name: kyverno-integration-collector-config
+  namespace: open-cluster-management
+  labels:
+    search.open-cluster-management.io/config-type: integration
+spec:
+  collectionRules:
+    - action: include
+      resourceSelector:
+        apiGroups:
+          - kyverno.io
+          - policies.kyverno.io
+        kinds:
+          - "*"

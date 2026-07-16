@@ -1,0 +1,19 @@
+# Integration CollectorConfig for GRC (Governance, Risk, and Compliance / Policy). Populated
+# from resources already hard-coded in search-collector/pkg/transforms/transformer.go and
+# policy.go/policyreport.go before this CollectorConfig existed. See ACM-37052.
+apiVersion: search.open-cluster-management.io/v1alpha1
+kind: CollectorConfig
+metadata:
+  name: grc-integration-collector-config
+  namespace: open-cluster-management
+  labels:
+    search.open-cluster-management.io/config-type: integration
+spec:
+  collectionRules:
+    - action: include
+      resourceSelector:
+        apiGroups:
+          - policy.open-cluster-management.io
+          - wgpolicyk8s.io
+        kinds:
+          - "*"
