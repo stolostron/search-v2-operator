@@ -1,0 +1,22 @@
+# Integration CollectorConfig for ACM Application Lifecycle (multicloud-operators subscription
+# stack: Channel, Deployable, HelmRelease, PlacementBinding, Subscription, and the upstream
+# sig-application "Application" kind). Populated from resources already hard-coded in
+# search-collector's typed transforms (channel.go, appdeployable.go, helmrelease.go,
+# placementbinding.go, subscription.go, application.go) before this CollectorConfig existed.
+# See ACM-37052.
+apiVersion: search.open-cluster-management.io/v1alpha1
+kind: CollectorConfig
+metadata:
+  name: app-lifecycle-integration-collector-config
+  namespace: open-cluster-management
+  labels:
+    search.open-cluster-management.io/config-type: integration
+spec:
+  collectionRules:
+    - action: include
+      resourceSelector:
+        apiGroups:
+          - apps.open-cluster-management.io
+          - app.k8s.io
+        kinds:
+          - "*"

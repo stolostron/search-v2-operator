@@ -1,0 +1,34 @@
+# Integration CollectorConfig for CNV (Container Native Virtualization / KubeVirt) and the
+# storage resources it depends on. Populated from resources already hard-coded in
+# search-collector/pkg/transforms/genericResourceConfig.go and transformer.go before this
+# CollectorConfig existed. See ACM-37052.
+#
+# This config is created by the search-v2-operator if not already present on the cluster
+# (config-hash annotation tracks the shipped version — see docs/ARCHITECTURE.md). Once created,
+# CNV is free to edit it directly; the operator will only overwrite it again if a future
+# release ships an updated default AND this object hasn't been locally customized since.
+apiVersion: search.open-cluster-management.io/v1alpha1
+kind: CollectorConfig
+metadata:
+  name: cnv-integration-collector-config
+  namespace: open-cluster-management
+  labels:
+    search.open-cluster-management.io/config-type: integration
+spec:
+  collectionRules:
+    - action: include
+      resourceSelector:
+        apiGroups:
+          - kubevirt.io
+          - cdi.kubevirt.io
+          - migrations.kubevirt.io
+          - clone.kubevirt.io
+          - instancetype.kubevirt.io
+          - snapshot.kubevirt.io
+          - networkaddonsoperator.network.kubevirt.io
+          - k8s.cni.cncf.io
+          - storage.k8s.io
+          - snapshot.storage.k8s.io
+          - snapshot.storage.kubevirt.io
+        kinds:
+          - "*"

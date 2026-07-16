@@ -4,6 +4,7 @@ package v1alpha1
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -11,7 +12,9 @@ import (
 	authenticationv1 "k8s.io/api/authentication/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
@@ -534,6 +537,29 @@ func TestRejectSAFromWrongNamespace(t *testing.T) {
 	assert.Contains(t, err.Error(), "managed by the search operator")
 }
 
+// A human/cluster-admin user (not a service account at all) trying to delete a CollectorConfig
+// that has an ownerReference — e.g. a tester who copied a sample that included one — is rejected
+// the same way a wrong-namespace SA is. This is the exact scenario a QE tester hit: a manually
+// applied test CollectorConfig carried an ownerReferences section pointing at the Search CR, so
+// it was treated as operator-managed and couldn't be deleted directly. See ACM-35522 test notes.
+func TestRejectHumanUserDeleteOwnedConfig(t *testing.T) {
+	humanCtx := ctxWithUser("kube:admin")
+	c := ownedConfig()
+	_, err := c.ValidateDelete(humanCtx, c)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "managed by the search operator")
+}
+
+// Same scenario via ValidateUpdate — a human user cannot edit an operator-owned config either.
+func TestRejectHumanUserUpdateOwnedConfig(t *testing.T) {
+	humanCtx := ctxWithUser("kube:admin")
+	old := ownedConfig()
+	updated := old.DeepCopy()
+	_, err := updated.ValidateUpdate(humanCtx, old, updated)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "managed by the search operator")
+}
+
 // --- Exclude rule tests ---
 
 // Accept a valid exclude rule with no fields/conditions.
@@ -752,6 +778,73 @@ func TestAcceptExcludeWildcardKindOnSafeAPIGroup(t *testing.T) {
 	assert.NoError(t, err, "wildcard kind on a non-protected apiGroup (apps) should be accepted")
 }
 
+// Groups that used to be in the static protectedAPIGroups safety net before ACM-37052 shipped
+// real integration CollectorConfigs for them (kubevirt.io -> CNV, argoproj.io -> Argo, etc).
+// Without a fake webhookClient, the dynamic integration-overlap check is skipped (see
+// TestExcludeIntegrationCheckSkippedWhenClientNil), so these should now be accepted.
+func TestAcceptExcludeFormerlyStaticProtectedGroupsNowIntegrationOwned(t *testing.T) {
+	formerlyProtected := []string{
+		"operators.coreos.com",              // OLM
+		"kubevirt.io",                       // CNV
+		"cdi.kubevirt.io",                   // CNV
+		"argoproj.io",                       // Argo
+		"policy.open-cluster-management.io", // GRC
+		"wgpolicyk8s.io",                    // GRC
+		"kyverno.io",                        // Kyverno
+		"policies.kyverno.io",               // Kyverno
+		"constraints.gatekeeper.sh",         // Gatekeeper
+		"apps.open-cluster-management.io",   // ACM app lifecycle
+		"app.k8s.io",                        // ACM app lifecycle
+		"storage.k8s.io",                    // CNV (storage)
+		"k8s.cni.cncf.io",                   // CNV (networking)
+	}
+	for _, apiGroup := range formerlyProtected {
+		t.Run(apiGroup, func(t *testing.T) {
+			c := validConfig()
+			c.Spec.CollectionRules[0] = CollectionRule{
+				Action: ActionExclude,
+				ResourceSelector: ResourceSelector{
+					APIGroups: []string{apiGroup},
+					Kinds:     []string{"*"},
+				},
+			}
+			_, err := c.ValidateCreate(context.Background(), c)
+			assert.NoError(t, err, apiGroup+" is no longer in the static protectedAPIGroups list")
+		})
+	}
+}
+
+// Groups with no single integration-team owner (or that Search itself depends on) remain in the
+// static protectedAPIGroups safety net after ACM-37052.
+func TestRejectExcludeStillStaticProtectedGroups(t *testing.T) {
+	stillProtected := []string{
+		"",                                    // core group — ConfigMap/Job/Node/Pod/PVC, multiple owners
+		"config.openshift.io",                 // no single integration-team owner
+		"template.openshift.io",               // no single integration-team owner
+		"admissionregistration.k8s.io",        // no single integration-team owner
+		"operator.open-cluster-management.io", // ACM hub operator — Search depends on this
+		"search.open-cluster-management.io",   // Search itself
+	}
+	for _, apiGroup := range stillProtected {
+		name := apiGroup
+		if name == "" {
+			name = "core"
+		}
+		t.Run(name, func(t *testing.T) {
+			c := validConfig()
+			c.Spec.CollectionRules[0] = CollectionRule{
+				Action: ActionExclude,
+				ResourceSelector: ResourceSelector{
+					APIGroups: []string{apiGroup},
+					Kinds:     []string{"*"},
+				},
+			}
+			_, err := c.ValidateCreate(context.Background(), c)
+			assert.Error(t, err, apiGroup+" must remain protected")
+		})
+	}
+}
+
 // --- Integration config overlap checks ---
 
 // buildFakeWebhookClient registers the scheme and returns a fake client pre-populated
@@ -766,6 +859,22 @@ func buildFakeWebhookClient(t *testing.T, objs ...runtime.Object) {
 		builder = builder.WithRuntimeObjects(o)
 	}
 	webhookClient = builder.Build()
+	t.Cleanup(func() { webhookClient = nil })
+}
+
+// buildFailingListWebhookClient sets webhookClient to one whose List call always fails, to
+// exercise the "log and allow" fallback in validateExcludeAgainstIntegrationConfigs — a List
+// failure should never block an otherwise-valid CollectorConfig operation.
+func buildFailingListWebhookClient(t *testing.T) {
+	t.Helper()
+	scheme := runtime.NewScheme()
+	_ = AddToScheme(scheme)
+	base := fake.NewClientBuilder().WithScheme(scheme).Build()
+	webhookClient = interceptor.NewClient(base, interceptor.Funcs{
+		List: func(ctx context.Context, c client.WithWatch, list client.ObjectList, opts ...client.ListOption) error {
+			return errors.New("simulated API server error")
+		},
+	})
 	t.Cleanup(func() { webhookClient = nil })
 }
 
@@ -879,4 +988,21 @@ func TestExcludeIntegrationCheckSkippedWhenClientNil(t *testing.T) {
 	}
 	_, err := c.ValidateCreate(context.Background(), c)
 	assert.NoError(t, err, "dynamic overlap check should be skipped when webhookClient is nil")
+}
+
+// A List failure when discovering integration team CollectorConfigs must not block an otherwise
+// valid exclude — it's logged and treated as "no integration configs found" rather than rejected.
+func TestExcludeAllowedWhenIntegrationListFails(t *testing.T) {
+	buildFailingListWebhookClient(t)
+	c := validConfig()
+	c.Namespace = "default"
+	c.Spec.CollectionRules[0] = CollectionRule{
+		Action: ActionExclude,
+		ResourceSelector: ResourceSelector{
+			APIGroups: []string{"coordination.k8s.io"},
+			Kinds:     []string{"Lease"},
+		},
+	}
+	_, err := c.ValidateCreate(context.Background(), c)
+	assert.NoError(t, err, "a List failure should be logged and allowed, not rejected")
 }
