@@ -9,6 +9,7 @@ import (
 	searchv1alpha1 "github.com/stolostron/search-v2-operator/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	networkingv1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -490,6 +491,48 @@ func (r *SearchReconciler) createOrUpdateConfigMap(ctx context.Context, cm *core
 			if cm.Name == postgresConfigmapName {
 				log.Info("Postgres must be restarted for changes to take effect.")
 			}
+		}
+	}
+	return nil, nil
+}
+
+func (r *SearchReconciler) createOrUpdateNetworkPolicy(ctx context.Context,
+	np *networkingv1.NetworkPolicy) (*reconcile.Result, error) {
+	found := &networkingv1.NetworkPolicy{}
+	err := r.Get(ctx, types.NamespacedName{
+		Name:      np.Name,
+		Namespace: np.Namespace,
+	}, found)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			err = r.Create(ctx, np)
+			if err != nil {
+				log.Error(err, "Could not create NetworkPolicy")
+				return &reconcile.Result{}, err
+			}
+			log.Info("Created NetworkPolicy " + np.Name)
+			return nil, nil
+		}
+		log.Error(err, "Could not get NetworkPolicy")
+		return &reconcile.Result{}, err
+	}
+	if !equality.Semantic.DeepEqual(found.Spec, np.Spec) {
+		found.Spec = np.Spec
+		if err := r.Update(ctx, found); err != nil {
+			log.Error(err, "Could not update NetworkPolicy")
+			return &reconcile.Result{}, err
+		}
+		log.V(2).Info("Updated NetworkPolicy ", "name", np.Name)
+	}
+	return nil, nil
+}
+
+// reconcileNetworkPolicies creates or updates the NetworkPolicy for each Search component.
+func (r *SearchReconciler) reconcileNetworkPolicies(ctx context.Context,
+	instance *searchv1alpha1.Search) (*reconcile.Result, error) {
+	for _, np := range r.NetworkPolicies(instance) {
+		if result, err := r.createOrUpdateNetworkPolicy(ctx, np); result != nil {
+			return result, err
 		}
 	}
 	return nil, nil
