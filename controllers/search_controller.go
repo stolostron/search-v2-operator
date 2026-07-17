@@ -53,7 +53,6 @@ type SearchReconciler struct {
 	Scheme        *runtime.Scheme
 	context       context.Context
 	DynamicClient dynamic.Interface
-	ServiceCIDR   string // cluster service network CIDR, e.g. "172.30.0.0/16"
 }
 
 const searchFinalizer = "search.open-cluster-management.io/finalizer"

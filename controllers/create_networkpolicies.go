@@ -32,7 +32,6 @@ const (
 	operatorMetricsPort = 8080
 	dnsPort             = 53
 	kubeAPIServerPort   = 6443
-	kubeAPIServicePort  = 443 // kubernetes.default.svc ClusterIP port used by in-cluster clients
 )
 
 func networkPolicyName(component string) string {
@@ -82,30 +81,16 @@ func dnsEgressRule() networkingv1.NetworkPolicyEgressRule {
 	}
 }
 
-// kubeAPIServerEgressRules allows a component to reach the Kubernetes/OpenShift API server,
+// kubeAPIServerEgressRule allows a component to reach the Kubernetes/OpenShift API server,
 // e.g. to watch resources, or perform TokenReview/SubjectAccessReview RBAC checks.
-// Two rules are required:
-//   - Port 6443 scoped to openshift-kube-apiserver: matches kube-apiserver pods directly.
-//   - Port 443 via ipBlock for the service CIDR: in-cluster clients use the
-//     kubernetes.default.svc ClusterIP (e.g. 172.30.0.1:443). In OVN-Kubernetes, ClusterIP
-//     traffic is handled by the OVN service load balancer at the logical switch level. A
-//     namespaceSelector or podSelector cannot match a ClusterIP; an ipBlock scoped to the
-//     service network CIDR is required. The CIDR is read from the network.config cluster CR
-//     at startup and injected via the SEARCH_SERVICE_CIDR env var (set by the operator itself).
-func kubeAPIServerEgressRules(serviceCIDR string) []networkingv1.NetworkPolicyEgressRule {
-	proto := corev1.ProtocolTCP
-	port443 := intstr.FromInt32(kubeAPIServicePort)
-	return []networkingv1.NetworkPolicyEgressRule{
-		{
-			To:    []networkingv1.NetworkPolicyPeer{namespaceSelectorPeer(openshiftKubeAPIServer)},
-			Ports: tcpPort(kubeAPIServerPort),
-		},
-		{
-			To: []networkingv1.NetworkPolicyPeer{
-				{IPBlock: &networkingv1.IPBlock{CIDR: serviceCIDR}},
-			},
-			Ports: []networkingv1.NetworkPolicyPort{{Protocol: &proto, Port: &port443}},
-		},
+// NOTE: This rule is retained for documentation purposes. In OVN-Kubernetes, ClusterIP
+// traffic (kubernetes.default.svc:443) is handled by the OVN service load balancer before
+// NetworkPolicy evaluation and cannot be matched by any egress rule type. Components that
+// need to call the Kubernetes API should use Ingress-only NetworkPolicies (no Egress policyType).
+func kubeAPIServerEgressRule() networkingv1.NetworkPolicyEgressRule {
+	return networkingv1.NetworkPolicyEgressRule{
+		To:    []networkingv1.NetworkPolicyPeer{namespaceSelectorPeer(openshiftKubeAPIServer)},
+		Ports: tcpPort(kubeAPIServerPort),
 	}
 }
 
@@ -126,12 +111,21 @@ func newNetworkPolicy(instance *searchv1alpha1.Search, component string,
 		},
 		Spec: networkingv1.NetworkPolicySpec{
 			PodSelector: metav1.LabelSelector{MatchLabels: podLabels},
+			// Default to Ingress-only. Components that need Egress restriction
+			// (e.g. postgres, which should never initiate outbound connections)
+			// explicitly set policyTypes after construction.
 			PolicyTypes: []networkingv1.PolicyType{
 				networkingv1.PolicyTypeIngress,
-				networkingv1.PolicyTypeEgress,
 			},
 		},
 	}
+	return np
+}
+
+// withEgress adds the Egress policyType to a NetworkPolicy, making egress explicitly
+// restricted by the policy's egress rules (deny-all egress by default unless rules are set).
+func withEgress(np *networkingv1.NetworkPolicy) *networkingv1.NetworkPolicy {
+	np.Spec.PolicyTypes = append(np.Spec.PolicyTypes, networkingv1.PolicyTypeEgress)
 	return np
 }
 
@@ -165,7 +159,9 @@ func (r *SearchReconciler) PostgresNetworkPolicy(instance *searchv1alpha1.Search
 			Ports: tcpPort(postgresPort),
 		},
 	}
-	// No egress rules: PostgreSQL only responds to inbound connections.
+	// Egress: PostgreSQL never initiates outbound connections so all egress is denied.
+	// withEgress() adds Egress to policyTypes; the empty egress list means deny-all.
+	withEgress(np)
 	np.Spec.Egress = []networkingv1.NetworkPolicyEgressRule{}
 	setNPControllerRef(r, instance, np)
 	return np
@@ -180,7 +176,7 @@ func (r *SearchReconciler) PostgresNetworkPolicy(instance *searchv1alpha1.Search
 //     kube-apiserver pods. Prometheus (openshift-monitoring) scrapes the same port for metrics.
 //   - Egress: The indexer writes aggregated data to search-postgres and watches hub-cluster
 //     resources directly via the Kubernetes API, in addition to resolving Service DNS names.
-func (r *SearchReconciler) IndexerNetworkPolicy(instance *searchv1alpha1.Search, serviceCIDR string) *networkingv1.NetworkPolicy {
+func (r *SearchReconciler) IndexerNetworkPolicy(instance *searchv1alpha1.Search, _ string) *networkingv1.NetworkPolicy {
 	podLabels := generateLabels("name", indexerDeploymentName)
 	np := newNetworkPolicy(instance, indexerDeploymentName, podLabels)
 	np.Spec.Ingress = []networkingv1.NetworkPolicyIngressRule{
@@ -190,12 +186,6 @@ func (r *SearchReconciler) IndexerNetworkPolicy(instance *searchv1alpha1.Search,
 		},
 		monitoringIngressRule(indexerPort),
 	}
-	np.Spec.Egress = append([]networkingv1.NetworkPolicyEgressRule{
-		{
-			To:    []networkingv1.NetworkPolicyPeer{podSelectorPeer(generateLabels("name", postgresDeploymentName))},
-			Ports: tcpPort(postgresPort),
-		},
-	}, append(kubeAPIServerEgressRules(serviceCIDR), dnsEgressRule())...)
 	setNPControllerRef(r, instance, np)
 	return np
 }
@@ -210,7 +200,7 @@ func (r *SearchReconciler) IndexerNetworkPolicy(instance *searchv1alpha1.Search,
 //   - Egress: The API queries search-postgres, and performs TokenReview/SubjectAccessReview
 //     RBAC checks and ManagedCluster lookups against the Kubernetes API, in addition to
 //     resolving Service DNS names.
-func (r *SearchReconciler) APINetworkPolicy(instance *searchv1alpha1.Search, serviceCIDR string) *networkingv1.NetworkPolicy {
+func (r *SearchReconciler) APINetworkPolicy(instance *searchv1alpha1.Search, _ string) *networkingv1.NetworkPolicy {
 	podLabels := generateLabels("name", apiDeploymentName)
 	np := newNetworkPolicy(instance, apiDeploymentName, podLabels)
 	np.Spec.Ingress = []networkingv1.NetworkPolicyIngressRule{
@@ -221,12 +211,6 @@ func (r *SearchReconciler) APINetworkPolicy(instance *searchv1alpha1.Search, ser
 		},
 		monitoringIngressRule(apiPort),
 	}
-	np.Spec.Egress = append([]networkingv1.NetworkPolicyEgressRule{
-		{
-			To:    []networkingv1.NetworkPolicyPeer{podSelectorPeer(generateLabels("name", postgresDeploymentName))},
-			Ports: tcpPort(postgresPort),
-		},
-	}, append(kubeAPIServerEgressRules(serviceCIDR), dnsEgressRule())...)
 	setNPControllerRef(r, instance, np)
 	return np
 }
@@ -240,18 +224,12 @@ func (r *SearchReconciler) APINetworkPolicy(instance *searchv1alpha1.Search, ser
 //     metrics and hit the liveness/readiness endpoints.
 //   - Egress: The collector watches hub-cluster resources via the Kubernetes API and pushes
 //     discovered resources to search-indexer, in addition to resolving Service DNS names.
-func (r *SearchReconciler) CollectorNetworkPolicy(instance *searchv1alpha1.Search, serviceCIDR string) *networkingv1.NetworkPolicy {
+func (r *SearchReconciler) CollectorNetworkPolicy(instance *searchv1alpha1.Search, _ string) *networkingv1.NetworkPolicy {
 	podLabels := generateLabels("name", collectorDeploymentName)
 	np := newNetworkPolicy(instance, collectorDeploymentName, podLabels)
 	np.Spec.Ingress = []networkingv1.NetworkPolicyIngressRule{
 		monitoringIngressRule(collectorPort),
 	}
-	np.Spec.Egress = append([]networkingv1.NetworkPolicyEgressRule{
-		{
-			To:    []networkingv1.NetworkPolicyPeer{podSelectorPeer(generateLabels("name", indexerDeploymentName))},
-			Ports: tcpPort(indexerPort),
-		},
-	}, append(kubeAPIServerEgressRules(serviceCIDR), dnsEgressRule())...)
 	setNPControllerRef(r, instance, np)
 	return np
 }
@@ -266,7 +244,7 @@ func (r *SearchReconciler) CollectorNetworkPolicy(instance *searchv1alpha1.Searc
 //   - Egress: The operator manages nearly every resource type used by Search (Deployments,
 //     Services, RBAC, addon framework CRs, etc.) on the hub API server, and resolves Service DNS
 //     names.
-func (r *SearchReconciler) OperatorNetworkPolicy(instance *searchv1alpha1.Search, serviceCIDR string) *networkingv1.NetworkPolicy {
+func (r *SearchReconciler) OperatorNetworkPolicy(instance *searchv1alpha1.Search, _ string) *networkingv1.NetworkPolicy {
 	podLabels := map[string]string{"app": "search", "control-plane": "controller-manager"}
 	np := newNetworkPolicy(instance, "search-operator", podLabels)
 	np.Spec.Ingress = []networkingv1.NetworkPolicyIngressRule{
@@ -276,7 +254,6 @@ func (r *SearchReconciler) OperatorNetworkPolicy(instance *searchv1alpha1.Search
 		},
 		monitoringIngressRule(operatorMetricsPort),
 	}
-	np.Spec.Egress = append(kubeAPIServerEgressRules(serviceCIDR), dnsEgressRule())
 	setNPControllerRef(r, instance, np)
 	return np
 }

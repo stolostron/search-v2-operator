@@ -106,16 +106,10 @@ func main() {
 		log.Error(err, "unable to add to scheme, search addon will be unavailable")
 	}
 
-	// Look up the cluster service network CIDR from the network.config CR.
-	// This is needed to allow egress to the kubernetes.default.svc ClusterIP (e.g. 172.30.0.1:443)
-	// in the Search NetworkPolicies, since OVN-Kubernetes requires an ipBlock rule for ClusterIPs.
-	serviceCIDR := controllers.GetServiceCIDR(mgr.GetConfig())
-
 	if err = (&controllers.SearchReconciler{
 		Client:        mgr.GetClient(),
 		DynamicClient: dynClient,
 		Scheme:        mgr.GetScheme(),
-		ServiceCIDR:   serviceCIDR,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Search")
 		os.Exit(1)
