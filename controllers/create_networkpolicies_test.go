@@ -94,7 +94,7 @@ func TestNetworkPolicies_AllComponentsPresent(t *testing.T) {
 	search := testSearchInstance()
 	r := newTestReconcilerForNetworkPolicies(t, search)
 
-	policies := r.NetworkPolicies(search)
+	policies := r.NetworkPolicies(search, "10.96.0.0/12")
 	assert.Len(t, policies, 5, "expected one NetworkPolicy per Search component")
 
 	names := map[string]bool{}
@@ -140,7 +140,7 @@ func TestIndexerNetworkPolicy(t *testing.T) {
 	search := testSearchInstance()
 	r := newTestReconcilerForNetworkPolicies(t, search)
 
-	np := r.IndexerNetworkPolicy(search)
+	np := r.IndexerNetworkPolicy(search, "10.96.0.0/12")
 
 	assert.Equal(t, indexerDeploymentName, np.Spec.PodSelector.MatchLabels["name"])
 
@@ -179,7 +179,7 @@ func TestAPINetworkPolicy(t *testing.T) {
 	search := testSearchInstance()
 	r := newTestReconcilerForNetworkPolicies(t, search)
 
-	np := r.APINetworkPolicy(search)
+	np := r.APINetworkPolicy(search, "10.96.0.0/12")
 
 	assert.Equal(t, apiDeploymentName, np.Spec.PodSelector.MatchLabels["name"])
 
@@ -220,7 +220,7 @@ func TestCollectorNetworkPolicy(t *testing.T) {
 	search := testSearchInstance()
 	r := newTestReconcilerForNetworkPolicies(t, search)
 
-	np := r.CollectorNetworkPolicy(search)
+	np := r.CollectorNetworkPolicy(search, "10.96.0.0/12")
 
 	assert.Equal(t, collectorDeploymentName, np.Spec.PodSelector.MatchLabels["name"])
 	assert.Len(t, np.Spec.Ingress, 1)
@@ -248,7 +248,7 @@ func TestOperatorNetworkPolicy(t *testing.T) {
 	search := testSearchInstance()
 	r := newTestReconcilerForNetworkPolicies(t, search)
 
-	np := r.OperatorNetworkPolicy(search)
+	np := r.OperatorNetworkPolicy(search, "10.96.0.0/12")
 
 	assert.Equal(t, "controller-manager", np.Spec.PodSelector.MatchLabels["control-plane"])
 

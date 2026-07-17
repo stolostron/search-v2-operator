@@ -535,7 +535,7 @@ func (r *SearchReconciler) createOrUpdateNetworkPolicy(ctx context.Context,
 // reconcileNetworkPolicies creates or updates the NetworkPolicy for each Search component.
 func (r *SearchReconciler) reconcileNetworkPolicies(ctx context.Context,
 	instance *searchv1alpha1.Search) (*reconcile.Result, error) {
-	for _, np := range r.NetworkPolicies(instance) {
+	for _, np := range r.NetworkPolicies(instance, r.ServiceCIDR) {
 		if result, err := r.createOrUpdateNetworkPolicy(ctx, np); result != nil {
 			return result, err
 		}
