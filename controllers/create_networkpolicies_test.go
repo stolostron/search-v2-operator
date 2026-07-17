@@ -97,18 +97,30 @@ func TestNetworkPolicies_AllComponentsPresent(t *testing.T) {
 	policies := r.NetworkPolicies(search, "10.96.0.0/12")
 	assert.Len(t, policies, 5, "expected one NetworkPolicy per Search component")
 
+	// postgresNetworkPolicyName has both Ingress and Egress policyTypes (deny-all egress).
+	// All other components use Ingress-only (OVN-K cannot match ClusterIP in egress rules).
+	ingressEgressPolicies := map[string]bool{
+		networkPolicyName(postgresDeploymentName): true,
+	}
+
 	names := map[string]bool{}
 	for _, np := range policies {
 		names[np.Name] = true
 		// Every policy must be namespaced with the Search instance and own an owner reference.
 		assert.Equal(t, search.Namespace, np.Namespace)
 		assert.NotEmpty(t, np.OwnerReferences, "NetworkPolicy %s should be owned by the Search CR", np.Name)
-		// Every policy must restrict both ingress and egress (default-deny unless allowed).
-		assert.ElementsMatch(t, []networkingv1.PolicyType{
-			networkingv1.PolicyTypeIngress, networkingv1.PolicyTypeEgress,
-		}, np.Spec.PolicyTypes)
 		// Every policy must scope to a specific set of pods, never the whole namespace.
 		assert.NotEmpty(t, np.Spec.PodSelector.MatchLabels, "NetworkPolicy %s must not select all pods", np.Name)
+		// Postgres restricts both ingress and egress; others restrict ingress only.
+		if ingressEgressPolicies[np.Name] {
+			assert.ElementsMatch(t, []networkingv1.PolicyType{
+				networkingv1.PolicyTypeIngress, networkingv1.PolicyTypeEgress,
+			}, np.Spec.PolicyTypes, "postgres policy must set both Ingress and Egress")
+		} else {
+			assert.ElementsMatch(t, []networkingv1.PolicyType{
+				networkingv1.PolicyTypeIngress,
+			}, np.Spec.PolicyTypes, "non-postgres policy %s must use Ingress-only (no Egress)", np.Name)
+		}
 	}
 
 	assert.True(t, names[networkPolicyName(postgresDeploymentName)])
@@ -157,22 +169,11 @@ func TestIndexerNetworkPolicy(t *testing.T) {
 	assert.True(t, sawAPIServer, "expected ingress from kube-apiserver namespace")
 	assert.True(t, sawMonitoring, "expected ingress from openshift-monitoring namespace")
 
-	// Egress: to postgres, kube-apiserver, and DNS.
-	var sawPostgres, sawAPIServerEgress, sawDNS bool
-	for _, rule := range np.Spec.Egress {
-		if containsPodSelectorLabel(rule.To, "name", postgresDeploymentName) && containsTCPPort(rule.Ports, postgresPort) {
-			sawPostgres = true
-		}
-		if containsNamespaceSelector(rule.To, openshiftKubeAPIServer) && containsTCPPort(rule.Ports, kubeAPIServerPort) {
-			sawAPIServerEgress = true
-		}
-		if containsNamespaceSelector(rule.To, openshiftDNS) && containsExactDNSPorts(rule.Ports) {
-			sawDNS = true
-		}
-	}
-	assert.True(t, sawPostgres, "expected egress to search-postgres")
-	assert.True(t, sawAPIServerEgress, "expected egress to kube-apiserver on 6443/TCP")
-	assert.True(t, sawDNS, "expected egress to DNS on 53/TCP+UDP only")
+	// Egress policyType is NOT set for indexer: OVN-Kubernetes cannot match
+	// kubernetes.default.svc ClusterIP traffic in NetworkPolicy egress rules, so applying
+	// Egress policyType would block the indexer from reaching the Kubernetes API.
+	assert.NotContains(t, np.Spec.PolicyTypes, networkingv1.PolicyTypeEgress,
+		"indexer NetworkPolicy must not set Egress policyType (would block kube API access)")
 }
 
 func TestAPINetworkPolicy(t *testing.T) {
@@ -199,21 +200,11 @@ func TestAPINetworkPolicy(t *testing.T) {
 	assert.True(t, sawSameNamespace, "expected ingress from same-namespace consumers (e.g. console-api)")
 	assert.True(t, sawMonitoring, "expected ingress from openshift-monitoring namespace")
 
-	var sawPostgres, sawAPIServerEgress, sawDNS bool
-	for _, rule := range np.Spec.Egress {
-		if containsPodSelectorLabel(rule.To, "name", postgresDeploymentName) && containsTCPPort(rule.Ports, postgresPort) {
-			sawPostgres = true
-		}
-		if containsNamespaceSelector(rule.To, openshiftKubeAPIServer) && containsTCPPort(rule.Ports, kubeAPIServerPort) {
-			sawAPIServerEgress = true
-		}
-		if containsNamespaceSelector(rule.To, openshiftDNS) && containsExactDNSPorts(rule.Ports) {
-			sawDNS = true
-		}
-	}
-	assert.True(t, sawPostgres, "expected egress to search-postgres on 5432/TCP")
-	assert.True(t, sawAPIServerEgress, "expected egress to kube-apiserver on 6443/TCP")
-	assert.True(t, sawDNS, "expected egress to DNS on 53/TCP+UDP only")
+	// Egress policyType is NOT set for api: OVN-Kubernetes cannot match
+	// kubernetes.default.svc ClusterIP traffic in NetworkPolicy egress rules, so applying
+	// Egress policyType would block the api from reaching the Kubernetes API.
+	assert.NotContains(t, np.Spec.PolicyTypes, networkingv1.PolicyTypeEgress,
+		"api NetworkPolicy must not set Egress policyType (would block kube API access)")
 }
 
 func TestCollectorNetworkPolicy(t *testing.T) {
@@ -227,21 +218,11 @@ func TestCollectorNetworkPolicy(t *testing.T) {
 	assert.True(t, containsNamespaceSelector(np.Spec.Ingress[0].From, openshiftMonitoring))
 	assert.True(t, containsTCPPort(np.Spec.Ingress[0].Ports, collectorPort))
 
-	var sawIndexer, sawAPIServerEgress, sawDNS bool
-	for _, rule := range np.Spec.Egress {
-		if containsPodSelectorLabel(rule.To, "name", indexerDeploymentName) && containsTCPPort(rule.Ports, indexerPort) {
-			sawIndexer = true
-		}
-		if containsNamespaceSelector(rule.To, openshiftKubeAPIServer) && containsTCPPort(rule.Ports, kubeAPIServerPort) {
-			sawAPIServerEgress = true
-		}
-		if containsNamespaceSelector(rule.To, openshiftDNS) && containsExactDNSPorts(rule.Ports) {
-			sawDNS = true
-		}
-	}
-	assert.True(t, sawIndexer, "expected egress to search-indexer on 3010/TCP")
-	assert.True(t, sawAPIServerEgress, "expected egress to kube-apiserver on 6443/TCP")
-	assert.True(t, sawDNS, "expected egress to DNS on 53/TCP+UDP only")
+	// Egress policyType is NOT set for collector: OVN-Kubernetes cannot match
+	// kubernetes.default.svc ClusterIP traffic in NetworkPolicy egress rules, so applying
+	// Egress policyType would block the collector from reaching the Kubernetes API.
+	assert.NotContains(t, np.Spec.PolicyTypes, networkingv1.PolicyTypeEgress,
+		"collector NetworkPolicy must not set Egress policyType (would block kube API access)")
 }
 
 func TestOperatorNetworkPolicy(t *testing.T) {
@@ -264,17 +245,11 @@ func TestOperatorNetworkPolicy(t *testing.T) {
 	assert.True(t, sawWebhook, "expected ingress from kube-apiserver for admission webhook calls")
 	assert.True(t, sawMonitoring, "expected ingress from openshift-monitoring for metrics")
 
-	var sawAPIServerEgress, sawDNS bool
-	for _, rule := range np.Spec.Egress {
-		if containsNamespaceSelector(rule.To, openshiftKubeAPIServer) && containsTCPPort(rule.Ports, kubeAPIServerPort) {
-			sawAPIServerEgress = true
-		}
-		if containsNamespaceSelector(rule.To, openshiftDNS) && containsExactDNSPorts(rule.Ports) {
-			sawDNS = true
-		}
-	}
-	assert.True(t, sawAPIServerEgress, "expected egress to kube-apiserver on 6443/TCP")
-	assert.True(t, sawDNS, "expected egress to DNS on 53/TCP+UDP only")
+	// Egress policyType is NOT set for the operator: OVN-Kubernetes cannot match
+	// kubernetes.default.svc ClusterIP traffic in NetworkPolicy egress rules, so applying
+	// Egress policyType would block the operator from reaching the Kubernetes API.
+	assert.NotContains(t, np.Spec.PolicyTypes, networkingv1.PolicyTypeEgress,
+		"operator NetworkPolicy must not set Egress policyType (would block kube API access)")
 }
 
 func TestReconcileNetworkPolicies_CreatesAndUpdates(t *testing.T) {
