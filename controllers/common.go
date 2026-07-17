@@ -516,8 +516,13 @@ func (r *SearchReconciler) createOrUpdateNetworkPolicy(ctx context.Context,
 		log.Error(err, "Could not get NetworkPolicy")
 		return &reconcile.Result{}, err
 	}
-	if !equality.Semantic.DeepEqual(found.Spec, np.Spec) {
+	specChanged := !equality.Semantic.DeepEqual(found.Spec, np.Spec)
+	labelsChanged := !equality.Semantic.DeepEqual(found.Labels, np.Labels)
+	ownerRefsChanged := !equality.Semantic.DeepEqual(found.OwnerReferences, np.OwnerReferences)
+	if specChanged || labelsChanged || ownerRefsChanged {
 		found.Spec = np.Spec
+		found.Labels = np.Labels
+		found.OwnerReferences = np.OwnerReferences
 		if err := r.Update(ctx, found); err != nil {
 			log.Error(err, "Could not update NetworkPolicy")
 			return &reconcile.Result{}, err

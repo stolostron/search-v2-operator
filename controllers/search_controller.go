@@ -332,6 +332,17 @@ func (r *SearchReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			return false
 		},
 	}
+	// Trigger reconcile when a NetworkPolicy we own is modified (e.g. tampered with or
+	// drifted from the desired state), so it gets self-healed. Skip CreateFunc since we
+	// just created it ourselves and don't need to immediately re-reconcile.
+	networkPolicyPred := predicate.Funcs{
+		CreateFunc: func(e event.CreateEvent) bool {
+			return false
+		},
+		UpdateFunc: func(e event.UpdateEvent) bool {
+			return true
+		},
+	}
 	// Trigger on create and update for ConfigMaps
 	configMapPred := predicate.Funcs{
 		CreateFunc: func(e event.CreateEvent) bool {
@@ -351,7 +362,7 @@ func (r *SearchReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Watches(&corev1.Secret{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(),
 			&searchv1alpha1.Search{}, handler.OnlyControllerOwner()), builder.WithPredicates(pred)).
 		Watches(&networkingv1.NetworkPolicy{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(),
-			&searchv1alpha1.Search{}, handler.OnlyControllerOwner()), builder.WithPredicates(pred)).
+			&searchv1alpha1.Search{}, handler.OnlyControllerOwner()), builder.WithPredicates(networkPolicyPred)).
 		Watches(&corev1.ConfigMap{}, handler.EnqueueRequestsFromMapFunc(
 			func(ctx context.Context, a client.Object) []reconcile.Request {
 				// Trigger reconcile if SEARCH_GLOBAL_CONFIG configmap
