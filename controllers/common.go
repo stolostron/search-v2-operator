@@ -122,6 +122,9 @@ func getPodSecurityContext() *corev1.PodSecurityContext {
 	trueVal := true
 	return &corev1.PodSecurityContext{
 		RunAsNonRoot: &trueVal,
+		SeccompProfile: &corev1.SeccompProfile{
+			Type: corev1.SeccompProfileTypeRuntimeDefault,
+		},
 	}
 }
 
