@@ -47,27 +47,6 @@ func containsTCPPort(ports []networkingv1.NetworkPolicyPort, port int32) bool {
 	return false
 }
 
-// containsExactPorts returns true if the port list is exactly the given set of TCP+UDP DNS
-// ports (53/TCP and 53/UDP) and nothing else, guarding against accidental all-port egress.
-func containsExactDNSPorts(ports []networkingv1.NetworkPolicyPort) bool {
-	if len(ports) != 2 {
-		return false
-	}
-	var sawTCP, sawUDP bool
-	for _, p := range ports {
-		if p.Port == nil || p.Port.IntVal != dnsPort || p.Protocol == nil {
-			return false
-		}
-		switch *p.Protocol {
-		case corev1.ProtocolTCP:
-			sawTCP = true
-		case corev1.ProtocolUDP:
-			sawUDP = true
-		}
-	}
-	return sawTCP && sawUDP
-}
-
 // containsNamespaceSelector returns true if any of the peers selects the given namespace name
 // via the well-known kubernetes.io/metadata.name label.
 func containsNamespaceSelector(peers []networkingv1.NetworkPolicyPeer, namespaceName string) bool {

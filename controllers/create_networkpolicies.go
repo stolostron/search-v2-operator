@@ -64,36 +64,6 @@ func tcpPort(port int32) []networkingv1.NetworkPolicyPort {
 	return []networkingv1.NetworkPolicyPort{{Protocol: &proto, Port: &p}}
 }
 
-// dnsEgressRule allows resolving in-cluster and external DNS names via the OpenShift DNS
-// operator (CoreDNS pods in the `openshift-dns` namespace). Every Search component needs this
-// to resolve Service DNS names (e.g. search-postgres.<ns>.svc) and, in the collector's case,
-// the hub API server host name.
-func dnsEgressRule() networkingv1.NetworkPolicyEgressRule {
-	tcp := corev1.ProtocolTCP
-	udp := corev1.ProtocolUDP
-	port := intstr.FromInt32(dnsPort)
-	return networkingv1.NetworkPolicyEgressRule{
-		To: []networkingv1.NetworkPolicyPeer{namespaceSelectorPeer(openshiftDNS)},
-		Ports: []networkingv1.NetworkPolicyPort{
-			{Protocol: &tcp, Port: &port},
-			{Protocol: &udp, Port: &port},
-		},
-	}
-}
-
-// kubeAPIServerEgressRule allows a component to reach the Kubernetes/OpenShift API server,
-// e.g. to watch resources, or perform TokenReview/SubjectAccessReview RBAC checks.
-// NOTE: This rule is retained for documentation purposes. In OVN-Kubernetes, ClusterIP
-// traffic (kubernetes.default.svc:443) is handled by the OVN service load balancer before
-// NetworkPolicy evaluation and cannot be matched by any egress rule type. Components that
-// need to call the Kubernetes API should use Ingress-only NetworkPolicies (no Egress policyType).
-func kubeAPIServerEgressRule() networkingv1.NetworkPolicyEgressRule {
-	return networkingv1.NetworkPolicyEgressRule{
-		To:    []networkingv1.NetworkPolicyPeer{namespaceSelectorPeer(openshiftKubeAPIServer)},
-		Ports: tcpPort(kubeAPIServerPort),
-	}
-}
-
 func monitoringIngressRule(port int32) networkingv1.NetworkPolicyIngressRule {
 	return networkingv1.NetworkPolicyIngressRule{
 		From:  []networkingv1.NetworkPolicyPeer{namespaceSelectorPeer(openshiftMonitoring)},
