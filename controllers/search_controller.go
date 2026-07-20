@@ -33,6 +33,7 @@ import (
 	searchv1alpha1 "github.com/stolostron/search-v2-operator/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	networkingv1 "k8s.io/api/networking/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -86,6 +87,7 @@ var cleanOnce sync.Once
 //+kubebuilder:rbac:groups=search.open-cluster-management.io,resources=searches/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=search.open-cluster-management.io,resources=searches/finalizers,verbs=update
 //+kubebuilder:rbac:groups=admissionregistration.k8s.io,resources=validatingwebhookconfigurations,verbs=get;update;patch
+//+kubebuilder:rbac:groups=networking.k8s.io,resources=networkpolicies,verbs=create;get;list;watch;update;patch;delete
 //+kubebuilder:rbac:groups=search.open-cluster-management.io,resources=collectorconfigs,verbs=get;list;watch;create;update;patch
 //+kubebuilder:rbac:groups=search.open-cluster-management.io,resources=collectorconfigs/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=work.open-cluster-management.io,resources=manifestworks,verbs=create;delete;get;list;patch
@@ -252,6 +254,11 @@ func (r *SearchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		log.Error(err, "API Deployment  setup failed")
 		return *result, err
 	}
+	result, err = r.reconcileNetworkPolicies(ctx, instance)
+	if result != nil {
+		log.Error(err, "NetworkPolicy setup failed")
+		return *result, err
+	}
 	result, err = r.createConfigMap(ctx, r.IndexerConfigmap(instance))
 	if result != nil {
 		log.Error(err, "Indexer configmap  setup failed")
@@ -325,6 +332,17 @@ func (r *SearchReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			return false
 		},
 	}
+	// Trigger reconcile when a NetworkPolicy we own is modified (e.g. tampered with or
+	// drifted from the desired state), so it gets self-healed. Skip CreateFunc since we
+	// just created it ourselves and don't need to immediately re-reconcile.
+	networkPolicyPred := predicate.Funcs{
+		CreateFunc: func(e event.CreateEvent) bool {
+			return false
+		},
+		UpdateFunc: func(e event.UpdateEvent) bool {
+			return true
+		},
+	}
 	// Trigger on create and update for ConfigMaps
 	configMapPred := predicate.Funcs{
 		CreateFunc: func(e event.CreateEvent) bool {
@@ -343,6 +361,8 @@ func (r *SearchReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			&searchv1alpha1.Search{}, handler.OnlyControllerOwner()), builder.WithPredicates(pred)).
 		Watches(&corev1.Secret{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(),
 			&searchv1alpha1.Search{}, handler.OnlyControllerOwner()), builder.WithPredicates(pred)).
+		Watches(&networkingv1.NetworkPolicy{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(),
+			&searchv1alpha1.Search{}, handler.OnlyControllerOwner()), builder.WithPredicates(networkPolicyPred)).
 		Watches(&corev1.ConfigMap{}, handler.EnqueueRequestsFromMapFunc(
 			func(ctx context.Context, a client.Object) []reconcile.Request {
 				// Trigger reconcile if SEARCH_GLOBAL_CONFIG configmap
