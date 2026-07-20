@@ -13,6 +13,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
@@ -73,7 +74,7 @@ func (r *SearchReconciler) SearchPVCPrometheusRule(instance *searchv1alpha1.Sear
 						{
 							Alert: "SearchPVCNotPresent",
 							Expr:  intstr.FromString(pvcAbsentExpr),
-							For:   monitorv1.Duration("5m"),
+							For:   ptr.To(monitorv1.Duration("5m")),
 							Labels: map[string]string{
 								"severity":  "info",
 								"component": "search",
@@ -95,7 +96,7 @@ func (r *SearchReconciler) SearchPVCPrometheusRule(instance *searchv1alpha1.Sear
 		rule.Spec.Groups[0].Rules = append(rule.Spec.Groups[0].Rules, monitorv1.Rule{
 			Alert: "SearchPVCNotPresentCritical",
 			Expr:  intstr.FromString(searchPVCCriticalExpr),
-			For:   monitorv1.Duration("5m"),
+			For:   ptr.To(monitorv1.Duration("5m")),
 			Labels: map[string]string{
 				"severity":  "critical",
 				"component": "search",

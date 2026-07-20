@@ -36,7 +36,9 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/dynamic"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
@@ -242,12 +244,13 @@ func (r *SearchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		log.Error(err, "Collector Deployment  setup failed")
 		return *result, err
 	}
-	result, err = r.createOrUpdateDeployment(ctx, r.IndexerDeployment(instance))
+	tlsEnvVars := r.getTLSEnvVars(ctx)
+	result, err = r.createOrUpdateDeployment(ctx, r.IndexerDeployment(instance, tlsEnvVars))
 	if result != nil {
 		log.Error(err, "Indexer Deployment  setup failed")
 		return *result, err
 	}
-	result, err = r.createOrUpdateDeployment(ctx, r.APIDeployment(instance))
+	result, err = r.createOrUpdateDeployment(ctx, r.APIDeployment(instance, tlsEnvVars))
 	if result != nil {
 		log.Error(err, "API Deployment  setup failed")
 		return *result, err
@@ -448,7 +451,36 @@ func (r *SearchReconciler) SetupWithManager(mgr ctrl.Manager) error {
 				return nil
 			}),
 		).
+		Watches(apiServerUnstructured(), handler.EnqueueRequestsFromMapFunc(
+			func(ctx context.Context, a client.Object) []reconcile.Request {
+				// Trigger reconcile when the cluster APIServer TLS profile changes.
+				if a.GetName() == "cluster" {
+					return []reconcile.Request{
+						{
+							NamespacedName: types.NamespacedName{
+								Name:      OperatorName,
+								Namespace: os.Getenv("POD_NAMESPACE"),
+							},
+						},
+					}
+				}
+				return nil
+			}),
+		).
 		Complete(r)
+}
+
+// apiServerUnstructured returns an unstructured APIServer object for use with
+// controller-runtime Watches. This allows watching the cluster TLS profile
+// without importing the full OpenShift typed client.
+func apiServerUnstructured() *unstructured.Unstructured {
+	u := &unstructured.Unstructured{}
+	u.SetGroupVersionKind(schema.GroupVersionKind{
+		Group:   "config.openshift.io",
+		Version: "v1",
+		Kind:    "APIServer",
+	})
+	return u
 }
 
 func (r *SearchReconciler) updateStatus(ctx context.Context, instance *searchv1alpha1.Search, podName string) error {
