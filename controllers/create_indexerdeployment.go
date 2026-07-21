@@ -9,7 +9,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
-func (r *SearchReconciler) IndexerDeployment(instance *searchv1alpha1.Search, tlsEnvVars []corev1.EnvVar) *appsv1.Deployment {
+func (r *SearchReconciler) IndexerDeployment(instance *searchv1alpha1.Search,
+	tlsEnvVars []corev1.EnvVar) *appsv1.Deployment {
 	deploymentName := indexerDeploymentName
 	image_sha := getImageSha(deploymentName, instance)
 	log.V(2).Info("Using indexer image ", "name", image_sha)
