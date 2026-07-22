@@ -239,12 +239,12 @@ func (r *SearchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return *result, err
 	}
 
-	result, err = r.createOrUpdateDeployment(ctx, r.CollectorDeployment(ctx, instance))
+	tlsEnvVars := r.getTLSEnvVars(ctx)
+	result, err = r.createOrUpdateDeployment(ctx, r.CollectorDeployment(ctx, instance, tlsEnvVars))
 	if result != nil {
 		log.Error(err, "Collector Deployment  setup failed")
 		return *result, err
 	}
-	tlsEnvVars := r.getTLSEnvVars(ctx)
 	result, err = r.createOrUpdateDeployment(ctx, r.IndexerDeployment(instance, tlsEnvVars))
 	if result != nil {
 		log.Error(err, "Indexer Deployment  setup failed")

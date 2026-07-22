@@ -13,7 +13,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
-func (r *SearchReconciler) CollectorDeployment(ctx context.Context, instance *searchv1alpha1.Search) *appsv1.Deployment {
+func (r *SearchReconciler) CollectorDeployment(ctx context.Context, instance *searchv1alpha1.Search,
+	tlsEnvVars []corev1.EnvVar) *appsv1.Deployment {
 	deploymentName := collectorDeploymentName
 	image_sha := getImageSha(deploymentName, instance)
 	log.V(2).Info("Using collector image ", "name", image_sha)
@@ -66,6 +67,9 @@ func (r *SearchReconciler) CollectorDeployment(ctx context.Context, instance *se
 	env := getContainerEnvVar(deploymentName, instance)
 	if env != nil {
 		collectorContainer.Env = append(collectorContainer.Env, env...)
+	}
+	if tlsEnvVars != nil {
+		collectorContainer.Env = append(collectorContainer.Env, tlsEnvVars...)
 	}
 	collectorContainer.Resources = getResourceRequirements(deploymentName, instance)
 	volumes := []corev1.Volume{
