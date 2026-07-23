@@ -13,8 +13,10 @@ import (
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/yaml"
 )
 
@@ -34,15 +36,18 @@ import (
 //
 // Reads from the real embedded config/integration_collector_configs/ directory; see
 // applyIntegrationCollectorConfigsFrom for the testable, FS-injectable version.
-func applyIntegrationCollectorConfigs(ctx context.Context, c client.Client, namespace string) error {
-	return applyIntegrationCollectorConfigsFrom(ctx, c, namespace, integrationconfigs.FS, integrationconfigs.Dir)
+func applyIntegrationCollectorConfigs(
+	ctx context.Context, c client.Client, scheme *runtime.Scheme, owner *searchv1alpha1.Search,
+) error {
+	return applyIntegrationCollectorConfigsFrom(ctx, c, scheme, owner, integrationconfigs.FS, integrationconfigs.Dir)
 }
 
 // applyIntegrationCollectorConfigsFrom is applyIntegrationCollectorConfigs with the filesystem and
 // directory injected, so tests can exercise malformed-manifest and read-error paths with a
 // fstest.MapFS instead of editing the real embedded YAMLs.
 func applyIntegrationCollectorConfigsFrom(
-	ctx context.Context, c client.Client, namespace string, fsys fs.FS, dir string,
+	ctx context.Context, c client.Client, scheme *runtime.Scheme, owner *searchv1alpha1.Search,
+	fsys fs.FS, dir string,
 ) error {
 	entries, err := fs.ReadDir(fsys, dir)
 	if err != nil {
@@ -53,22 +58,31 @@ func applyIntegrationCollectorConfigsFrom(
 	// Sort for deterministic, readable logs (fs.ReadDir is already sorted, but be explicit).
 	sort.Slice(entries, func(i, j int) bool { return entries[i].Name() < entries[j].Name() })
 
+	namespace := owner.Namespace
+	var firstErr error
 	for _, entry := range entries {
 		if entry.IsDir() {
 			continue
 		}
-		if err := applyOneIntegrationCollectorConfig(ctx, c, namespace, fsys, dir, entry.Name()); err != nil {
-			return err
+		if err := applyOneIntegrationCollectorConfig(ctx, c, scheme, owner, namespace, fsys, dir, entry.Name()); err != nil {
+			// Log and continue — one bad or temporarily broken config must not prevent the
+			// remaining integrations from being applied. The seeder retries the whole batch on
+			// the next interval, so a transient failure here is self-healing.
+			log.Error(err, "Failed to apply integration CollectorConfig, continuing with the rest", "file", entry.Name())
+			if firstErr == nil {
+				firstErr = err
+			}
 		}
 	}
-	return nil
+	return firstErr
 }
 
 // applyOneIntegrationCollectorConfig unconditionally creates or overwrites a single embedded
 // integration CollectorConfig manifest — no diffing, no hash comparison. See
 // applyIntegrationCollectorConfigsFrom for why an unconditional overwrite is safe here.
 func applyOneIntegrationCollectorConfig(
-	ctx context.Context, c client.Client, namespace string, fsys fs.FS, dir, filename string,
+	ctx context.Context, c client.Client, scheme *runtime.Scheme, owner *searchv1alpha1.Search,
+	namespace string, fsys fs.FS, dir, filename string,
 ) error {
 	raw, err := fs.ReadFile(fsys, dir+"/"+filename)
 	if err != nil {
@@ -105,6 +119,14 @@ func applyOneIntegrationCollectorConfig(
 			cc.Labels = map[string]string{}
 		}
 		cc.Labels[searchv1alpha1.IntegrationTeamLabel] = searchv1alpha1.IntegrationTeamLabelValue
+		// Set the Search CR as controller-owner so this config is garbage-collected when
+		// Search is torn down, consistent with other operator-managed resources.
+		if scheme != nil && owner != nil && owner.UID != "" {
+			if err := controllerutil.SetControllerReference(owner, cc, scheme); err != nil {
+				log.Error(err, "Could not set ownerReference on integration CollectorConfig", "name", cc.Name)
+				return err
+			}
+		}
 		if err := c.Create(ctx, cc); err != nil {
 			log.Error(err, "Could not create integration CollectorConfig", "name", cc.Name)
 			return err
@@ -117,8 +139,9 @@ func applyOneIntegrationCollectorConfig(
 	}
 
 	hasIntegrationLabel := found.Labels[searchv1alpha1.IntegrationTeamLabel] == searchv1alpha1.IntegrationTeamLabelValue
-	if hasIntegrationLabel && equality.Semantic.DeepEqual(found.Spec, desired.Spec) {
-		// Already matches the currently shipped default and correctly labeled — skip the write.
+	hasOwnerRef := hasControllerOwnerRef(found, owner)
+	if hasIntegrationLabel && hasOwnerRef && equality.Semantic.DeepEqual(found.Spec, desired.Spec) {
+		// Already matches the currently shipped default, correctly labeled, and owned — skip.
 		return nil
 	}
 	found.Spec = desired.Spec
@@ -129,10 +152,31 @@ func applyOneIntegrationCollectorConfig(
 	// without it would otherwise be invisible to the webhook's integration-overlap check and to
 	// the merge step's label-based discovery, silently letting conflicting user excludes through.
 	found.Labels[searchv1alpha1.IntegrationTeamLabel] = searchv1alpha1.IntegrationTeamLabelValue
+	// Ensure ownerReference is set for GC when Search is torn down.
+	if scheme != nil && owner != nil && owner.UID != "" && !hasOwnerRef {
+		if err := controllerutil.SetControllerReference(owner, found, scheme); err != nil {
+			log.Error(err, "Could not set ownerReference on integration CollectorConfig", "name", desired.Name)
+			return err
+		}
+	}
 	if err := c.Update(ctx, found); err != nil {
 		log.Error(err, "Could not overwrite integration CollectorConfig", "name", desired.Name)
 		return err
 	}
 	log.Info("Overwrote integration CollectorConfig with the currently shipped default", "name", desired.Name)
 	return nil
+}
+
+// hasControllerOwnerRef returns true if obj already has a controller ownerReference pointing to
+// the given owner. Used to avoid redundant updates.
+func hasControllerOwnerRef(obj metav1.Object, owner *searchv1alpha1.Search) bool {
+	if owner == nil || owner.UID == "" {
+		return true // no owner to check against — treat as "already set" to avoid forcing updates in tests.
+	}
+	for _, ref := range obj.GetOwnerReferences() {
+		if ref.UID == owner.UID {
+			return true
+		}
+	}
+	return false
 }
