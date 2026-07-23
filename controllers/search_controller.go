@@ -176,6 +176,9 @@ func (r *SearchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		log.Error(err, "Failed to ensure webhook CA injection annotation")
 		// Non-fatal — continue reconciliation, the webhook may already have the annotation.
 	}
+	// Built-in integration CollectorConfigs are seeded once at operator startup by
+	// IntegrationCollectorConfigSeeder (see main.go), not on every reconcile — see
+	// docs/ARCHITECTURE.md for why.
 	result, err = r.createOrUpdateMergedCollectorConfig(ctx, instance)
 	if result != nil {
 		log.Error(err, "Merged CollectorConfig setup failed")

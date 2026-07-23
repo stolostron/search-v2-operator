@@ -1,0 +1,19 @@
+# Integration CollectorConfig for OLM (Operator Lifecycle Manager). Populated from resources
+# already hard-coded in search-collector/pkg/transforms/genericResourceConfig.go before this
+# CollectorConfig existed. See ACM-37052.
+apiVersion: search.open-cluster-management.io/v1alpha1
+kind: CollectorConfig
+metadata:
+  name: olm-integration-collector-config
+  namespace: open-cluster-management
+  labels:
+    search.open-cluster-management.io/config-type: integration
+    cluster.open-cluster-management.io/backup: ""
+spec:
+  collectionRules:
+    - action: include
+      resourceSelector:
+        apiGroups:
+          - operators.coreos.com
+        kinds:
+          - "*"
