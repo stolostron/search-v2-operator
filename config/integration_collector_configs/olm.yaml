@@ -8,6 +8,7 @@ metadata:
   namespace: open-cluster-management
   labels:
     search.open-cluster-management.io/config-type: integration
+    cluster.open-cluster-management.io/backup: ""
 spec:
   collectionRules:
     - action: include

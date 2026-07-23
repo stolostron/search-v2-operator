@@ -124,6 +124,7 @@ func main() {
 	// in real deployments, so the seeder discovers its namespace from the live Search CR instead.
 	if err := mgr.Add(&controllers.IntegrationCollectorConfigSeeder{
 		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
 	}); err != nil {
 		setupLog.Error(err, "unable to add integration CollectorConfig seeder")
 		os.Exit(1)

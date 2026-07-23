@@ -11,10 +11,24 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 )
+
+// testSearchOwner returns a Search CR suitable for ownerReference testing. It has an empty UID
+// which causes applyOneIntegrationCollectorConfig to skip the ownerReference logic — that's fine
+// for tests that don't specifically test the ownerRef behavior, since the fake client doesn't
+// populate UID anyway.
+func testSearchOwner() *searchv1alpha1.Search {
+	return newSearchInstance()
+}
+
+// testScheme returns the scheme used by setupReconciler, for passing to apply functions.
+func testScheme() *runtime.Scheme {
+	return setupReconciler().Scheme
+}
 
 // expectedIntegrationConfigNames must match metadata.name in each file under
 // config/integration_collector_configs/. Kept explicit (rather than derived from the embedded
@@ -32,7 +46,7 @@ var expectedIntegrationConfigNames = []string{
 func TestApplyIntegrationCollectorConfigs_CreatesAllEmbeddedConfigs(t *testing.T) {
 	r := setupReconciler()
 
-	err := applyIntegrationCollectorConfigs(context.TODO(), r.Client, testNamespace)
+	err := applyIntegrationCollectorConfigs(context.TODO(), r.Client, testScheme(), testSearchOwner())
 	require.NoError(t, err)
 
 	for _, name := range expectedIntegrationConfigNames {
@@ -48,7 +62,7 @@ func TestApplyIntegrationCollectorConfigs_NoOpWhenAlreadyUpToDate(t *testing.T) 
 	r := setupReconciler()
 
 	// First pass creates everything.
-	require.NoError(t, applyIntegrationCollectorConfigs(context.TODO(), r.Client, testNamespace))
+	require.NoError(t, applyIntegrationCollectorConfigs(context.TODO(), r.Client, testScheme(), testSearchOwner()))
 
 	before := &searchv1alpha1.CollectorConfig{}
 	require.NoError(t, r.Get(context.TODO(), types.NamespacedName{
@@ -56,7 +70,7 @@ func TestApplyIntegrationCollectorConfigs_NoOpWhenAlreadyUpToDate(t *testing.T) 
 	}, before))
 
 	// Second pass should be a no-op — same resourceVersion, same spec.
-	require.NoError(t, applyIntegrationCollectorConfigs(context.TODO(), r.Client, testNamespace))
+	require.NoError(t, applyIntegrationCollectorConfigs(context.TODO(), r.Client, testScheme(), testSearchOwner()))
 
 	after := &searchv1alpha1.CollectorConfig{}
 	require.NoError(t, r.Get(context.TODO(), types.NamespacedName{
@@ -84,7 +98,7 @@ func TestApplyIntegrationCollectorConfigs_OverwritesCustomizedCanonicalConfig(t 
 	})
 	r := setupReconciler(customized)
 
-	require.NoError(t, applyIntegrationCollectorConfigs(context.TODO(), r.Client, testNamespace))
+	require.NoError(t, applyIntegrationCollectorConfigs(context.TODO(), r.Client, testScheme(), testSearchOwner()))
 
 	after := &searchv1alpha1.CollectorConfig{}
 	require.NoError(t, r.Get(context.TODO(), types.NamespacedName{
@@ -119,7 +133,7 @@ func TestApplyIntegrationCollectorConfigs_AddsMissingLabelWhenSpecAlreadyMatches
 	require.Empty(t, unlabeled.Labels, "test setup: must start with no labels at all")
 	r := setupReconciler(unlabeled)
 
-	require.NoError(t, applyIntegrationCollectorConfigs(context.TODO(), r.Client, testNamespace))
+	require.NoError(t, applyIntegrationCollectorConfigs(context.TODO(), r.Client, testScheme(), testSearchOwner()))
 
 	after := &searchv1alpha1.CollectorConfig{}
 	require.NoError(t, r.Get(context.TODO(), types.NamespacedName{
@@ -142,7 +156,7 @@ func TestApplyIntegrationCollectorConfigs_AddsMissingLabelWhenSpecAlsoDiffers(t 
 	require.Empty(t, unlabeled.Labels)
 	r := setupReconciler(unlabeled)
 
-	require.NoError(t, applyIntegrationCollectorConfigs(context.TODO(), r.Client, testNamespace))
+	require.NoError(t, applyIntegrationCollectorConfigs(context.TODO(), r.Client, testScheme(), testSearchOwner()))
 
 	after := &searchv1alpha1.CollectorConfig{}
 	require.NoError(t, r.Get(context.TODO(), types.NamespacedName{
@@ -168,7 +182,7 @@ func TestApplyIntegrationCollectorConfigs_LeavesDifferentlyNamedConfigsAlone(t *
 	})
 	r := setupReconciler(testConfig)
 
-	require.NoError(t, applyIntegrationCollectorConfigs(context.TODO(), r.Client, testNamespace))
+	require.NoError(t, applyIntegrationCollectorConfigs(context.TODO(), r.Client, testScheme(), testSearchOwner()))
 
 	after := &searchv1alpha1.CollectorConfig{}
 	require.NoError(t, r.Get(context.TODO(), types.NamespacedName{
@@ -199,7 +213,7 @@ func TestApplyIntegrationCollectorConfigsFrom_ReadDirError(t *testing.T) {
 	r := setupReconciler()
 	fsys := fstest.MapFS{} // "configs" directory does not exist.
 
-	err := applyIntegrationCollectorConfigsFrom(context.TODO(), r.Client, testNamespace, fsys, "configs")
+	err := applyIntegrationCollectorConfigsFrom(context.TODO(), r.Client, testScheme(), testSearchOwner(), fsys, "configs")
 	assert.Error(t, err)
 }
 
@@ -213,7 +227,7 @@ func TestApplyIntegrationCollectorConfigsFrom_SkipsSubdirectories(t *testing.T) 
 		"configs/a-real-file.yaml":   &fstest.MapFile{Data: validCollectorConfigYAML("real-config")},
 		"configs/subdir/nested.yaml": &fstest.MapFile{Data: validCollectorConfigYAML("nested-config")},
 	}
-	err := applyIntegrationCollectorConfigsFrom(context.TODO(), r.Client, testNamespace, fsys, "configs")
+	err := applyIntegrationCollectorConfigsFrom(context.TODO(), r.Client, testScheme(), testSearchOwner(), fsys, "configs")
 	require.NoError(t, err)
 
 	cc := &searchv1alpha1.CollectorConfig{}
@@ -227,21 +241,22 @@ func TestApplyIntegrationCollectorConfigsFrom_SkipsSubdirectories(t *testing.T) 
 	assert.True(t, apierrors.IsNotFound(err), "nested file must not be read directly out of a subdirectory")
 }
 
-func TestApplyIntegrationCollectorConfigsFrom_StopsOnFirstFileError(t *testing.T) {
+// A malformed manifest returns an error but does NOT prevent the rest from being applied.
+func TestApplyIntegrationCollectorConfigsFrom_ContinuesOnSingleFileError(t *testing.T) {
 	r := setupReconciler()
 	fsys := fstest.MapFS{
 		"configs/a-bad.yaml":  &fstest.MapFile{Data: []byte("not: valid: yaml: [")},
 		"configs/z-good.yaml": &fstest.MapFile{Data: validCollectorConfigYAML("good-config")},
 	}
 
-	err := applyIntegrationCollectorConfigsFrom(context.TODO(), r.Client, testNamespace, fsys, "configs")
-	assert.Error(t, err, "a malformed manifest must fail the whole pass, not be silently skipped")
+	err := applyIntegrationCollectorConfigsFrom(context.TODO(), r.Client, testScheme(), testSearchOwner(), fsys, "configs")
+	assert.Error(t, err, "the first error is still returned to the caller for retry")
 
-	// Files are processed in sorted order, so "a-bad.yaml" (alphabetically first) fails before
-	// "z-good.yaml" is ever reached.
+	// Despite the error on "a-bad.yaml", "z-good.yaml" must still have been applied.
 	goodConfigKey := types.NamespacedName{Name: "good-config", Namespace: testNamespace}
-	err = r.Get(context.TODO(), goodConfigKey, &searchv1alpha1.CollectorConfig{})
-	assert.True(t, apierrors.IsNotFound(err), "processing stops at the first error, later files are never applied")
+	cc := &searchv1alpha1.CollectorConfig{}
+	require.NoError(t, r.Get(context.TODO(), goodConfigKey, cc),
+		"a failure on one file must not prevent the rest from being applied")
 }
 
 func TestApplyOneIntegrationCollectorConfig_SkipsManifestWithNoName(t *testing.T) {
@@ -255,7 +270,7 @@ spec:
 `)},
 	}
 
-	err := applyIntegrationCollectorConfigsFrom(context.TODO(), r.Client, testNamespace, fsys, "configs")
+	err := applyIntegrationCollectorConfigsFrom(context.TODO(), r.Client, testScheme(), testSearchOwner(), fsys, "configs")
 	assert.NoError(t, err, "a manifest with no metadata.name is skipped, not an error")
 }
 
@@ -265,7 +280,7 @@ func TestApplyOneIntegrationCollectorConfig_MalformedYAMLReturnsError(t *testing
 		"configs/broken.yaml": &fstest.MapFile{Data: []byte("not: valid: yaml: [")},
 	}
 
-	err := applyIntegrationCollectorConfigsFrom(context.TODO(), r.Client, testNamespace, fsys, "configs")
+	err := applyIntegrationCollectorConfigsFrom(context.TODO(), r.Client, testScheme(), testSearchOwner(), fsys, "configs")
 	assert.Error(t, err)
 }
 
@@ -279,7 +294,7 @@ func TestApplyOneIntegrationCollectorConfig_GetErrorOtherThanNotFound(t *testing
 		},
 	})
 
-	err := applyIntegrationCollectorConfigs(context.TODO(), failingClient, testNamespace)
+	err := applyIntegrationCollectorConfigs(context.TODO(), failingClient, testScheme(), testSearchOwner())
 	assert.Error(t, err)
 }
 
@@ -291,7 +306,7 @@ func TestApplyOneIntegrationCollectorConfig_CreateError(t *testing.T) {
 		},
 	})
 
-	err := applyIntegrationCollectorConfigs(context.TODO(), failingClient, testNamespace)
+	err := applyIntegrationCollectorConfigs(context.TODO(), failingClient, testScheme(), testSearchOwner())
 	assert.Error(t, err)
 }
 
@@ -313,6 +328,6 @@ func TestApplyOneIntegrationCollectorConfig_UpdateError(t *testing.T) {
 		},
 	})
 
-	err := applyIntegrationCollectorConfigs(context.TODO(), failingClient, testNamespace)
+	err := applyIntegrationCollectorConfigs(context.TODO(), failingClient, testScheme(), testSearchOwner())
 	assert.Error(t, err)
 }
