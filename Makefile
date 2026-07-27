@@ -145,10 +145,13 @@ rm -rf $$TMP_DIR ;\
 endef
 
 .PHONY: bundle
-bundle: manifests kustomize ## Generate bundle manifests and metadata, then validate generated files.
+bundle: manifests kustomize ## Generate bundle manifests and metadata.
 	operator-sdk generate kustomize manifests -q
 	cd config/manager && $(KUSTOMIZE) edit set image controller=$(IMG)
 	$(KUSTOMIZE) build config/manifests | operator-sdk generate bundle -q --overwrite --version $(VERSION) $(BUNDLE_METADATA_OPTS)
+
+.PHONY: bundle-validate
+bundle-validate: ## Validate the bundle (informational — ClusterManagementAddOn triggers a known false-positive warning).
 	operator-sdk bundle validate ./bundle
 
 .PHONY: bundle-build
