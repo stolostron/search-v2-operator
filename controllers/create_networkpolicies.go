@@ -140,10 +140,13 @@ func (r *SearchReconciler) PostgresNetworkPolicy(instance *searchv1alpha1.Search
 // IndexerNetworkPolicy restricts access to the search-indexer pod.
 //
 // Rationale:
-//   - Ingress: search-collector agents (both the hub-local collector and collectors running on
-//     managed clusters) push discovered resources to the indexer through the hub API server's
-//     service proxy using their addon bootstrap kubeconfig, so the traffic is sourced from
-//     kube-apiserver pods. Prometheus (openshift-monitoring) scrapes the same port for metrics.
+//   - Ingress (kube-apiserver): Managed-cluster search-collector agents push discovered
+//     resources to the indexer through the hub API server's service proxy using their addon
+//     bootstrap kubeconfig, so that proxied traffic is sourced from kube-apiserver pods.
+//   - Ingress (hub-local collector): The hub-local search-collector deployed by this operator
+//     connects to the indexer directly (same namespace, no proxy), so its pod-selector ingress
+//     is required in addition to the kube-apiserver namespace selector above.
+//   - Ingress (monitoring): Prometheus (openshift-monitoring) scrapes indexer metrics.
 //   - Egress: The indexer writes aggregated data to search-postgres and watches hub-cluster
 //     resources directly via the Kubernetes API, in addition to resolving Service DNS names.
 func (r *SearchReconciler) IndexerNetworkPolicy(instance *searchv1alpha1.Search, _ string) *networkingv1.NetworkPolicy {
@@ -151,7 +154,14 @@ func (r *SearchReconciler) IndexerNetworkPolicy(instance *searchv1alpha1.Search,
 	np := newNetworkPolicy(instance, indexerDeploymentName, podLabels)
 	np.Spec.Ingress = []networkingv1.NetworkPolicyIngressRule{
 		{
+			// Managed-cluster collectors arrive via the kube-apiserver service proxy.
+			// The hub-local collector connects directly (same namespace), so it gets its own rule below.
 			From:  []networkingv1.NetworkPolicyPeer{namespaceSelectorPeer(openshiftKubeAPIServer)},
+			Ports: tcpPort(indexerPort),
+		},
+		{
+			// Hub-local collector: runs in the same namespace and pushes directly without proxying.
+			From:  []networkingv1.NetworkPolicyPeer{podSelectorPeer(generateLabels("name", collectorDeploymentName))},
 			Ports: tcpPort(indexerPort),
 		},
 		monitoringIngressRule(indexerPort),

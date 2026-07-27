@@ -135,17 +135,22 @@ func TestIndexerNetworkPolicy(t *testing.T) {
 
 	assert.Equal(t, indexerDeploymentName, np.Spec.PodSelector.MatchLabels["name"])
 
-	// Ingress: from kube-apiserver (proxied collector traffic) and monitoring (metrics).
-	var sawAPIServer, sawMonitoring bool
+	// Ingress: from kube-apiserver (proxied managed-cluster collector traffic), the hub-local
+	// collector (direct, same-namespace connection), and monitoring (metrics).
+	var sawAPIServer, sawHubCollector, sawMonitoring bool
 	for _, rule := range np.Spec.Ingress {
 		if containsNamespaceSelector(rule.From, openshiftKubeAPIServer) && containsTCPPort(rule.Ports, indexerPort) {
 			sawAPIServer = true
+		}
+		if containsPodSelectorLabel(rule.From, "name", collectorDeploymentName) && containsTCPPort(rule.Ports, indexerPort) {
+			sawHubCollector = true
 		}
 		if containsNamespaceSelector(rule.From, openshiftMonitoring) && containsTCPPort(rule.Ports, indexerPort) {
 			sawMonitoring = true
 		}
 	}
-	assert.True(t, sawAPIServer, "expected ingress from kube-apiserver namespace")
+	assert.True(t, sawAPIServer, "expected ingress from kube-apiserver namespace (proxied managed-cluster collectors)")
+	assert.True(t, sawHubCollector, "expected ingress from hub-local collector pod (direct, same-namespace connection)")
 	assert.True(t, sawMonitoring, "expected ingress from openshift-monitoring namespace")
 
 	// Egress policyType is NOT set for indexer: OVN-Kubernetes cannot match
