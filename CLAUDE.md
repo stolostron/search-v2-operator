@@ -23,6 +23,22 @@ make clean          # Remove bin/ directory
 
 After any change to `api/v1alpha1/` types, run **both** `make manifests` and `make generate`.
 
+## OLM bundle
+
+The `bundle/` directory contains the OLM (Operator Lifecycle Manager) bundle used for production installs. It must be kept in sync with `config/rbac/` and `config/manifests/` whenever RBAC rules or the CSV spec change.
+
+```bash
+make bundle   # Regenerate bundle/manifests/search-v2-operator.clusterserviceversion.yaml
+              # and bundle/metadata/annotations.yaml from config/rbac/ + config/manifests/
+```
+
+**When to run `make bundle`:**
+- Any time you add or remove a `+kubebuilder:rbac` marker in a Go source file (after also running `make manifests` to update `config/rbac/role.yaml`)
+- Any time you edit `config/manifests/` directly (e.g. CSV metadata, deployment spec, or webhook definitions)
+- Before opening a PR that touches RBAC — the CSV `permissions:`/`clusterPermissions:` blocks in the bundle must match `config/rbac/role.yaml`, otherwise OLM-based installations will be missing the required permissions
+
+**Important:** `make bundle` also stamps the current timestamp and local `operator-sdk` version into the CSV metadata. These cosmetic diffs are expected and harmless — commit them together with the substantive change.
+
 ## Local run setup
 
 `make run` requires these environment variables (get values from an active cluster with `make setup`):
