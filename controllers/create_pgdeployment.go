@@ -8,7 +8,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
-func (r *SearchReconciler) PGDeployment(instance *searchv1alpha1.Search) *appsv1.Deployment {
+func (r *SearchReconciler) PGDeployment(instance *searchv1alpha1.Search, configHash string) *appsv1.Deployment {
 	deploymentName := postgresDeploymentName
 	image_sha := getImageSha(deploymentName, instance)
 	log.V(2).Info("Using postgres image ", "name", image_sha)
@@ -180,6 +180,12 @@ func (r *SearchReconciler) PGDeployment(instance *searchv1alpha1.Search) *appsv1
 	postgresContainer.ImagePullPolicy = getImagePullPolicy(deploymentName, instance)
 	postgresContainer.SecurityContext = getContainerSecurityContext()
 	deployment.Spec.Replicas = getReplicaCount(deploymentName, instance)
+
+	// Annotate the pod template with a config hash so ConfigMap changes trigger a rollout.
+	if deployment.Spec.Template.Annotations == nil {
+		deployment.Spec.Template.Annotations = map[string]string{}
+	}
+	deployment.Spec.Template.Annotations["search.open-cluster-management.io/postgres-config-hash"] = configHash
 
 	deployment.Spec.Template.Spec.SecurityContext = getPodSecurityContext()
 	deployment.Spec.Template.Spec.Containers = []corev1.Container{postgresContainer}

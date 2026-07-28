@@ -8,14 +8,17 @@ import (
 	"strings"
 	"testing"
 
+	configv1 "github.com/openshift/api/config/v1"
 	searchv1alpha1 "github.com/stolostron/search-v2-operator/api/v1alpha1"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	dynamicfake "k8s.io/client-go/dynamic/fake"
+	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
@@ -208,6 +211,181 @@ func TestDeploymentsWorkWithNilTLSEnvVars(t *testing.T) {
 
 	assert.NotContains(t, indexerNames, "TLS_MIN_VERSION")
 	assert.NotContains(t, apiNames, "TLS_MIN_VERSION")
+}
+
+func TestTlsVersionToPostgres(t *testing.T) {
+	tests := []struct {
+		input configv1.TLSProtocolVersion
+		want  string
+	}{
+		{configv1.VersionTLS10, "TLSv1"},
+		{configv1.VersionTLS11, "TLSv1.1"},
+		{configv1.VersionTLS12, "TLSv1.2"},
+		{configv1.VersionTLS13, "TLSv1.3"},
+		{"UnknownVersion", "TLSv1.2"},
+	}
+	for _, tt := range tests {
+		t.Run(string(tt.input), func(t *testing.T) {
+			assert.Equal(t, tt.want, tlsVersionToPostgres(tt.input))
+		})
+	}
+}
+
+func TestOpensslCiphersFromProfile(t *testing.T) {
+	t.Run("filters TLS 1.3 ciphers", func(t *testing.T) {
+		ciphers := []string{
+			"TLS_AES_128_GCM_SHA256",
+			"ECDHE-RSA-AES128-GCM-SHA256",
+			"ECDHE-RSA-AES256-GCM-SHA384",
+		}
+		result := opensslCiphersFromProfile(ciphers)
+		assert.Equal(t, "ECDHE-RSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384", result)
+	})
+
+	t.Run("all TLS 1.3 returns fallback", func(t *testing.T) {
+		assert.Equal(t, "HIGH:!aNULL", opensslCiphersFromProfile(
+			[]string{"TLS_AES_128_GCM_SHA256", "TLS_CHACHA20_POLY1305_SHA256"}))
+	})
+
+	t.Run("nil returns fallback", func(t *testing.T) {
+		assert.Equal(t, "HIGH:!aNULL", opensslCiphersFromProfile(nil))
+	})
+
+	t.Run("empty returns fallback", func(t *testing.T) {
+		assert.Equal(t, "HIGH:!aNULL", opensslCiphersFromProfile([]string{}))
+	})
+
+	t.Run("no TLS 1.3 passes all through", func(t *testing.T) {
+		ciphers := []string{"ECDHE-RSA-AES128-GCM-SHA256", "ECDHE-RSA-AES256-GCM-SHA384"}
+		assert.Equal(t, "ECDHE-RSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384",
+			opensslCiphersFromProfile(ciphers))
+	})
+}
+
+func TestGetPostgresTLSConfig_Intermediate(t *testing.T) {
+	apiServer := newFakeAPIServer(map[string]interface{}{"type": "Intermediate"})
+	r := &SearchReconciler{
+		Client:        fake.NewClientBuilder().Build(),
+		Scheme:        scheme.Scheme,
+		DynamicClient: newFakeDynamicClient(apiServer),
+	}
+
+	cfg := r.getPostgresTLSConfig(context.TODO())
+
+	assert.Equal(t, "TLSv1.2", cfg.SSLMinProtocolVersion)
+	assert.NotEmpty(t, cfg.SSLCiphers)
+	assert.NotContains(t, cfg.SSLCiphers, "TLS_")
+}
+
+func TestGetPostgresTLSConfig_Old(t *testing.T) {
+	apiServer := newFakeAPIServer(map[string]interface{}{"type": "Old"})
+	r := &SearchReconciler{
+		Client:        fake.NewClientBuilder().Build(),
+		Scheme:        scheme.Scheme,
+		DynamicClient: newFakeDynamicClient(apiServer),
+	}
+
+	cfg := r.getPostgresTLSConfig(context.TODO())
+
+	assert.Equal(t, "TLSv1", cfg.SSLMinProtocolVersion)
+	assert.Contains(t, cfg.SSLCiphers, "DES-CBC3-SHA")
+}
+
+func TestGetPostgresTLSConfig_Modern(t *testing.T) {
+	apiServer := newFakeAPIServer(map[string]interface{}{"type": "Modern"})
+	r := &SearchReconciler{
+		Client:        fake.NewClientBuilder().Build(),
+		Scheme:        scheme.Scheme,
+		DynamicClient: newFakeDynamicClient(apiServer),
+	}
+
+	cfg := r.getPostgresTLSConfig(context.TODO())
+
+	assert.Equal(t, "TLSv1.3", cfg.SSLMinProtocolVersion)
+	assert.Equal(t, "HIGH:!aNULL", cfg.SSLCiphers)
+}
+
+func TestGetPostgresTLSConfig_NoAPIServer(t *testing.T) {
+	r := &SearchReconciler{
+		Client:        fake.NewClientBuilder().Build(),
+		Scheme:        scheme.Scheme,
+		DynamicClient: newFakeDynamicClient(),
+	}
+
+	cfg := r.getPostgresTLSConfig(context.TODO())
+
+	assert.Equal(t, "TLSv1.2", cfg.SSLMinProtocolVersion)
+	assert.NotEmpty(t, cfg.SSLCiphers)
+}
+
+func TestGetPostgresTLSConfig_NoProfile(t *testing.T) {
+	apiServer := newFakeAPIServer(nil)
+	r := &SearchReconciler{
+		Client:        fake.NewClientBuilder().Build(),
+		Scheme:        scheme.Scheme,
+		DynamicClient: newFakeDynamicClient(apiServer),
+	}
+
+	cfg := r.getPostgresTLSConfig(context.TODO())
+
+	assert.Equal(t, "TLSv1.2", cfg.SSLMinProtocolVersion)
+	assert.NotEmpty(t, cfg.SSLCiphers)
+}
+
+func TestPostgresConfigmapTLSSettings(t *testing.T) {
+	r := &SearchReconciler{
+		Client: fake.NewClientBuilder().Build(),
+		Scheme: scheme.Scheme,
+	}
+	cm := r.PostgresConfigmap(newTLSTestSearchInstance(), PostgresTLSConfig{
+		SSLMinProtocolVersion: "TLSv1.3",
+		SSLCiphers:            "ECDHE-RSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384",
+	})
+
+	conf := cm.Data["postgresql.conf"]
+	assert.Contains(t, conf, "ssl_min_protocol_version = 'TLSv1.3'")
+	assert.Contains(t, conf, "ssl_ciphers = 'ECDHE-RSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384'")
+}
+
+func TestPostgresConfigHash_ChangesWithConfig(t *testing.T) {
+	hash1 := postgresConfigHash(map[string]string{
+		"postgresql.conf": "ssl_min_protocol_version = 'TLSv1.2'",
+	})
+	hash2 := postgresConfigHash(map[string]string{
+		"postgresql.conf": "ssl_min_protocol_version = 'TLSv1.3'",
+	})
+
+	assert.NotEqual(t, hash1, hash2)
+}
+
+func TestPostgresConfigHash_Stable(t *testing.T) {
+	data := map[string]string{"postgresql.conf": "ssl = 'on'"}
+	assert.Equal(t, postgresConfigHash(data), postgresConfigHash(data))
+}
+
+func TestPostgresConfigHash_IgnoresScripts(t *testing.T) {
+	base := map[string]string{
+		"postgresql.conf":     "ssl = 'on'",
+		"postgresql-start.sh": "echo v1",
+	}
+	modified := map[string]string{
+		"postgresql.conf":     "ssl = 'on'",
+		"postgresql-start.sh": "echo v2",
+	}
+	assert.Equal(t, postgresConfigHash(base), postgresConfigHash(modified))
+}
+
+func TestPGDeployment_ConfigHashAnnotation(t *testing.T) {
+	r := &SearchReconciler{
+		Client: fake.NewClientBuilder().Build(),
+		Scheme: scheme.Scheme,
+	}
+
+	dep := r.PGDeployment(newTLSTestSearchInstance(), "abc123")
+
+	require.NotNil(t, dep.Spec.Template.Annotations)
+	assert.Equal(t, "abc123",
+		dep.Spec.Template.Annotations["search.open-cluster-management.io/postgres-config-hash"])
 }
 
 // helpers

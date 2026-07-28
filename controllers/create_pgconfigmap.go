@@ -3,6 +3,8 @@ package controllers
 
 import (
 	"context"
+	"crypto/sha256"
+	"fmt"
 	"strings"
 
 	searchv1alpha1 "github.com/stolostron/search-v2-operator/api/v1alpha1"
@@ -12,7 +14,7 @@ import (
 )
 
 // PostgresConfigmap returns a configmap object for the search postgres controller for the operator.
-func (r *SearchReconciler) PostgresConfigmap(instance *searchv1alpha1.Search) *corev1.ConfigMap {
+func (r *SearchReconciler) PostgresConfigmap(instance *searchv1alpha1.Search, pgTLS PostgresTLSConfig) *corev1.ConfigMap {
 	startScript := "postgresql-start.sh"
 	ns := instance.GetNamespace()
 	cm := &corev1.ConfigMap{
@@ -29,13 +31,14 @@ func (r *SearchReconciler) PostgresConfigmap(instance *searchv1alpha1.Search) *c
 	data["custom-postgresql.conf"] = `# Customizations appended to postgresql.conf.
 `
 
-	data["postgresql.conf"] = `ssl = 'on'
+	data["postgresql.conf"] = fmt.Sprintf(`ssl = 'on'
 ssl_cert_file = '/sslcert/tls.crt'
 ssl_key_file = '/sslcert/tls.key'
-ssl_ciphers = 'HIGH:!aNULL'
+ssl_min_protocol_version = '%s'
+ssl_ciphers = '%s'
 max_parallel_workers_per_gather = '8'
 statement_timeout = '60000'
-logging_collector = 'false'`
+logging_collector = 'false'`, pgTLS.SSLMinProtocolVersion, pgTLS.SSLCiphers)
 
 	data["postgresql-pre-start.sh"] = `#!/bin/bash
 set -euo pipefail
@@ -273,4 +276,12 @@ func UpdatePostgresConfigmap(existing, new *corev1.ConfigMap) {
 			new.Data["custom-postgresql.conf"] = customPostgresConfig
 		}
 	}
+}
+
+// postgresConfigHash returns a short hex hash of postgresql.conf for use as a pod annotation.
+// custom-postgresql.conf is already merged into postgresql.conf by UpdatePostgresConfigmap,
+// and startup scripts don't require a pod restart, so only this key is hashed.
+func postgresConfigHash(data map[string]string) string {
+	sum := sha256.Sum256([]byte(data["postgresql.conf"]))
+	return fmt.Sprintf("%x", sum[:8])
 }
