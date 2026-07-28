@@ -67,12 +67,7 @@ make bundle-validate   # Run operator-sdk bundle validate (informational — see
 
 **Important:** `make bundle` also stamps the current timestamp and local `operator-sdk` version into the CSV metadata. These cosmetic diffs are expected and harmless — commit them together with the substantive change.
 
-**Known issue — `serviceAccountName` gets rewritten:** `make bundle` incorrectly changes `serviceAccountName: search-v2-operator` to `serviceAccountName: search-v2-operator-controller-manager` in three places in the CSV. This is caused by a mismatch between the kustomize `namePrefix: search-v2-operator-` in `config/default/kustomization.yaml` and newer versions of `operator-sdk generate bundle` (v1.34+), which now faithfully copies the prefixed SA name from kustomize output. The production SA is named `search-v2-operator` (no suffix). After running `make bundle`, restore the correct value manually:
-
-```bash
-sed -i 's/serviceAccountName: search-v2-operator-controller-manager/serviceAccountName: search-v2-operator/g' \
-  bundle/manifests/search-v2-operator.clusterserviceversion.yaml
-```
+**Known issue — `serviceAccountName` rewrite (handled automatically):** `operator-sdk generate bundle` v1.34+ copies the kustomize-prefixed SA name (`search-v2-operator-controller-manager`) into the CSV instead of the correct production SA name (`search-v2-operator`). The Makefile `bundle` target applies a `sed` workaround to restore the correct value automatically. This is a known limitation of the `namePrefix: search-v2-operator-` convention in `config/default/kustomization.yaml` and will require a larger kustomize config restructure to fix properly.
 
 ## Fleet Engineering Skills
 
