@@ -34,13 +34,13 @@ func testScheme() *runtime.Scheme {
 // config/integration_collector_configs/. Kept explicit (rather than derived from the embedded
 // FS) so a typo in a shipped YAML's name fails a test instead of silently creating nothing.
 var expectedIntegrationConfigNames = []string{
-	"cnv-integration-collector-config",
-	"olm-integration-collector-config",
-	"grc-integration-collector-config",
-	"kyverno-integration-collector-config",
-	"gatekeeper-integration-collector-config",
-	"argo-integration-collector-config",
-	"app-lifecycle-integration-collector-config",
+	"cnv-integration",
+	"olm-integration",
+	"grc-integration",
+	"kyverno-integration",
+	"gatekeeper-integration",
+	"argo-integration",
+	"app-lifecycle-integration",
 }
 
 func TestApplyIntegrationCollectorConfigs_CreatesAllEmbeddedConfigs(t *testing.T) {
@@ -66,7 +66,7 @@ func TestApplyIntegrationCollectorConfigs_NoOpWhenAlreadyUpToDate(t *testing.T) 
 
 	before := &searchv1alpha1.CollectorConfig{}
 	require.NoError(t, r.Get(context.TODO(), types.NamespacedName{
-		Name: "cnv-integration-collector-config", Namespace: testNamespace,
+		Name: "cnv-integration", Namespace: testNamespace,
 	}, before))
 
 	// Second pass should be a no-op — same resourceVersion, same spec.
@@ -74,7 +74,7 @@ func TestApplyIntegrationCollectorConfigs_NoOpWhenAlreadyUpToDate(t *testing.T) 
 
 	after := &searchv1alpha1.CollectorConfig{}
 	require.NoError(t, r.Get(context.TODO(), types.NamespacedName{
-		Name: "cnv-integration-collector-config", Namespace: testNamespace,
+		Name: "cnv-integration", Namespace: testNamespace,
 	}, after))
 	assert.Equal(t, before.ResourceVersion, after.ResourceVersion, "unchanged config should not be updated")
 }
@@ -86,7 +86,7 @@ func TestApplyIntegrationCollectorConfigs_NoOpWhenAlreadyUpToDate(t *testing.T) 
 // A team that wants a change to persist across restarts before it's officially shipped should use
 // a different name for their CollectorConfig instead of editing the canonical one.
 func TestApplyIntegrationCollectorConfigs_OverwritesCustomizedCanonicalConfig(t *testing.T) {
-	customized := newIntegrationTeamConfig("cnv-integration-collector-config", searchv1alpha1.CollectorConfigSpec{
+	customized := newIntegrationTeamConfig("cnv-integration", searchv1alpha1.CollectorConfigSpec{
 		CollectionRules: []searchv1alpha1.CollectionRule{
 			{
 				Action: searchv1alpha1.ActionInclude,
@@ -102,7 +102,7 @@ func TestApplyIntegrationCollectorConfigs_OverwritesCustomizedCanonicalConfig(t 
 
 	after := &searchv1alpha1.CollectorConfig{}
 	require.NoError(t, r.Get(context.TODO(), types.NamespacedName{
-		Name: "cnv-integration-collector-config", Namespace: testNamespace,
+		Name: "cnv-integration", Namespace: testNamespace,
 	}, after))
 	assert.NotEqual(t, customized.Spec, after.Spec,
 		"canonical config is reset to the shipped default on every seeder run, regardless of customization")
@@ -114,7 +114,7 @@ func TestApplyIntegrationCollectorConfigs_OverwritesCustomizedCanonicalConfig(t 
 // integration-overlap check and to the merge step's label-based discovery, silently allowing a
 // conflicting user exclude through.
 func TestApplyIntegrationCollectorConfigs_AddsMissingLabelWhenSpecAlreadyMatches(t *testing.T) {
-	unlabeled := newCollectorConfig("cnv-integration-collector-config", searchv1alpha1.CollectorConfigSpec{
+	unlabeled := newCollectorConfig("cnv-integration", searchv1alpha1.CollectorConfigSpec{
 		CollectionRules: []searchv1alpha1.CollectionRule{
 			{
 				Action: searchv1alpha1.ActionInclude,
@@ -137,7 +137,7 @@ func TestApplyIntegrationCollectorConfigs_AddsMissingLabelWhenSpecAlreadyMatches
 
 	after := &searchv1alpha1.CollectorConfig{}
 	require.NoError(t, r.Get(context.TODO(), types.NamespacedName{
-		Name: "cnv-integration-collector-config", Namespace: testNamespace,
+		Name: "cnv-integration", Namespace: testNamespace,
 	}, after))
 	assert.Equal(t, searchv1alpha1.IntegrationTeamLabelValue, after.Labels[searchv1alpha1.IntegrationTeamLabel],
 		"label must be added even though the spec already matched the shipped default")
@@ -145,7 +145,7 @@ func TestApplyIntegrationCollectorConfigs_AddsMissingLabelWhenSpecAlreadyMatches
 
 // Same as above, but the spec also differs — both the spec and the label must be fixed together.
 func TestApplyIntegrationCollectorConfigs_AddsMissingLabelWhenSpecAlsoDiffers(t *testing.T) {
-	unlabeled := newCollectorConfig("cnv-integration-collector-config", searchv1alpha1.CollectorConfigSpec{
+	unlabeled := newCollectorConfig("cnv-integration", searchv1alpha1.CollectorConfigSpec{
 		CollectionRules: []searchv1alpha1.CollectionRule{
 			{
 				Action:           searchv1alpha1.ActionInclude,
@@ -160,7 +160,7 @@ func TestApplyIntegrationCollectorConfigs_AddsMissingLabelWhenSpecAlsoDiffers(t 
 
 	after := &searchv1alpha1.CollectorConfig{}
 	require.NoError(t, r.Get(context.TODO(), types.NamespacedName{
-		Name: "cnv-integration-collector-config", Namespace: testNamespace,
+		Name: "cnv-integration", Namespace: testNamespace,
 	}, after))
 	assert.Equal(t, searchv1alpha1.IntegrationTeamLabelValue, after.Labels[searchv1alpha1.IntegrationTeamLabel])
 	assert.NotEqual(t, "stale.example.io", after.Spec.CollectionRules[0].ResourceSelector.APIGroups[0])
@@ -170,7 +170,7 @@ func TestApplyIntegrationCollectorConfigs_AddsMissingLabelWhenSpecAlsoDiffers(t 
 // touched by applyIntegrationCollectorConfigs — it only knows about the fixed set of names in
 // config/integration_collector_configs/.
 func TestApplyIntegrationCollectorConfigs_LeavesDifferentlyNamedConfigsAlone(t *testing.T) {
-	testConfig := newIntegrationTeamConfig("cnv-integration-collector-config-2", searchv1alpha1.CollectorConfigSpec{
+	testConfig := newIntegrationTeamConfig("cnv-integration-2", searchv1alpha1.CollectorConfigSpec{
 		CollectionRules: []searchv1alpha1.CollectionRule{
 			{
 				Action: searchv1alpha1.ActionInclude,
@@ -186,7 +186,7 @@ func TestApplyIntegrationCollectorConfigs_LeavesDifferentlyNamedConfigsAlone(t *
 
 	after := &searchv1alpha1.CollectorConfig{}
 	require.NoError(t, r.Get(context.TODO(), types.NamespacedName{
-		Name: "cnv-integration-collector-config-2", Namespace: testNamespace,
+		Name: "cnv-integration-2", Namespace: testNamespace,
 	}, after))
 	assert.Equal(t, testConfig.Spec, after.Spec, "differently-named configs are never touched")
 }
@@ -313,7 +313,7 @@ func TestApplyOneIntegrationCollectorConfig_CreateError(t *testing.T) {
 func TestApplyOneIntegrationCollectorConfig_UpdateError(t *testing.T) {
 	// Pre-create one config with a spec that differs from the shipped default, so the code
 	// takes the Update path rather than Create.
-	existing := newIntegrationTeamConfig("cnv-integration-collector-config", searchv1alpha1.CollectorConfigSpec{
+	existing := newIntegrationTeamConfig("cnv-integration", searchv1alpha1.CollectorConfigSpec{
 		CollectionRules: []searchv1alpha1.CollectionRule{
 			{
 				Action:           searchv1alpha1.ActionInclude,

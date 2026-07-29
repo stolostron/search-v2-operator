@@ -22,7 +22,7 @@ import (
 
 // applyIntegrationCollectorConfigs creates or overwrites the initial integration team
 // CollectorConfig CRs (CNV, OLM, GRC, Kyverno, Gatekeeper, Argo, ACM app lifecycle, etc.) from
-// the manifests embedded in config/integration_collector_configs/. See ACM-37052.
+// the manifests embedded in config/integration_collector_configs/.
 //
 // Integration teams contribute a plain CollectorConfig YAML file to that directory instead of
 // writing Go code. This runs exactly once per operator process, at startup (see
@@ -138,9 +138,9 @@ func applyOneIntegrationCollectorConfig(
 		return err
 	}
 
-	hasIntegrationLabel := found.Labels[searchv1alpha1.IntegrationTeamLabel] == searchv1alpha1.IntegrationTeamLabelValue
+	hasAllLabels := hasDesiredLabels(found, desired)
 	hasOwnerRef := hasControllerOwnerRef(found, owner)
-	if hasIntegrationLabel && hasOwnerRef && equality.Semantic.DeepEqual(found.Spec, desired.Spec) {
+	if hasAllLabels && hasOwnerRef && equality.Semantic.DeepEqual(found.Spec, desired.Spec) {
 		// Already matches the currently shipped default, correctly labeled, and owned — skip.
 		return nil
 	}
@@ -148,9 +148,13 @@ func applyOneIntegrationCollectorConfig(
 	if found.Labels == nil {
 		found.Labels = map[string]string{}
 	}
-	// Always (re-)set the label, even when only the spec differed — a pre-existing config found
-	// without it would otherwise be invisible to the webhook's integration-overlap check and to
-	// the merge step's label-based discovery, silently letting conflicting user excludes through.
+	// Merge all labels from the shipped YAML, then enforce the integration label on top.
+	// This makes Create and Update symmetric: the shipped YAML's labels are always the
+	// source of truth — if someone removes the backup label from a live config, the seeder
+	// restores it on the next restart.
+	for k, v := range desired.Labels {
+		found.Labels[k] = v
+	}
 	found.Labels[searchv1alpha1.IntegrationTeamLabel] = searchv1alpha1.IntegrationTeamLabelValue
 	// Ensure ownerReference is set for GC when Search is torn down.
 	if scheme != nil && owner != nil && owner.UID != "" && !hasOwnerRef {
@@ -179,4 +183,18 @@ func hasControllerOwnerRef(obj metav1.Object, owner *searchv1alpha1.Search) bool
 		}
 	}
 	return false
+}
+
+// hasDesiredLabels returns true if found already has every label from desired (including the
+// integration team label). Used to avoid redundant updates when labels already match.
+func hasDesiredLabels(found, desired *searchv1alpha1.CollectorConfig) bool {
+	if found.Labels == nil {
+		return len(desired.Labels) == 0
+	}
+	for k, v := range desired.Labels {
+		if found.Labels[k] != v {
+			return false
+		}
+	}
+	return found.Labels[searchv1alpha1.IntegrationTeamLabel] == searchv1alpha1.IntegrationTeamLabelValue
 }

@@ -37,7 +37,7 @@ func TestIntegrationCollectorConfigSeeder_AppliesConfigsAndReturns(t *testing.T)
 
 	cc := &searchv1alpha1.CollectorConfig{}
 	require.NoError(t, r.Get(context.TODO(), types.NamespacedName{
-		Name: "cnv-integration-collector-config", Namespace: testNamespace,
+		Name: "cnv-integration", Namespace: testNamespace,
 	}, cc))
 	assert.NotEmpty(t, cc.Spec.CollectionRules)
 }
@@ -91,7 +91,7 @@ func TestIntegrationCollectorConfigSeeder_DiscoversNamespaceFromSearchCR(t *test
 
 	cc := &searchv1alpha1.CollectorConfig{}
 	require.NoError(t, r.Get(context.TODO(), types.NamespacedName{
-		Name: "cnv-integration-collector-config", Namespace: testNamespace,
+		Name: "cnv-integration", Namespace: testNamespace,
 	}, cc), "config should be created in the Search CR's namespace, discovered dynamically")
 }
 
@@ -129,7 +129,7 @@ func TestIntegrationCollectorConfigSeeder_RetriesUntilSearchCRExists(t *testing.
 	// success both return nil, so this is what actually proves it succeeded rather than timing out.
 	cc := &searchv1alpha1.CollectorConfig{}
 	require.NoError(t, r.Get(context.TODO(), types.NamespacedName{
-		Name: "cnv-integration-collector-config", Namespace: testNamespace,
+		Name: "cnv-integration", Namespace: testNamespace,
 	}, cc))
 }
 
@@ -192,7 +192,7 @@ func TestIntegrationCollectorConfigSeeder_HonorsSearchPause(t *testing.T) {
 		// Expected.
 	}
 	err := r.Get(context.TODO(), types.NamespacedName{
-		Name: "cnv-integration-collector-config", Namespace: testNamespace,
+		Name: "cnv-integration", Namespace: testNamespace,
 	}, &searchv1alpha1.CollectorConfig{})
 	assert.Error(t, err, "nothing should be created while search-pause is true")
 
@@ -209,7 +209,7 @@ func TestIntegrationCollectorConfigSeeder_HonorsSearchPause(t *testing.T) {
 		t.Fatal("Start did not proceed after search-pause was cleared")
 	}
 	require.NoError(t, r.Get(context.TODO(), types.NamespacedName{
-		Name: "cnv-integration-collector-config", Namespace: testNamespace,
+		Name: "cnv-integration", Namespace: testNamespace,
 	}, &searchv1alpha1.CollectorConfig{}))
 }
 
@@ -232,7 +232,7 @@ func TestIntegrationCollectorConfigSeeder_RejectsAmbiguousSearchCR(t *testing.T)
 
 	for _, ns := range []string{"namespace-a", "namespace-b"} {
 		err := r.Get(context.TODO(), types.NamespacedName{
-			Name: "cnv-integration-collector-config", Namespace: ns,
+			Name: "cnv-integration", Namespace: ns,
 		}, &searchv1alpha1.CollectorConfig{})
 		assert.Error(t, err, "must not have guessed either namespace")
 	}

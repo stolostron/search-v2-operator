@@ -1,18 +1,18 @@
+# Copyright Contributors to the Open Cluster Management project
 # Integration CollectorConfig for CNV (Container Native Virtualization / KubeVirt) and the
 # storage resources it depends on. Populated from resources already hard-coded in
 # search-collector/pkg/transforms/genericResourceConfig.go and transformer.go before this
-# CollectorConfig existed. See ACM-37052.
+# CollectorConfig existed.
 #
 # This config is created by the search-v2-operator once per process, at startup, and reset to
 # this shipped default on every restart/upgrade — see docs/ARCHITECTURE.md. CNV can edit it
 # directly and the edit will persist until the next restart, but to make a change survive
 # restarts before it's officially shipped here, create a differently-named CollectorConfig
-# (e.g. cnv-integration-collector-config-2) instead — the operator only manages this exact name.
+# (e.g. cnv-integration-2) instead — the operator only manages this exact name.
 apiVersion: search.open-cluster-management.io/v1alpha1
 kind: CollectorConfig
 metadata:
-  name: cnv-integration-collector-config
-  namespace: open-cluster-management
+  name: cnv-integration
   labels:
     search.open-cluster-management.io/config-type: integration
     cluster.open-cluster-management.io/backup: ""

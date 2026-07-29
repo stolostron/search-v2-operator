@@ -1,7 +1,7 @@
 // Copyright Contributors to the Open Cluster Management project
 
 // Package integrationconfigs embeds the initial integration team CollectorConfig manifests
-// shipped in integration_collector_configs/. See ACM-37052.
+// shipped in integration_collector_configs/.
 //
 // Integration teams (CNV, OLM, GRC, Kyverno, Gatekeeper, Argo, ACM app lifecycle) contribute a
 // plain CollectorConfig YAML file to that directory instead of writing Go code. The operator

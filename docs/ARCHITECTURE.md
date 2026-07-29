@@ -52,7 +52,7 @@ Allows integration teams and users to customize search-collector behaviour (reso
 
 The webhook (`api/v1alpha1/collectorconfig_webhook.go`) sets defaults and validates on admission.
 
-### Built-in integration CollectorConfigs (ACM-37052)
+### Built-in integration CollectorConfigs
 
 Integration teams (CNV, OLM, GRC, Kyverno, Gatekeeper, Argo, ACM app lifecycle) contribute a
 plain `CollectorConfig` YAML file to `config/integration_collector_configs/` instead of writing
@@ -70,11 +70,11 @@ interval until it succeeds once, then returns; it does not use `sync.Once`, sinc
 permanently give up after a single failed attempt.
 
 Because this only runs at startup, a team can freely edit their canonical config
-(`cnv-integration-collector-config`, etc.) and it persists for the life of that pod — the reset
+(`cnv-integration`, etc.) and it persists for the life of that pod — the reset
 only happens on the *next* restart/upgrade, at which point it's unconditionally reverted to
 whatever's currently embedded. **A team that wants a change to survive across restarts before
 it's officially shipped creates a differently-named CollectorConfig instead of editing the
-canonical one** (e.g. `cnv-integration-collector-config-2`) — the seeder only knows about its
+canonical one** (e.g. `cnv-integration-2`) — the seeder only knows about its
 fixed set of embedded names, so any other name is left alone entirely, and the merge step already
 discovers integration configs by label rather than name, so it picks up any number of them
 automatically. To ship a change permanently, the team opens a PR updating their YAML in
