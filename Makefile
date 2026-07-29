@@ -151,7 +151,7 @@ bundle: manifests kustomize ## Generate bundle manifests and metadata.
 	$(KUSTOMIZE) build config/manifests | operator-sdk generate bundle -q --overwrite --version $(VERSION) $(BUNDLE_METADATA_OPTS)
 	# Workaround: operator-sdk v1.34+ copies the kustomize-prefixed SA name into the CSV.
 	# The production SA is search-v2-operator, not search-v2-operator-controller-manager.
-	sed -i '' 's/serviceAccountName: search-v2-operator-controller-manager/serviceAccountName: search-v2-operator/g' bundle/manifests/search-v2-operator.clusterserviceversion.yaml
+	sed -i 's/serviceAccountName: search-v2-operator-controller-manager/serviceAccountName: search-v2-operator/g' bundle/manifests/search-v2-operator.clusterserviceversion.yaml
 
 .PHONY: bundle-validate
 bundle-validate: ## Validate the bundle (informational — ClusterManagementAddOn triggers a known false-positive warning).
