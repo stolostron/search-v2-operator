@@ -102,6 +102,57 @@ func defaultProfileSpec() *configv1.TLSProfileSpec {
 	return &spec
 }
 
+// PostgresTLSConfig holds PostgreSQL SSL settings derived from the cluster TLS profile.
+type PostgresTLSConfig struct {
+	SSLMinProtocolVersion string // e.g. "TLSv1.2"
+	SSLCiphers            string // colon-separated OpenSSL cipher names
+}
+
+// getPostgresTLSConfig reads the cluster TLS profile and maps it to PostgreSQL ssl_ settings.
+func (r *SearchReconciler) getPostgresTLSConfig(ctx context.Context) PostgresTLSConfig {
+	profileSpec, err := r.fetchTLSProfileSpec(ctx)
+	if err != nil {
+		log.Info("Could not read APIServer TLS profile for postgres, using Intermediate defaults")
+		profileSpec = defaultProfileSpec()
+	}
+
+	return PostgresTLSConfig{
+		SSLMinProtocolVersion: tlsVersionToPostgres(profileSpec.MinTLSVersion),
+		SSLCiphers:            opensslCiphersFromProfile(profileSpec.Ciphers),
+	}
+}
+
+// tlsVersionToPostgres maps OpenShift TLS version constants to PostgreSQL's ssl_min_protocol_version values.
+func tlsVersionToPostgres(v configv1.TLSProtocolVersion) string {
+	switch v {
+	case configv1.VersionTLS10:
+		return "TLSv1"
+	case configv1.VersionTLS11:
+		return "TLSv1.1"
+	case configv1.VersionTLS12:
+		return "TLSv1.2"
+	case configv1.VersionTLS13:
+		return "TLSv1.3"
+	default:
+		return "TLSv1.2"
+	}
+}
+
+// opensslCiphersFromProfile converts the profile's cipher list to a PostgreSQL ssl_ciphers string.
+// TLS 1.3 ciphers (TLS_ prefix) are excluded because PostgreSQL/OpenSSL manages them separately.
+func opensslCiphersFromProfile(ciphers []string) string {
+	var filtered []string
+	for _, c := range ciphers {
+		if !strings.HasPrefix(c, "TLS_") {
+			filtered = append(filtered, c)
+		}
+	}
+	if len(filtered) == 0 {
+		return "HIGH:!aNULL"
+	}
+	return strings.Join(filtered, ":")
+}
+
 // cipherIDsToIANA converts crypto/tls cipher suite IDs to IANA names using Go's stdlib.
 // No hardcoded map — automatically picks up new ciphers when Go adds them.
 func cipherIDsToIANA(ids []uint16) []string {

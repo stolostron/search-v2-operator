@@ -2,6 +2,8 @@
 package controllers
 
 import (
+	"crypto/sha256"
+	"fmt"
 	"testing"
 
 	searchv1alpha1 "github.com/stolostron/search-v2-operator/api/v1alpha1"
@@ -28,7 +30,10 @@ func TestPostgresConfigmapWithStatementTimeout(t *testing.T) {
 	cl := fake.NewClientBuilder().WithRuntimeObjects(objs...).Build()
 	r := &SearchReconciler{Client: cl, Scheme: s}
 
-	configMap := r.PostgresConfigmap(search)
+	configMap := r.PostgresConfigmap(search, PostgresTLSConfig{
+		SSLMinProtocolVersion: "TLSv1.2",
+		SSLCiphers:            "HIGH:!aNULL",
+	})
 
 	// Verify that statement_timeout is included in postgresql.conf
 	postgresConf := configMap.Data["postgresql.conf"]
@@ -149,4 +154,18 @@ func TestUpdatePostgresConfigmapCustomConfigAlreadyMerged(t *testing.T) {
 	// Should merge custom config with new postgresql.conf
 	expectedConf := "ssl = 'on'\nssl_cert_file = '/sslcert/tls.crt'\nstatement_timeout = '60000'\n" + customConfig
 	assert.Equal(t, expectedConf, new.Data["postgresql.conf"])
+}
+
+func TestPostgresConfigmapHash(t *testing.T) {
+	data := map[string]string{
+		"pregresql.conf":      "adsf =ghjk",
+		"postgresql.conf":     "thing = on",
+		"postpostgresql.conf": "qwer=tyui",
+	}
+	hash := sha256.Sum256([]byte(data["postgresql.conf"]))
+	expectedHash := fmt.Sprintf("%x", hash[:8])
+
+	returnedHash := postgresConfigHash(data)
+
+	assert.Equal(t, expectedHash, returnedHash)
 }
