@@ -10,6 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
@@ -95,7 +96,7 @@ func (r *SearchReconciler) ServiceMonitor(instance *searchv1alpha1.Search,
 					Interval:        "60s",
 					BearerTokenFile: "/var/run/secrets/kubernetes.io/serviceaccount/token", // #nosec G101
 					TLSConfig: &monitorv1.TLSConfig{
-						SafeTLSConfig: monitorv1.SafeTLSConfig{InsecureSkipVerify: true}},
+						SafeTLSConfig: monitorv1.SafeTLSConfig{InsecureSkipVerify: ptr.To(true)}},
 				},
 			},
 			Selector: metav1.LabelSelector{

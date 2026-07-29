@@ -108,6 +108,15 @@ func (r *SearchReconciler) PGDeployment(instance *searchv1alpha1.Search) *appsv1
 	}
 	postgresContainer.Env = append(postgresContainer.Env, env...)
 	postgresContainer.Resources = getResourceRequirements(deploymentName, instance)
+	// emptyDir volumes required for readOnlyRootFilesystem: postgres writes to these paths at runtime
+	postgresContainer.VolumeMounts = append(postgresContainer.VolumeMounts,
+		corev1.VolumeMount{Name: "postgres-run", MountPath: "/var/run/postgresql"},
+		corev1.VolumeMount{Name: "postgres-tmp", MountPath: "/tmp"},
+		corev1.VolumeMount{Name: "postgres-log", MountPath: "/var/log"},
+		// /var/lib/pgsql is the home dir; startup scripts write passwd and other files here.
+		// The PVC only covers /var/lib/pgsql/data, so the parent dir needs its own writable mount.
+		corev1.VolumeMount{Name: "postgres-home", MountPath: "/var/lib/pgsql"},
+	)
 	volumes := []corev1.Volume{
 		{
 			Name: "postgresql-cfg",
@@ -150,16 +159,26 @@ func (r *SearchReconciler) PGDeployment(instance *searchv1alpha1.Search) *appsv1
 		},
 	}
 	postgresVolume := getPostgresVolume(instance)
-	volumes = append(volumes, postgresVolume)
+	volumes = append(volumes, postgresVolume,
+		corev1.Volume{
+			Name:         "postgres-run",
+			VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{Medium: corev1.StorageMediumMemory}},
+		},
+		corev1.Volume{
+			Name:         "postgres-tmp",
+			VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{Medium: corev1.StorageMediumMemory}},
+		},
+		corev1.Volume{
+			Name:         "postgres-log",
+			VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{Medium: corev1.StorageMediumMemory}},
+		},
+		corev1.Volume{
+			Name:         "postgres-home",
+			VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{Medium: corev1.StorageMediumMemory}},
+		},
+	)
 	postgresContainer.ImagePullPolicy = getImagePullPolicy(deploymentName, instance)
-	falseVal := false
-	trueVal := true
-	postgresContainer.SecurityContext = &corev1.SecurityContext{
-		Privileged:               &falseVal,
-		AllowPrivilegeEscalation: &falseVal,
-		RunAsNonRoot:             &trueVal,
-		Capabilities:             &corev1.Capabilities{Drop: []corev1.Capability{"ALL"}},
-	}
+	postgresContainer.SecurityContext = getContainerSecurityContext()
 	deployment.Spec.Replicas = getReplicaCount(deploymentName, instance)
 
 	deployment.Spec.Template.Spec.SecurityContext = getPodSecurityContext()
