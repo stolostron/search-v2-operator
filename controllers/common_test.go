@@ -661,7 +661,7 @@ func TestPGDeployment(t *testing.T) {
 	cl := fake.NewClientBuilder().WithRuntimeObjects(objs...).Build()
 
 	r := &SearchReconciler{Client: cl, Scheme: s}
-	actualDep := r.PGDeployment(search)
+	actualDep := r.PGDeployment(search, "testhash")
 
 	// Validate Env variables
 	for _, env := range actualDep.Spec.Template.Spec.Containers[0].Env {

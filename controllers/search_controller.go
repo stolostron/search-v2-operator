@@ -205,7 +205,20 @@ func (r *SearchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		log.Error(err, "Postgres Service setup failed")
 		return *result, err
 	}
-	result, err = r.createOrUpdateDeployment(ctx, r.PGDeployment(instance))
+	// Create/update the postgres ConfigMap before the Deployment so that
+	// UpdatePostgresConfigmap can merge custom-postgresql.conf into postgresql.conf
+	// and rollout the pod in the event of a changed config hash.
+	pgTLS := r.getPostgresTLSConfig(ctx)
+	pgConfigMap := r.PostgresConfigmap(instance, pgTLS)
+	result, err = r.createOrUpdateConfigMap(ctx, pgConfigMap)
+	if result != nil {
+		log.Error(err, "Postgres configmap setup failed")
+		return *result, err
+	}
+	// pgConfigMap.Data["postgresql.conf"] now contains the merged result
+	pgConfigHash := postgresConfigHash(pgConfigMap.Data)
+
+	result, err = r.createOrUpdateDeployment(ctx, r.PGDeployment(instance, pgConfigHash))
 	if result != nil {
 		log.Error(err, "Postgres Deployment setup failed")
 		return *result, err
@@ -265,11 +278,6 @@ func (r *SearchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	result, err = r.createConfigMap(ctx, r.IndexerConfigmap(instance))
 	if result != nil {
 		log.Error(err, "Indexer configmap  setup failed")
-		return *result, err
-	}
-	result, err = r.createOrUpdateConfigMap(ctx, r.PostgresConfigmap(instance))
-	if result != nil {
-		log.Error(err, "Postgres configmap setup failed")
 		return *result, err
 	}
 	result, err = r.createConfigMap(ctx, r.SearchCACert(instance))
