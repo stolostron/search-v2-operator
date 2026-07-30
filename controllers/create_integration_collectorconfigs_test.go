@@ -108,6 +108,34 @@ func TestApplyIntegrationCollectorConfigs_OverwritesCustomizedCanonicalConfig(t 
 		"canonical config is reset to the shipped default on every seeder run, regardless of customization")
 }
 
+// If a user annotates an integration CollectorConfig with the manual-override annotation, the
+// seeder must skip it entirely — even if the spec differs from the shipped default.
+func TestApplyIntegrationCollectorConfigs_SkipsManualOverrideAnnotatedConfig(t *testing.T) {
+	customized := newIntegrationTeamConfig("cnv-integration", searchv1alpha1.CollectorConfigSpec{
+		CollectionRules: []searchv1alpha1.CollectionRule{
+			{
+				Action: searchv1alpha1.ActionInclude,
+				ResourceSelector: searchv1alpha1.ResourceSelector{
+					APIGroups: []string{"custom.example.io"}, Kinds: []string{"*"},
+				},
+			},
+		},
+	})
+	customized.Annotations = map[string]string{
+		searchv1alpha1.AnnotationManualOverride: "true",
+	}
+	r := setupReconciler(customized)
+
+	require.NoError(t, applyIntegrationCollectorConfigs(context.TODO(), r.Client, testScheme(), testSearchOwner()))
+
+	after := &searchv1alpha1.CollectorConfig{}
+	require.NoError(t, r.Get(context.TODO(), types.NamespacedName{
+		Name: "cnv-integration", Namespace: testNamespace,
+	}, after))
+	assert.Equal(t, customized.Spec, after.Spec,
+		"config with manual-override annotation must not be overwritten")
+}
+
 // If a canonical-named CollectorConfig exists without the integration label (e.g. pre-existing
 // state from before this feature, or a bug elsewhere), the label must be added even when the spec
 // already matches the shipped default — otherwise it stays invisible to the webhook's

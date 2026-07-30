@@ -138,6 +138,13 @@ func applyOneIntegrationCollectorConfig(
 		return err
 	}
 
+	// If the user annotated this config with manual-override, respect their customization and
+	// do not overwrite — even on restart/upgrade. The user is in control.
+	if _, overridden := found.Annotations[searchv1alpha1.AnnotationManualOverride]; overridden {
+		log.Info("Skipping integration CollectorConfig with manual-override annotation", "name", found.Name)
+		return nil
+	}
+
 	hasAllLabels := hasDesiredLabels(found, desired)
 	hasOwnerRef := hasControllerOwnerRef(found, owner)
 	if hasAllLabels && hasOwnerRef && equality.Semantic.DeepEqual(found.Spec, desired.Spec) {
