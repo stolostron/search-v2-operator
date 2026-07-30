@@ -15,6 +15,7 @@ Search CR (search-v2-operator)
         ├──► search-v2-api   Deployment + Service
         ├──► search-collector Deployment + Service
         ├──► RBAC (ClusterRole, ClusterRoleBinding, ServiceAccount)
+        ├──► NetworkPolicies (one per component pod)
         ├──► ServiceMonitors (Prometheus)
         ├──► CollectorConfig (merged from user + integration configs)
         └──► Addon framework (ManagedClusterAddon CSR approval)
@@ -67,10 +68,11 @@ Each reconcile call processes the `Search` CR in a fixed sequence:
 9. **Component services** — Indexer, API, Collector Services.
 10. **ServiceMonitors** — Prometheus ServiceMonitors for indexer, api, collector.
 11. **Component deployments** — Collector, Indexer, API Deployments.
-12. **ConfigMaps** — Indexer ConfigMap, Postgres ConfigMap, Search CA cert.
-13. **Feature configurations** — Global search, fine-grained RBAC, virtual machine integration.
-14. **Prometheus alert rules** — PVC usage alert.
-15. **One-time migrations** (`cleanOnce.Do`) — removes legacy serviceMonitor setup from `openshift-monitoring` (introduced ACM 2.9) and removes Search ownerRef from ClusterManagementAddon (introduced ACM 2.10).
+12. **NetworkPolicies** — one per component pod (postgres, indexer, api, collector, operator), least-privilege ingress/egress. See [docs/NETWORK_POLICIES.md](NETWORK_POLICIES.md).
+13. **ConfigMaps** — Indexer ConfigMap, Postgres ConfigMap, Search CA cert.
+14. **Feature configurations** — Global search, fine-grained RBAC, virtual machine integration.
+15. **Prometheus alert rules** — PVC usage alert.
+16. **One-time migrations** (`cleanOnce.Do`) — removes legacy serviceMonitor setup from `openshift-monitoring` (introduced ACM 2.9) and removes Search ownerRef from ClusterManagementAddon (introduced ACM 2.10).
 
 ## Watch sources
 
