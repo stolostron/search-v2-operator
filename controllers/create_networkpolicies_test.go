@@ -58,6 +58,18 @@ func containsNamespaceSelector(peers []networkingv1.NetworkPolicyPeer, namespace
 	return false
 }
 
+// containsNamespaceAndPodSelector returns true if any peer combines a namespace selector for the
+// given namespace name with a pod selector matching the given label key/value pair.
+func containsNamespaceAndPodSelector(peers []networkingv1.NetworkPolicyPeer, namespaceName, podLabelKey, podLabelValue string) bool {
+	for _, p := range peers {
+		if p.NamespaceSelector != nil && p.NamespaceSelector.MatchLabels[nsLabelKey] == namespaceName &&
+			p.PodSelector != nil && p.PodSelector.MatchLabels[podLabelKey] == podLabelValue {
+			return true
+		}
+	}
+	return false
+}
+
 // containsPodSelectorLabel returns true if any of the peers selects pods with the given label
 // key/value pair.
 func containsPodSelectorLabel(peers []networkingv1.NetworkPolicyPeer, key, value string) bool {
@@ -135,12 +147,12 @@ func TestIndexerNetworkPolicy(t *testing.T) {
 
 	assert.Equal(t, indexerDeploymentName, np.Spec.PodSelector.MatchLabels["name"])
 
-	// Ingress: from kube-apiserver (proxied managed-cluster collector traffic), the hub-local
+	// Ingress: from ocm-proxyserver (proxied managed-cluster collector traffic), the hub-local
 	// collector (direct, same-namespace connection), and monitoring (metrics).
-	var sawAPIServer, sawHubCollector, sawMonitoring bool
+	var sawProxyServer, sawHubCollector, sawMonitoring bool
 	for _, rule := range np.Spec.Ingress {
-		if containsNamespaceSelector(rule.From, openshiftKubeAPIServer) && containsTCPPort(rule.Ports, indexerPort) {
-			sawAPIServer = true
+		if containsNamespaceAndPodSelector(rule.From, multiclusterEngine, "control-plane", "ocm-proxyserver") && containsTCPPort(rule.Ports, indexerPort) {
+			sawProxyServer = true
 		}
 		if containsPodSelectorLabel(rule.From, "name", collectorDeploymentName) && containsTCPPort(rule.Ports, indexerPort) {
 			sawHubCollector = true
@@ -149,7 +161,7 @@ func TestIndexerNetworkPolicy(t *testing.T) {
 			sawMonitoring = true
 		}
 	}
-	assert.True(t, sawAPIServer, "expected ingress from kube-apiserver namespace (proxied managed-cluster collectors)")
+	assert.True(t, sawProxyServer, "expected ingress from ocm-proxyserver in multicluster-engine namespace (proxied managed-cluster collectors)")
 	assert.True(t, sawHubCollector, "expected ingress from hub-local collector pod (direct, same-namespace connection)")
 	assert.True(t, sawMonitoring, "expected ingress from openshift-monitoring namespace")
 
