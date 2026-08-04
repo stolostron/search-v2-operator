@@ -44,7 +44,7 @@ owned by the `Search` custom resource, so they're automatically removed if Searc
 
 | Direction | Peer | Port | Rationale |
 |---|---|---|---|
-| Ingress | `openshift-kube-apiserver` namespace | 3010/TCP | Managed-cluster `search-collector` agents push discovered resources to the indexer through the hub API server's service-proxy (addon bootstrap kubeconfig), so that traffic is sourced from kube-apiserver pods. |
+| Ingress | `ocm-proxyserver` pods in `multicluster-engine` namespace | 3010/TCP | Managed-cluster `search-collector` agents push discovered resources to the indexer through the hub API server's aggregated API (`proxy.open-cluster-management.io`). The kube-apiserver forwards these requests to `ocm-proxyserver` in the `multicluster-engine` namespace, which then proxies to the indexer. Traffic is therefore sourced from `ocm-proxyserver` pods (labeled `control-plane: ocm-proxyserver`), not from kube-apiserver pods. |
 | Ingress | Pods labeled `name: search-collector` | 3010/TCP | The hub-local collector deployed by this operator runs in the same namespace and connects to the indexer directly (no proxy). |
 | Ingress | `openshift-monitoring` namespace | 3010/TCP | Prometheus (`prometheus-k8s`) scrapes indexer metrics over the same HTTPS port used for data ingestion (see the indexer `ServiceMonitor`). |
 | Egress | *(not restricted — Ingress-only policy)* | — | OVN-Kubernetes handles `kubernetes.default.svc` ClusterIP traffic via the OVN service load balancer before NetworkPolicy evaluation, so no egress rule can match kube-API traffic. Applying an Egress policyType would silently block the indexer from reaching the Kubernetes API. |

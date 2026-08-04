@@ -18,6 +18,7 @@ const (
 	openshiftKubeAPIServer = "openshift-kube-apiserver"
 	openshiftMonitoring    = "openshift-monitoring"
 	openshiftDNS           = "openshift-dns"
+	multiclusterEngine     = "multicluster-engine"
 )
 
 // Container ports exposed by each Search component. These match the Service definitions in
@@ -140,12 +141,14 @@ func (r *SearchReconciler) PostgresNetworkPolicy(instance *searchv1alpha1.Search
 // IndexerNetworkPolicy restricts access to the search-indexer pod.
 //
 // Rationale:
-//   - Ingress (kube-apiserver): Managed-cluster search-collector agents push discovered
-//     resources to the indexer through the hub API server's service proxy using their addon
-//     bootstrap kubeconfig, so that proxied traffic is sourced from kube-apiserver pods.
+//   - Ingress (ocm-proxyserver): Managed-cluster search-collector agents push discovered
+//     resources to the indexer through the hub API server's aggregated API for
+//     proxy.open-cluster-management.io. The kube-apiserver forwards these requests to the
+//     ocm-proxyserver (multicluster-engine namespace), which then connects to the indexer.
+//     Traffic is therefore sourced from ocm-proxyserver pods.
 //   - Ingress (hub-local collector): The hub-local search-collector deployed by this operator
 //     connects to the indexer directly (same namespace, no proxy), so its pod-selector ingress
-//     is required in addition to the kube-apiserver namespace selector above.
+//     is required in addition to the ocm-proxyserver rule above.
 //   - Ingress (monitoring): Prometheus (openshift-monitoring) scrapes indexer metrics.
 //   - Egress: The indexer writes aggregated data to search-postgres and watches hub-cluster
 //     resources directly via the Kubernetes API, in addition to resolving Service DNS names.
@@ -154,9 +157,17 @@ func (r *SearchReconciler) IndexerNetworkPolicy(instance *searchv1alpha1.Search,
 	np := newNetworkPolicy(instance, indexerDeploymentName, podLabels)
 	np.Spec.Ingress = []networkingv1.NetworkPolicyIngressRule{
 		{
-			// Managed-cluster collectors arrive via the kube-apiserver service proxy.
-			// The hub-local collector connects directly (same namespace), so it gets its own rule below.
-			From:  []networkingv1.NetworkPolicyPeer{namespaceSelectorPeer(openshiftKubeAPIServer)},
+			// Managed-cluster collectors arrive via ocm-proxyserver in multicluster-engine.
+			// The kube-apiserver aggregates proxy.open-cluster-management.io requests to
+			// ocm-proxyserver, which then proxies to the indexer on port 3010.
+			From: []networkingv1.NetworkPolicyPeer{{
+				NamespaceSelector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{nsLabelKey: multiclusterEngine},
+				},
+				PodSelector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{"control-plane": "ocm-proxyserver"},
+				},
+			}},
 			Ports: tcpPort(indexerPort),
 		},
 		{
