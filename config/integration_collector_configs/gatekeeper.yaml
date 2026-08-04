@@ -2,6 +2,9 @@
 # Integration CollectorConfig for Gatekeeper. Populated from resources already hard-coded in
 # search-collector/pkg/transforms/gatekeeperconstraint.go and transformer.go before this
 # CollectorConfig existed.
+#
+# Managed by the operator — reset to this default on restart unless annotated with
+# search.open-cluster-management.io/manual-override. See docs/ARCHITECTURE.md.
 apiVersion: search.open-cluster-management.io/v1alpha1
 kind: CollectorConfig
 metadata:

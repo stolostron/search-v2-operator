@@ -81,11 +81,16 @@ automatically. To ship a change permanently, the team opens a PR updating their 
 `config/integration_collector_configs/` — the next operator upgrade applies it to every cluster
 that hasn't switched to a differently-named override for that team.
 
-**Known accepted limitation (tech preview):** this is deliberately not a smart merge. A
-customization to the canonical name is only safe for as long as the pod doesn't restart; there's
+**Preventing overwrite with `manual-override`:** to protect a customization from being reset on
+restart, annotate the config with `search.open-cluster-management.io/manual-override`. The seeder
+skips any config carrying this annotation, regardless of whether its spec differs from the shipped
+default. Remove the annotation to resume receiving updates from future operator releases.
+
+**Known accepted limitation (tech preview):** without the manual-override annotation, a
+customization to the canonical name is only safe for as long as the pod doesn't restart — there's
 no attempt to distinguish "this changed because of a new release" from "this changed because
-someone edited it" — restarting always wins. There's also no cleanup path if a team removes their
-YAML file entirely: the previously-created CR becomes orphaned and is left as-is.
+someone edited it." There's also no cleanup path if a team removes their YAML file entirely: the
+previously-created CR becomes orphaned and is left as-is.
 
 **Namespace is discovered dynamically from the Search CR, not from env vars.**
 `WATCH_NAMESPACE`/`POD_NAMESPACE` are not reliably set in all deployment paths.
