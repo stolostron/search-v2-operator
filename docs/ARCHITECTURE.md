@@ -53,9 +53,61 @@ Allows integration teams and users to customize search-collector behaviour (reso
 
 The webhook (`api/v1alpha1/collectorconfig_webhook.go`) sets defaults and validates on admission.
 
+### Built-in integration CollectorConfigs
+
+Integration teams (CNV, OLM, GRC, Kyverno, Gatekeeper, Argo, ACM app lifecycle) contribute a
+plain `CollectorConfig` YAML file to `config/integration_collector_configs/` instead of writing
+Go code. `config/integrationconfigs.go` embeds that directory (`//go:embed`) at build time.
+
+**This is seeded once per operator process, at manager startup — not on every reconcile.**
+`IntegrationCollectorConfigSeeder` (`controllers/integration_collectorconfig_seeder.go`) is a
+`manager.Runnable` added via `mgr.Add(...)` in `main.go`. Its `Start` calls
+`applyIntegrationCollectorConfigs` (`controllers/create_integration_collectorconfigs.go`), which
+walks the embedded files and for each **unconditionally creates or overwrites** the CR with that
+fixed name — no diffing against customizations, no hash, no attempt to detect "is this a new
+release." If the API/webhook isn't ready yet (a known startup race — the CollectorConfig
+webhook's CA bundle injection can take a couple of reconciles), `Start` retries on a fixed
+interval until it succeeds once, then returns; it does not use `sync.Once`, since that would
+permanently give up after a single failed attempt.
+
+Because this only runs at startup, a team can freely edit their canonical config
+(`cnv-integration`, etc.) and it persists for the life of that pod — the reset
+only happens on the *next* restart/upgrade, at which point it's unconditionally reverted to
+whatever's currently embedded. **A team that wants a change to survive across restarts before
+it's officially shipped creates a differently-named CollectorConfig instead of editing the
+canonical one** (e.g. `cnv-integration-2`) — the seeder only knows about its
+fixed set of embedded names, so any other name is left alone entirely, and the merge step already
+discovers integration configs by label rather than name, so it picks up any number of them
+automatically. To ship a change permanently, the team opens a PR updating their YAML in
+`config/integration_collector_configs/` — the next operator upgrade applies it to every cluster
+that hasn't switched to a differently-named override for that team.
+
+**Preventing overwrite with `manual-override`:** to protect a customization from being reset on
+restart, annotate the config with `search.open-cluster-management.io/manual-override`. The seeder
+skips any config carrying this annotation, regardless of whether its spec differs from the shipped
+default. Remove the annotation to resume receiving updates from future operator releases.
+
+**Known accepted limitation (tech preview):** without the manual-override annotation, a
+customization to the canonical name is only safe for as long as the pod doesn't restart — there's
+no attempt to distinguish "this changed because of a new release" from "this changed because
+someone edited it." There's also no cleanup path if a team removes their YAML file entirely: the
+previously-created CR becomes orphaned and is left as-is.
+
+**Namespace is discovered dynamically from the Search CR, not from env vars.**
+`WATCH_NAMESPACE`/`POD_NAMESPACE` are not reliably set in all deployment paths.
+`resolveSearch` lists the `Search` CRs cluster-wide, finds the one named `OperatorName`, and uses
+its namespace. It also checks `search-pause` before writing, consistent with the reconciler.
+
+As each apiGroup gets covered by a real integration config, it's removed from the temporary
+`protectedAPIGroups` safety net in the webhook (see below) — the dynamic
+`validateExcludeAgainstIntegrationConfigs` check already protects anything with a real `include`
+rule in an integration-labeled CollectorConfig, regardless of how that CR was created.
+
 ## Reconcile flow
 
-Each reconcile call processes the `Search` CR in a fixed sequence:
+Each reconcile call processes the `Search` CR in a fixed sequence. Note: seeding the built-in
+integration CollectorConfigs (above) happens once at manager startup via
+`IntegrationCollectorConfigSeeder`, outside of this per-CR reconcile sequence entirely.
 
 1. **Addon setup** (`once.Do`) — registers the OCM addon framework once per process.
 2. **Status update** (pod events only) — updates `Search.Status` with pod readiness; skips full reconcile.

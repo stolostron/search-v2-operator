@@ -120,6 +120,16 @@ func main() {
 	}
 	//+kubebuilder:scaffold:builder
 
+	// Namespace is intentionally left unset — WATCH_NAMESPACE/POD_NAMESPACE are not reliably set
+	// in real deployments, so the seeder discovers its namespace from the live Search CR instead.
+	if err := mgr.Add(&controllers.IntegrationCollectorConfigSeeder{
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+	}); err != nil {
+		setupLog.Error(err, "unable to add integration CollectorConfig seeder")
+		os.Exit(1)
+	}
+
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
 		setupLog.Error(err, "unable to set up health check")
 		os.Exit(1)

@@ -40,6 +40,10 @@ const IntegrationTeamLabel = "search.open-cluster-management.io/config-type"
 // IntegrationTeamLabelValue is the expected value for IntegrationTeamLabel.
 const IntegrationTeamLabelValue = "integration"
 
+// AnnotationManualOverride, when present on an integration CollectorConfig, signals that a user
+// has intentionally customized this config and the operator must not overwrite it on restart.
+const AnnotationManualOverride = "search.open-cluster-management.io/manual-override"
+
 // Reason constants for the CollectorConfig Applied condition.
 const (
 	// CollectorConfigReasonApplied means all rules were processed and applied successfully.

@@ -229,55 +229,28 @@ var protectedKinds = map[string]string{
 }
 
 // protectedAPIGroups is a temporary list of API groups that must not be excluded.
-// These cover resources that integration teams (CNV, OLM, GRC, Argo, Kyverno, etc.)
-// and Search itself depend on. Once integration teams ship labeled CollectorConfig CRs
-// (search.open-cluster-management.io/config-type: integration), the dynamic webhook check
-// will replace this list. Until then this provides a safety net.
+// This started as a broad safety net covering everything integration teams (CNV, OLM, GRC,
+// Argo, Kyverno, etc.) and Search itself depend on. As of ACM-37052, most of those teams now
+// have a real labeled CollectorConfig (search.open-cluster-management.io/config-type: integration,
+// shipped from config/integration_collector_configs/ — see IntegrationCollectorConfigSeeder),
+// so the dynamic check (validateExcludeAgainstIntegrationConfigs) already protects their apiGroups
+// via those configs' include rules. What remains here are groups with no single integration-team
+// owner, or that Search itself depends on directly.
 //
-// Source: search-collector/pkg/transforms/genericResourceConfig.go plus ACM integration teams.
-// "" = core group (ConfigMap, Job, Node, Pod, PVC — needed by CNV, console, and others).
+// "" = core group (ConfigMap, Job, Node, Pod, PVC — needed by CNV, console, and others; no single owner).
 var protectedAPIGroups = map[string]struct{}{
-	// Core group — ConfigMap, Job, Node, Pod, PVC needed by CNV / console
+	// Core group — ConfigMap, Job, Node, Pod, PVC needed by CNV / console / multiple consumers.
 	"": {},
-	// OLM
-	"operators.coreos.com": {},
-	// OpenShift cluster config
+	// OpenShift cluster config — no single integration-team owner.
 	"config.openshift.io": {},
-	// CNV / KubeVirt family
-	"kubevirt.io":                               {},
-	"cdi.kubevirt.io":                           {},
-	"migrations.kubevirt.io":                    {},
-	"clone.kubevirt.io":                         {},
-	"instancetype.kubevirt.io":                  {},
-	"snapshot.kubevirt.io":                      {},
-	"networkaddonsoperator.network.kubevirt.io": {},
-	// Networking
-	"k8s.cni.cncf.io": {},
-	// Storage
-	"storage.k8s.io":               {},
-	"snapshot.storage.k8s.io":      {},
-	"snapshot.storage.kubevirt.io": {},
-	// OpenShift templates
+	// OpenShift templates — no single integration-team owner.
 	"template.openshift.io": {},
-	// Admission / webhook configs
+	// Admission / webhook configs — no single integration-team owner.
 	"admissionregistration.k8s.io": {},
-	// ACM hub operator
+	// ACM hub operator — Search itself depends on this.
 	"operator.open-cluster-management.io": {},
-	// ACM Search itself
+	// ACM Search itself.
 	"search.open-cluster-management.io": {},
-	// ACM app lifecycle
-	"apps.open-cluster-management.io": {},
-	"app.k8s.io":                      {},
-	// GRC / Policy
-	"policy.open-cluster-management.io": {},
-	"wgpolicyk8s.io":                    {},
-	// Kyverno
-	"kyverno.io":          {},
-	"policies.kyverno.io": {},
-	// Gatekeeper
-	"constraints.gatekeeper.sh": {},
-	// Argo
-	"argoproj.io": {},
 }
 
 // validateExcludeRule enforces constraints specific to exclude rules:
