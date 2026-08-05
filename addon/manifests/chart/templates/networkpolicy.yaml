@@ -1,0 +1,28 @@
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ template "controller.fullname" . }}-network-policy
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ template "controller.fullname" . }}
+    chart: {{ template "controller.chart" . }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+    component: search
+spec:
+  podSelector:
+    matchLabels:
+      component: "search"
+  policyTypes:
+  - Ingress
+{{- if .Values.prometheus.enabled }}
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: openshift-monitoring
+    ports:
+    - protocol: TCP
+      port: 5010
+{{- end }}

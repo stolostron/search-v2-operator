@@ -69,6 +69,20 @@ cluster/namespace, and are out of scope for this operator's `NetworkPolicy` reco
 | Ingress | `openshift-monitoring` namespace | 5010/TCP | Prometheus scrapes collector metrics and probes the liveness/readiness endpoints. |
 | Egress | *(not restricted — Ingress-only policy)* | — | OVN-Kubernetes handles `kubernetes.default.svc` ClusterIP traffic via the OVN service load balancer before NetworkPolicy evaluation, so no egress rule can match kube-API traffic. Applying an Egress policyType would silently block the collector from reaching the Kubernetes API (resource watch). |
 
+### search-collector (managed cluster addon)
+
+Managed-cluster collectors are deployed via the addon framework (Helm chart in
+`addon/manifests/chart/templates/`). The chart is embedded in the search-v2-operator binary and
+deployed at runtime to each managed cluster's `open-cluster-management-agent-addon` namespace.
+When `prometheus.enabled` is true, Prometheus scraping is allowed; when false, the policy is
+deny-all ingress — the collector has no legitimate inbound traffic in that case.
+
+| Direction | Peer | Port | Rationale |
+|---|---|---|---|
+| Ingress | `openshift-monitoring` namespace *(only when `prometheus.enabled`)* | 5010/TCP | Prometheus scrapes collector metrics on the managed cluster. |
+| Ingress | *(deny-all when `prometheus.enabled` is false)* | — | The collector serves no inbound traffic other than metrics; liveness/readiness probes from the kubelet bypass NetworkPolicy. |
+| Egress | *(not restricted — Ingress-only policy)* | — | The collector needs to reach the hub's kube-apiserver (via its addon bootstrap kubeconfig) to push discovered resources to the indexer. No egress restriction is applied for the same OVN-Kubernetes reason as the hub components. |
+
 ### search-v2-operator (controller-manager)
 
 | Direction | Peer | Port | Rationale |
