@@ -90,7 +90,7 @@ var cleanOnce sync.Once
 //+kubebuilder:rbac:groups=search.open-cluster-management.io,resources=searches/finalizers,verbs=update
 //+kubebuilder:rbac:groups=admissionregistration.k8s.io,resources=validatingwebhookconfigurations,verbs=get;update;patch
 //+kubebuilder:rbac:groups=networking.k8s.io,resources=networkpolicies,verbs=create;get;list;watch;update;patch;delete
-//+kubebuilder:rbac:groups=search.open-cluster-management.io,resources=collectorconfigs,verbs=get;list;watch;create;update;patch
+//+kubebuilder:rbac:groups=search.open-cluster-management.io,resources=collectorconfigs,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=search.open-cluster-management.io,resources=collectorconfigs/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=work.open-cluster-management.io,resources=manifestworks,verbs=create;delete;get;list;patch
 //+kubebuilder:rbac:groups=multicluster.openshift.io,resources=multiclusterengines,verbs=get;list
