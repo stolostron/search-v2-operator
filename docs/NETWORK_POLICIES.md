@@ -81,7 +81,7 @@ deny-all ingress — the collector has no legitimate inbound traffic in that cas
 |---|---|---|---|
 | Ingress | `openshift-monitoring` namespace *(only when `prometheus.enabled`)* | 5010/TCP | Prometheus scrapes collector metrics on the managed cluster. |
 | Ingress | *(deny-all when `prometheus.enabled` is false)* | — | The collector serves no inbound traffic other than metrics; liveness/readiness probes from the kubelet bypass NetworkPolicy. |
-| Egress | *(not restricted — Ingress-only policy)* | — | The collector needs to reach the hub's kube-apiserver (via its addon bootstrap kubeconfig) to push discovered resources to the indexer. No egress restriction is applied for the same OVN-Kubernetes reason as the hub components. |
+| Egress | *(not restricted — Ingress-only policy)* | — | The collector uses `HUB_CONFIG` to send `clusterstatuses` requests to the hub API server's `proxy.open-cluster-management.io` aggregated API, which proxies traffic to the indexer. It also watches local cluster resources via the managed cluster's Kubernetes API. Egress is not restricted because destination addresses (hub API server, local API server) vary per deployment. |
 
 ### search-v2-operator (controller-manager)
 
