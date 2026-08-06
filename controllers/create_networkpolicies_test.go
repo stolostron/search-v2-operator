@@ -180,7 +180,7 @@ func TestAPINetworkPolicy(t *testing.T) {
 
 	assert.Equal(t, apiDeploymentName, np.Spec.PodSelector.MatchLabels["name"])
 
-	var sawSameNamespace, sawMonitoring bool
+	var sawSameNamespace, sawConsoleMCE, sawMonitoring bool
 	for _, rule := range np.Spec.Ingress {
 		if containsTCPPort(rule.Ports, apiPort) {
 			for _, from := range rule.From {
@@ -188,12 +188,16 @@ func TestAPINetworkPolicy(t *testing.T) {
 					sawSameNamespace = true
 				}
 			}
+			if containsNamespaceAndPodSelector(rule.From, multiclusterEngine, "app", "console-mce") {
+				sawConsoleMCE = true
+			}
 			if containsNamespaceSelector(rule.From, openshiftMonitoring) {
 				sawMonitoring = true
 			}
 		}
 	}
 	assert.True(t, sawSameNamespace, "expected ingress from same-namespace consumers (e.g. console-api)")
+	assert.True(t, sawConsoleMCE, "expected ingress from console-mce in multicluster-engine namespace")
 	assert.True(t, sawMonitoring, "expected ingress from openshift-monitoring namespace")
 
 	// Egress policyType is NOT set for api: OVN-Kubernetes cannot match

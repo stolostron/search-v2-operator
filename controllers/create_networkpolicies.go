@@ -186,8 +186,8 @@ func (r *SearchReconciler) IndexerNetworkPolicy(instance *searchv1alpha1.Search,
 // Rationale:
 //   - Ingress: search-v2-api serves the Search GraphQL API to other components running in the
 //     same namespace (e.g. console-api) via its ClusterIP Service, so ingress is allowed from
-//     pods in the same namespace. Prometheus (openshift-monitoring) scrapes the same port for
-//     metrics.
+//     pods in the same namespace. console-mce in the multicluster-engine namespace also
+//     consumes the API. Prometheus (openshift-monitoring) scrapes the same port for metrics.
 //   - Egress: The API queries search-postgres, and performs TokenReview/SubjectAccessReview
 //     RBAC checks and ManagedCluster lookups against the Kubernetes API, in addition to
 //     resolving Service DNS names.
@@ -198,6 +198,18 @@ func (r *SearchReconciler) APINetworkPolicy(instance *searchv1alpha1.Search, _ s
 		{
 			// Same-namespace consumers of the Search GraphQL API (e.g. console-api).
 			From:  []networkingv1.NetworkPolicyPeer{podSelectorPeer(map[string]string{})},
+			Ports: tcpPort(apiPort),
+		},
+		{
+			// console-mce in the multicluster-engine namespace.
+			From: []networkingv1.NetworkPolicyPeer{{
+				NamespaceSelector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{nsLabelKey: multiclusterEngine},
+				},
+				PodSelector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{"app": "console-mce"},
+				},
+			}},
 			Ports: tcpPort(apiPort),
 		},
 		monitoringIngressRule(apiPort),
