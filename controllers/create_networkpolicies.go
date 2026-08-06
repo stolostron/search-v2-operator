@@ -2,6 +2,8 @@
 package controllers
 
 import (
+	"context"
+
 	searchv1alpha1 "github.com/stolostron/search-v2-operator/api/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
@@ -152,17 +154,17 @@ func (r *SearchReconciler) PostgresNetworkPolicy(instance *searchv1alpha1.Search
 //   - Ingress (monitoring): Prometheus (openshift-monitoring) scrapes indexer metrics.
 //   - Egress: The indexer writes aggregated data to search-postgres and watches hub-cluster
 //     resources directly via the Kubernetes API, in addition to resolving Service DNS names.
-func (r *SearchReconciler) IndexerNetworkPolicy(instance *searchv1alpha1.Search, _ string) *networkingv1.NetworkPolicy {
+func (r *SearchReconciler) IndexerNetworkPolicy(instance *searchv1alpha1.Search, mceNamespace string) *networkingv1.NetworkPolicy {
 	podLabels := generateLabels("name", indexerDeploymentName)
 	np := newNetworkPolicy(instance, indexerDeploymentName, podLabels)
 	np.Spec.Ingress = []networkingv1.NetworkPolicyIngressRule{
 		{
-			// Managed-cluster collectors arrive via ocm-proxyserver in multicluster-engine.
+			// Managed-cluster collectors arrive via ocm-proxyserver in the MCE namespace.
 			// The kube-apiserver aggregates proxy.open-cluster-management.io requests to
 			// ocm-proxyserver, which then proxies to the indexer on port 3010.
 			From: []networkingv1.NetworkPolicyPeer{{
 				NamespaceSelector: &metav1.LabelSelector{
-					MatchLabels: map[string]string{nsLabelKey: multiclusterEngine},
+					MatchLabels: map[string]string{nsLabelKey: mceNamespace},
 				},
 				PodSelector: &metav1.LabelSelector{
 					MatchLabels: map[string]string{"control-plane": "ocm-proxyserver"},
@@ -186,18 +188,30 @@ func (r *SearchReconciler) IndexerNetworkPolicy(instance *searchv1alpha1.Search,
 // Rationale:
 //   - Ingress: search-v2-api serves the Search GraphQL API to other components running in the
 //     same namespace (e.g. console-api) via its ClusterIP Service, so ingress is allowed from
-//     pods in the same namespace. Prometheus (openshift-monitoring) scrapes the same port for
-//     metrics.
+//     pods in the same namespace. console-mce in the multicluster-engine namespace also
+//     consumes the API. Prometheus (openshift-monitoring) scrapes the same port for metrics.
 //   - Egress: The API queries search-postgres, and performs TokenReview/SubjectAccessReview
 //     RBAC checks and ManagedCluster lookups against the Kubernetes API, in addition to
 //     resolving Service DNS names.
-func (r *SearchReconciler) APINetworkPolicy(instance *searchv1alpha1.Search, _ string) *networkingv1.NetworkPolicy {
+func (r *SearchReconciler) APINetworkPolicy(instance *searchv1alpha1.Search, mceNamespace string) *networkingv1.NetworkPolicy {
 	podLabels := generateLabels("name", apiDeploymentName)
 	np := newNetworkPolicy(instance, apiDeploymentName, podLabels)
 	np.Spec.Ingress = []networkingv1.NetworkPolicyIngressRule{
 		{
 			// Same-namespace consumers of the Search GraphQL API (e.g. console-api).
 			From:  []networkingv1.NetworkPolicyPeer{podSelectorPeer(map[string]string{})},
+			Ports: tcpPort(apiPort),
+		},
+		{
+			// console-mce in the MCE namespace.
+			From: []networkingv1.NetworkPolicyPeer{{
+				NamespaceSelector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{nsLabelKey: mceNamespace},
+				},
+				PodSelector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{"app": "console-mce"},
+				},
+			}},
 			Ports: tcpPort(apiPort),
 		},
 		monitoringIngressRule(apiPort),
@@ -215,7 +229,7 @@ func (r *SearchReconciler) APINetworkPolicy(instance *searchv1alpha1.Search, _ s
 //     metrics and hit the liveness/readiness endpoints.
 //   - Egress: The collector watches hub-cluster resources via the Kubernetes API and pushes
 //     discovered resources to search-indexer, in addition to resolving Service DNS names.
-func (r *SearchReconciler) CollectorNetworkPolicy(instance *searchv1alpha1.Search, _ string) *networkingv1.NetworkPolicy {
+func (r *SearchReconciler) CollectorNetworkPolicy(instance *searchv1alpha1.Search) *networkingv1.NetworkPolicy {
 	podLabels := generateLabels("name", collectorDeploymentName)
 	np := newNetworkPolicy(instance, collectorDeploymentName, podLabels)
 	np.Spec.Ingress = []networkingv1.NetworkPolicyIngressRule{
@@ -235,7 +249,7 @@ func (r *SearchReconciler) CollectorNetworkPolicy(instance *searchv1alpha1.Searc
 //   - Egress: The operator manages nearly every resource type used by Search (Deployments,
 //     Services, RBAC, addon framework CRs, etc.) on the hub API server, and resolves Service DNS
 //     names.
-func (r *SearchReconciler) OperatorNetworkPolicy(instance *searchv1alpha1.Search, _ string) *networkingv1.NetworkPolicy {
+func (r *SearchReconciler) OperatorNetworkPolicy(instance *searchv1alpha1.Search) *networkingv1.NetworkPolicy {
 	podLabels := map[string]string{"app": "search", "control-plane": "controller-manager"}
 	np := newNetworkPolicy(instance, "search-operator", podLabels)
 	np.Spec.Ingress = []networkingv1.NetworkPolicyIngressRule{
@@ -253,12 +267,20 @@ func (r *SearchReconciler) OperatorNetworkPolicy(instance *searchv1alpha1.Search
 // component pod. Each policy only selects its own component's pods (never the whole
 // namespace), so unrelated workloads sharing the namespace (e.g. other ACM components) are
 // unaffected.
-func (r *SearchReconciler) NetworkPolicies(instance *searchv1alpha1.Search, serviceCIDR string) []*networkingv1.NetworkPolicy {
+func (r *SearchReconciler) NetworkPolicies(ctx context.Context, instance *searchv1alpha1.Search) []*networkingv1.NetworkPolicy {
+	mceNamespace := multiclusterEngine
+	if r.DynamicClient != nil {
+		if ns, err := r.getMCETargetNamespace(ctx); err != nil {
+			log.V(2).Info("Could not resolve MCE target namespace, using default", "default", multiclusterEngine)
+		} else {
+			mceNamespace = ns
+		}
+	}
 	return []*networkingv1.NetworkPolicy{
 		r.PostgresNetworkPolicy(instance),
-		r.IndexerNetworkPolicy(instance, serviceCIDR),
-		r.APINetworkPolicy(instance, serviceCIDR),
-		r.CollectorNetworkPolicy(instance, serviceCIDR),
-		r.OperatorNetworkPolicy(instance, serviceCIDR),
+		r.IndexerNetworkPolicy(instance, mceNamespace),
+		r.APINetworkPolicy(instance, mceNamespace),
+		r.CollectorNetworkPolicy(instance),
+		r.OperatorNetworkPolicy(instance),
 	}
 }

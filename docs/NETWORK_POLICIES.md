@@ -54,6 +54,7 @@ owned by the `Search` custom resource, so they're automatically removed if Searc
 | Direction | Peer | Port | Rationale |
 |---|---|---|---|
 | Ingress | Any pod in the same namespace | 4010/TCP | The API is consumed via its ClusterIP Service (`search-search-api`) directly by same-namespace clients such as `console-api` (see `console/backend/src/lib/search.ts`, which calls `https://search-search-api.<ns>.svc.cluster.local:4010`). It is not registered as an aggregated `APIService`, so traffic arrives directly from client pods rather than being proxied through the Kubernetes API server. |
+| Ingress | `console-mce` pods in `multicluster-engine` namespace | 4010/TCP | The MCE console (`console-mce`) queries the Search GraphQL API cross-namespace to power search features in the MCE UI. |
 | Ingress | `openshift-monitoring` namespace | 4010/TCP | Prometheus scrapes API metrics over the same HTTPS port used to serve GraphQL requests. |
 | Egress | *(not restricted — Ingress-only policy)* | — | OVN-Kubernetes handles `kubernetes.default.svc` ClusterIP traffic via the OVN service load balancer before NetworkPolicy evaluation, so no egress rule can match kube-API traffic. Applying an Egress policyType would silently block the API from reaching the Kubernetes API (TokenReview/SubjectAccessReview calls). |
 
