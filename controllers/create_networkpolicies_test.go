@@ -85,7 +85,7 @@ func TestNetworkPolicies_AllComponentsPresent(t *testing.T) {
 	search := testSearchInstance()
 	r := newTestReconcilerForNetworkPolicies(t, search)
 
-	policies := r.NetworkPolicies(search, "10.96.0.0/12")
+	policies := r.NetworkPolicies(t.Context(), search)
 	assert.Len(t, policies, 5, "expected one NetworkPolicy per Search component")
 
 	// postgresNetworkPolicyName has both Ingress and Egress policyTypes (deny-all egress).
@@ -143,7 +143,7 @@ func TestIndexerNetworkPolicy(t *testing.T) {
 	search := testSearchInstance()
 	r := newTestReconcilerForNetworkPolicies(t, search)
 
-	np := r.IndexerNetworkPolicy(search, "10.96.0.0/12")
+	np := r.IndexerNetworkPolicy(search, "multicluster-engine")
 
 	assert.Equal(t, indexerDeploymentName, np.Spec.PodSelector.MatchLabels["name"])
 
@@ -176,7 +176,7 @@ func TestAPINetworkPolicy(t *testing.T) {
 	search := testSearchInstance()
 	r := newTestReconcilerForNetworkPolicies(t, search)
 
-	np := r.APINetworkPolicy(search, "10.96.0.0/12")
+	np := r.APINetworkPolicy(search, "multicluster-engine")
 
 	assert.Equal(t, apiDeploymentName, np.Spec.PodSelector.MatchLabels["name"])
 
@@ -211,7 +211,7 @@ func TestCollectorNetworkPolicy(t *testing.T) {
 	search := testSearchInstance()
 	r := newTestReconcilerForNetworkPolicies(t, search)
 
-	np := r.CollectorNetworkPolicy(search, "10.96.0.0/12")
+	np := r.CollectorNetworkPolicy(search)
 
 	assert.Equal(t, collectorDeploymentName, np.Spec.PodSelector.MatchLabels["name"])
 	assert.Len(t, np.Spec.Ingress, 1)
@@ -229,7 +229,7 @@ func TestOperatorNetworkPolicy(t *testing.T) {
 	search := testSearchInstance()
 	r := newTestReconcilerForNetworkPolicies(t, search)
 
-	np := r.OperatorNetworkPolicy(search, "10.96.0.0/12")
+	np := r.OperatorNetworkPolicy(search)
 
 	assert.Equal(t, "controller-manager", np.Spec.PodSelector.MatchLabels["control-plane"])
 
