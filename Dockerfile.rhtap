@@ -1,6 +1,6 @@
 # Copyright Contributors to the Open Cluster Management project
 
-FROM brew.registry.redhat.io/rh-osbs/openshift-golang-builder:rhel_9_1.24 AS builder
+FROM brew.registry.redhat.io/rh-osbs/openshift-golang-builder:rhel_9_1.26 AS builder
 
 WORKDIR /workspace
 # Copy the Go Modules manifests
@@ -22,7 +22,7 @@ RUN CGO_ENABLED=1 go build -a -o manager main.go
 FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
 
 ENV USER_UID=1001 \
-    USER_NAME=search-v2-operator
+    USER_NAME=search-operator
 
 # install operator binary
 COPY --from=builder /workspace/manager .

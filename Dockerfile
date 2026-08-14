@@ -1,6 +1,6 @@
 # Copyright Contributors to the Open Cluster Management project
 
-FROM registry.ci.openshift.org/stolostron/builder:go1.24-linux AS builder
+FROM registry.ci.openshift.org/stolostron/builder:go1.26-linux AS builder
 
 WORKDIR /workspace
 # Copy the Go Modules manifests
@@ -21,11 +21,10 @@ RUN CGO_ENABLED=1 go build -a -o manager main.go
 FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
 
 ENV USER_UID=1001 \
-    USER_NAME=search-v2-operator
+    USER_NAME=search-operator
 
 # install operator binary
 COPY --from=builder /workspace/manager .
 USER ${USER_UID}
 
 ENTRYPOINT ["/manager"]
-

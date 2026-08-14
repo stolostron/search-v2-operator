@@ -15,7 +15,7 @@ func (r *SearchReconciler) IndexerService(instance *searchv1alpha1.Search) *core
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        "search-indexer",
 			Namespace:   instance.GetNamespace(),
-			Annotations: map[string]string{"service.beta.openshift.io/serving-cert-secret-name": "search-indexer-certs"},
+			Annotations: map[string]string{"service.beta.openshift.io/serving-cert-secret-name": "search-indexer-certs"}, // #nosec G101
 			Labels:      map[string]string{"search-monitor": "search-indexer"},
 		},
 	}

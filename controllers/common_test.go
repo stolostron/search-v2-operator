@@ -78,7 +78,7 @@ func TestResourcesNotCustomized(t *testing.T) {
 			},
 		},
 	}
-	os.Setenv("COLLECTOR_IMAGE", "value-from-env")
+	_ = os.Setenv("COLLECTOR_IMAGE", "value-from-env")
 	want := false
 	if isResourcesCustomized("search-collector", instance) != want {
 		t.Error("Collector is customized")
@@ -443,7 +443,7 @@ func TestPostgresCustomization(t *testing.T) {
 	}
 
 	actual_volume := getPostgresVolume(instance)
-	if actual_volume.VolumeSource.EmptyDir == nil {
+	if actual_volume.VolumeSource.EmptyDir == nil { //nolint:staticcheck // "could remove embedded field 'VolumeSource' from selector
 		t.Error("Incorrect Volume created")
 	}
 	envVars := getContainerEnvVar(testFor, instance)
@@ -487,7 +487,7 @@ func TestPostgresCustomizationPVC(t *testing.T) {
 		},
 	}
 	actual_volume := getPostgresVolume(instance)
-	if actual_volume.VolumeSource.PersistentVolumeClaim.ClaimName != "test-search" {
+	if actual_volume.VolumeSource.PersistentVolumeClaim.ClaimName != "test-search" { //nolint:staticcheck // "could remove embedded field 'VolumeSource' from selector
 		t.Error("Incorrect Volume created")
 	}
 }
@@ -712,7 +712,7 @@ func TestPGDeployment(t *testing.T) {
 	if sharedMemoryVolume.Name != "dshm" {
 		t.Errorf("Expected shared volume dshm to be present, but got: %+v ", sharedMemoryVolume)
 	}
-	if !sharedMemoryVolume.VolumeSource.EmptyDir.SizeLimit.Equal(resource.MustParse("1Gi")) {
-		t.Errorf("Expected shared volume SizeLimit to be 1Gi, but got: %+v ", sharedMemoryVolume.VolumeSource.EmptyDir.SizeLimit)
+	if !sharedMemoryVolume.VolumeSource.EmptyDir.SizeLimit.Equal(resource.MustParse("1Gi")) { // nolint:staticcheck // "could remove embedded field 'VolumeSource' from selector"
+		t.Errorf("Expected shared volume SizeLimit to be 1Gi, but got: %+v ", sharedMemoryVolume.VolumeSource.EmptyDir.SizeLimit) // nolint:staticcheck // "could remove embedded field 'VolumeSource' from selector"
 	}
 }
