@@ -233,16 +233,26 @@ func TestOperatorNetworkPolicy(t *testing.T) {
 
 	assert.Equal(t, "controller-manager", np.Spec.PodSelector.MatchLabels["control-plane"])
 
-	var sawWebhook, sawMonitoring bool
+	var sawWebhookOpenToAll, sawMetricsOpenToAll, sawMonitoring bool
 	for _, rule := range np.Spec.Ingress {
-		if containsNamespaceSelector(rule.From, openshiftKubeAPIServer) && containsTCPPort(rule.Ports, operatorWebhookPort) {
-			sawWebhook = true
+		// Webhook rule must have NO From restriction (empty From = allow all sources).
+		// The kube-apiserver uses hostNetwork: true, making its traffic unmatchable by
+		// namespace/pod selectors. Webhook security relies on the Kubernetes admission
+		// control model (only the API server routes to webhook services).
+		if len(rule.From) == 0 && containsTCPPort(rule.Ports, operatorWebhookPort) {
+			sawWebhookOpenToAll = true
+		}
+		if len(rule.From) == 0 && containsTCPPort(rule.Ports, operatorMetricsPort) {
+			sawMetricsOpenToAll = true
 		}
 		if containsNamespaceSelector(rule.From, openshiftMonitoring) && containsTCPPort(rule.Ports, operatorMetricsPort) {
 			sawMonitoring = true
 		}
 	}
-	assert.True(t, sawWebhook, "expected ingress from kube-apiserver for admission webhook calls")
+	assert.True(t, sawWebhookOpenToAll,
+		"expected webhook ingress with empty From (API server uses hostNetwork, cannot be selector-matched)")
+	assert.False(t, sawMetricsOpenToAll,
+		"metrics port must NOT have unrestricted ingress — only openshift-monitoring should reach it")
 	assert.True(t, sawMonitoring, "expected ingress from openshift-monitoring for metrics")
 
 	// Egress policyType is NOT set for the operator: OVN-Kubernetes cannot match

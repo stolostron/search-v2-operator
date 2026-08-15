@@ -243,9 +243,14 @@ func (r *SearchReconciler) CollectorNetworkPolicy(instance *searchv1alpha1.Searc
 // itself.
 //
 // Rationale:
-//   - Ingress: The Kubernetes API server calls the operator's admission webhook (CollectorConfig
-//     defaulting/validation) on the webhook port. Prometheus (openshift-monitoring) scrapes the
-//     controller-runtime metrics port.
+//   - Ingress (webhook): The Kubernetes API server calls the operator's admission webhook
+//     (CollectorConfig validation) on port 9443. The API server uses hostNetwork: true, so its
+//     traffic cannot be matched by namespaceSelector or podSelector — only an unrestricted port
+//     rule works. Webhook access is inherently restricted by the Kubernetes service network:
+//     only the API server can route to webhook ClusterIP services. This is the standard model
+//     used by all OCP operators (see cluster-kube-apiserver-operator CNTRLPLANE-2698).
+//   - Ingress (metrics): Prometheus (openshift-monitoring) scrapes the controller-runtime
+//     metrics port.
 //   - Egress: The operator manages nearly every resource type used by Search (Deployments,
 //     Services, RBAC, addon framework CRs, etc.) on the hub API server, and resolves Service DNS
 //     names.
@@ -254,7 +259,12 @@ func (r *SearchReconciler) OperatorNetworkPolicy(instance *searchv1alpha1.Search
 	np := newNetworkPolicy(instance, "search-operator", podLabels)
 	np.Spec.Ingress = []networkingv1.NetworkPolicyIngressRule{
 		{
-			From:  []networkingv1.NetworkPolicyPeer{namespaceSelectorPeer(openshiftKubeAPIServer)},
+			// Webhook port: allow from all sources. The kube-apiserver uses hostNetwork: true,
+			// making its traffic unmatchable by namespace/pod selectors. Restricting this port
+			// to openshift-kube-apiserver namespace blocks webhook calls on clusters with
+			// NetworkPolicies enabled (API server traffic arrives from the node IP, not from
+			// a pod in that namespace). Access is inherently restricted by the Kubernetes
+			// service network — only the API server routes to webhook ClusterIP services.
 			Ports: tcpPort(operatorWebhookPort),
 		},
 		monitoringIngressRule(operatorMetricsPort),
