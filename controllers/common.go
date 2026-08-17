@@ -57,6 +57,15 @@ func getServiceAccountName() string {
 	return "search-serviceaccount"
 }
 
+// getAPIServiceAccountName returns the dedicated ServiceAccount used only by
+// the search-api deployment. Impersonation rights (users/groups/serviceaccounts)
+// are bound to this SA alone so that the postgres, indexer and collector pods —
+// which share the generic search-serviceaccount — cannot escalate to
+// system:masters via their mounted token.
+func getAPIServiceAccountName() string {
+	return "search-api-serviceaccount"
+}
+
 func getDefaultDBConfig(varName string) string {
 	value, okay := dbDefaultMap[varName]
 	if okay {
