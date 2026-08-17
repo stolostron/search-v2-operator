@@ -245,10 +245,12 @@ func (r *SearchReconciler) CollectorNetworkPolicy(instance *searchv1alpha1.Searc
 // Rationale:
 //   - Ingress (webhook): The Kubernetes API server calls the operator's admission webhook
 //     (CollectorConfig validation) on port 9443. The API server uses hostNetwork: true, so its
-//     traffic cannot be matched by namespaceSelector or podSelector — only an unrestricted port
-//     rule works. Webhook access is inherently restricted by the Kubernetes service network:
-//     only the API server can route to webhook ClusterIP services. This is the standard model
-//     used by all OCP operators (see cluster-kube-apiserver-operator CNTRLPLANE-2698).
+//     traffic cannot be matched by a plain namespaceSelector — OCP/OVN-Kubernetes only matches
+//     hostNetwork traffic when a peer sets BOTH namespaceSelector and podSelector to an empty
+//     LabelSelector (the documented "allow-from-hostnetwork" pattern). An empty namespaceSelector
+//     alone would silently reintroduce this bug. Combined with an empty podSelector, this peer
+//     matches any pod in any namespace plus hostNetwork traffic — i.e. all cluster-internal
+//     traffic, which is the full reachable set for a ClusterIP-only webhook service anyway.
 //   - Ingress (metrics): Prometheus (openshift-monitoring) scrapes the controller-runtime
 //     metrics port.
 //   - Egress: The operator manages nearly every resource type used by Search (Deployments,
@@ -259,12 +261,16 @@ func (r *SearchReconciler) OperatorNetworkPolicy(instance *searchv1alpha1.Search
 	np := newNetworkPolicy(instance, "search-operator", podLabels)
 	np.Spec.Ingress = []networkingv1.NetworkPolicyIngressRule{
 		{
-			// Webhook port: allow from all sources. The kube-apiserver uses hostNetwork: true,
-			// making its traffic unmatchable by namespace/pod selectors. Restricting this port
-			// to openshift-kube-apiserver namespace blocks webhook calls on clusters with
-			// NetworkPolicies enabled (API server traffic arrives from the node IP, not from
-			// a pod in that namespace). Access is inherently restricted by the Kubernetes
-			// service network — only the API server routes to webhook ClusterIP services.
+			// Webhook port: allow from any namespace/pod in the cluster, including
+			// hostNetwork pods. The kube-apiserver uses hostNetwork: true, so an empty
+			// namespaceSelector alone would NOT match it (OCP docs: "Using the
+			// namespaceSelector field without the podSelector field set to {} will not
+			// include hostNetwork pods"). Both selectors must be empty in the same peer
+			// to also match hostNetwork traffic.
+			From: []networkingv1.NetworkPolicyPeer{{
+				NamespaceSelector: &metav1.LabelSelector{},
+				PodSelector:       &metav1.LabelSelector{},
+			}},
 			Ports: tcpPort(operatorWebhookPort),
 		},
 		monitoringIngressRule(operatorMetricsPort),

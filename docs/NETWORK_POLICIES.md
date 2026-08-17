@@ -88,7 +88,7 @@ deny-all ingress — the collector has no legitimate inbound traffic in that cas
 
 | Direction | Peer | Port | Rationale |
 |---|---|---|---|
-| Ingress | *(all sources)* | 9443/TCP | The Kubernetes API server calls the operator's `CollectorConfig` admission webhook. The API server uses `hostNetwork: true`, making its traffic unmatchable by namespace/pod selectors — only an unrestricted port rule works. Webhook authentication is mTLS (CA bundle), not NetworkPolicy. |
+| Ingress | *(any namespace/pod in cluster — empty `namespaceSelector` + `podSelector` on the same peer)* | 9443/TCP | The Kubernetes API server calls the operator's `CollectorConfig` admission webhook. The API server uses `hostNetwork: true`, so an empty `namespaceSelector` alone would not match it — OCP requires the `allow-from-hostnetwork` pattern (empty `namespaceSelector` **and** `podSelector` on one peer) to also match hostNetwork traffic. This scopes ingress to cluster-internal traffic (the full reachable set for a ClusterIP-only service) rather than a fully unrestricted rule. |
 | Ingress | `openshift-monitoring` namespace | 8080/TCP | Prometheus scrapes controller-runtime metrics. |
 | Egress | *(not restricted — Ingress-only policy)* | — | OVN-Kubernetes handles `kubernetes.default.svc` ClusterIP traffic via the OVN service load balancer before NetworkPolicy evaluation, so no egress rule can match kube-API traffic. Applying an Egress policyType would silently block the operator from reaching the Kubernetes API (it manages Deployments, Services, Secrets, RBAC, addon CRs, etc.). |
 
