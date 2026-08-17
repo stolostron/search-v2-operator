@@ -672,6 +672,62 @@ func TestPGDeployment(t *testing.T) {
 
 }
 
+func TestSanitizeDBConfig(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{"valid plain number", "65536", "65536"},
+		{"valid kB", "4096kB", "4096kB"},
+		{"valid MB", "64MB", "64MB"},
+		{"valid GB", "1GB", "1GB"},
+		{"valid TB", "1TB", "1TB"},
+		{"shell injection", `64MB'; touch /tmp/pwned #`, default_WORK_MEM},
+		{"SQL injection", `64MB'; DROP TABLE search.resources; --`, default_WORK_MEM},
+		{"empty string", "", default_WORK_MEM},
+		{"wrong unit", "64mb", default_WORK_MEM},
+		{"spaces", "64 MB", default_WORK_MEM},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := sanitizeDBConfig("WORK_MEM", tt.input)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestPGDeploymentRejectsInvalidWorkMem(t *testing.T) {
+	malicious := `64MB'; touch /tmp/pwned #`
+	search := &searchv1alpha1.Search{
+		TypeMeta:   metav1.TypeMeta{Kind: "Search"},
+		ObjectMeta: metav1.ObjectMeta{Name: "search-v2-operator"},
+		Spec: searchv1alpha1.SearchSpec{
+			Deployments: searchv1alpha1.SearchDeployments{
+				Database: searchv1alpha1.DeploymentConfig{
+					Env: []corev1.EnvVar{{Name: "WORK_MEM", Value: malicious}},
+				},
+			},
+		},
+	}
+	s := scheme.Scheme
+	err := searchv1alpha1.SchemeBuilder.AddToScheme(s)
+	assert.NoError(t, err)
+
+	cl := fake.NewClientBuilder().WithRuntimeObjects(search).Build()
+	r := &SearchReconciler{Client: cl, Scheme: s}
+	dep := r.PGDeployment(search, "testhash")
+
+	for _, env := range dep.Spec.Template.Spec.Containers[0].Env {
+		if env.Name == "WORK_MEM" {
+			assert.Equal(t, default_WORK_MEM, env.Value,
+				"invalid WORK_MEM in deployment env should fall back to default")
+			return
+		}
+	}
+	t.Error("WORK_MEM env var not found in deployment")
+}
+
 // Tests for createOrUpdateConfigMap function
 func TestCreateOrUpdateConfigMap_CreateNew(t *testing.T) {
 	// Test case: ConfigMap doesn't exist, should create it
