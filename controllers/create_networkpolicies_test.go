@@ -70,6 +70,20 @@ func containsNamespaceAndPodSelector(peers []networkingv1.NetworkPolicyPeer, nam
 	return false
 }
 
+// containsEmptyNamespaceAndPodSelector returns true if any peer sets BOTH NamespaceSelector and
+// PodSelector to a non-nil, empty (match-everything) LabelSelector. This is the OCP/OVN-Kubernetes
+// "allow-from-hostnetwork" pattern: it matches pods in any namespace AND hostNetwork traffic,
+// which a namespaceSelector alone does not.
+func containsEmptyNamespaceAndPodSelector(peers []networkingv1.NetworkPolicyPeer) bool {
+	for _, p := range peers {
+		if p.NamespaceSelector != nil && len(p.NamespaceSelector.MatchLabels) == 0 && len(p.NamespaceSelector.MatchExpressions) == 0 &&
+			p.PodSelector != nil && len(p.PodSelector.MatchLabels) == 0 && len(p.PodSelector.MatchExpressions) == 0 {
+			return true
+		}
+	}
+	return false
+}
+
 // containsPodSelectorLabel returns true if any of the peers selects pods with the given label
 // key/value pair.
 func containsPodSelectorLabel(peers []networkingv1.NetworkPolicyPeer, key, value string) bool {
@@ -233,16 +247,37 @@ func TestOperatorNetworkPolicy(t *testing.T) {
 
 	assert.Equal(t, "controller-manager", np.Spec.PodSelector.MatchLabels["control-plane"])
 
-	var sawWebhook, sawMonitoring bool
+	var sawWebhookClusterWide, sawWebhookOpenToAll, sawMetricsOpenToAll, sawMonitoring bool
 	for _, rule := range np.Spec.Ingress {
-		if containsNamespaceSelector(rule.From, openshiftKubeAPIServer) && containsTCPPort(rule.Ports, operatorWebhookPort) {
-			sawWebhook = true
+		// Webhook rule must use the "allow-from-hostnetwork" pattern: an empty
+		// NamespaceSelector AND an empty PodSelector on the SAME peer. The kube-apiserver
+		// uses hostNetwork: true, so a namespaceSelector alone would NOT match it (OCP
+		// docs: "Using the namespaceSelector field without the podSelector field set to {}
+		// will not include hostNetwork pods"). This still matches any pod in any namespace
+		// plus hostNetwork traffic, i.e. all cluster-internal traffic.
+		if containsEmptyNamespaceAndPodSelector(rule.From) && containsTCPPort(rule.Ports, operatorWebhookPort) {
+			sawWebhookClusterWide = true
+		}
+		// A completely bare From (or one with no selectors at all) would also allow
+		// hostNetwork traffic, but is over-broad and must NOT be used for the webhook.
+		if len(rule.From) == 0 && containsTCPPort(rule.Ports, operatorWebhookPort) {
+			sawWebhookOpenToAll = true
+		}
+		if len(rule.From) == 0 && containsTCPPort(rule.Ports, operatorMetricsPort) {
+			sawMetricsOpenToAll = true
 		}
 		if containsNamespaceSelector(rule.From, openshiftMonitoring) && containsTCPPort(rule.Ports, operatorMetricsPort) {
 			sawMonitoring = true
 		}
 	}
-	assert.True(t, sawWebhook, "expected ingress from kube-apiserver for admission webhook calls")
+	assert.True(t, sawWebhookClusterWide,
+		"expected webhook ingress with empty namespaceSelector+podSelector on the same peer "+
+			"(API server uses hostNetwork, requires the allow-from-hostnetwork pattern)")
+	assert.False(t, sawWebhookOpenToAll,
+		"webhook ingress must not use a completely unrestricted From — it should be scoped "+
+			"to the cluster via the empty namespaceSelector+podSelector peer")
+	assert.False(t, sawMetricsOpenToAll,
+		"metrics port must NOT have unrestricted ingress — only openshift-monitoring should reach it")
 	assert.True(t, sawMonitoring, "expected ingress from openshift-monitoring for metrics")
 
 	// Egress policyType is NOT set for the operator: OVN-Kubernetes cannot match
