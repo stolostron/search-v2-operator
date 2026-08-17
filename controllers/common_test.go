@@ -17,6 +17,34 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
+func TestSharedClusterRoleHasNoImpersonate(t *testing.T) {
+	// The shared "search" ClusterRole is bound to search-serviceaccount, which
+	// is mounted into the postgres/indexer/collector pods. It must not carry
+	// impersonate; that verb is isolated on the search-api ClusterRole which is
+	// bound only to search-api-serviceaccount.
+	for _, rule := range getRules() {
+		for _, v := range rule.Verbs {
+			if v == "impersonate" {
+				t.Fatalf("shared search ClusterRole must not grant impersonate; found on %v", rule.Resources)
+			}
+		}
+	}
+	hasImpersonate := false
+	for _, rule := range getAPIRules() {
+		for _, v := range rule.Verbs {
+			if v == "impersonate" {
+				hasImpersonate = true
+			}
+		}
+	}
+	if !hasImpersonate {
+		t.Fatal("search-api ClusterRole expected to carry impersonate")
+	}
+	if getAPIServiceAccountName() == getServiceAccountName() {
+		t.Fatal("search-api must use a dedicated ServiceAccount")
+	}
+}
+
 func TestGetDeploymentConfigForNil(t *testing.T) {
 	instance := &searchv1alpha1.Search{
 		Spec: searchv1alpha1.SearchSpec{
