@@ -965,3 +965,69 @@ func TestSearch_controller_DBConfigAndEnvOverlap(t *testing.T) {
 	verifyDeploymentEnv(t, dep4, "indEnv", "indEnvValue")
 	verifyDeploymentArgs(t, dep4, "-v=4")
 }
+
+// TestCreateUpdateRoles_UpdatesExistingClusterRole verifies that when a pre-existing
+// ClusterRole has stale rules (e.g. still carries impersonate on the shared role),
+// createUpdateRoles copies the desired rules onto the fetched object and updates it.
+// This exercises the resourceVersion-preserving path: the fetched existingClusterRole
+// is updated rather than the freshly constructed crole, which has no resourceVersion
+// and would be rejected by the API server.
+func TestCreateUpdateRoles_UpdatesExistingClusterRole(t *testing.T) {
+	namespace := "test-ns"
+	search := &searchv1alpha1.Search{
+		TypeMeta:   metav1.TypeMeta{Kind: "Search"},
+		ObjectMeta: metav1.ObjectMeta{Name: OperatorName, Namespace: namespace},
+	}
+
+	// Pre-existing ClusterRole with stale rules (impersonate still present).
+	staleRule := rbacv1.PolicyRule{
+		APIGroups: []string{""},
+		Resources: []string{"users", "serviceaccounts", "groups"},
+		Verbs:     []string{"impersonate"},
+	}
+	existing := &rbacv1.ClusterRole{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            getRoleName(),
+			Namespace:       namespace, // match the namespace set by ClusterRole() builder
+			ResourceVersion: "999",    // simulates a server-assigned value
+		},
+		Rules: []rbacv1.PolicyRule{staleRule},
+	}
+
+	s := scheme.Scheme
+	if err := searchv1alpha1.SchemeBuilder.AddToScheme(s); err != nil {
+		t.Fatalf("scheme: %v", err)
+	}
+	if err := rbacv1.AddToScheme(s); err != nil {
+		t.Fatalf("scheme rbac: %v", err)
+	}
+	cl := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(existing).Build()
+	r := &SearchReconciler{Client: cl, Scheme: s}
+
+	// Build the desired ClusterRole (no impersonate in getRules()).
+	desired := r.ClusterRole(search)
+
+	result, err := r.createUpdateRoles(context.TODO(), desired)
+	if result != nil || err != nil {
+		t.Fatalf("createUpdateRoles returned unexpected result=%v err=%v", result, err)
+	}
+
+	updated := &rbacv1.ClusterRole{}
+	if err := cl.Get(context.TODO(), types.NamespacedName{Name: getRoleName(), Namespace: namespace}, updated); err != nil {
+		t.Fatalf("get updated ClusterRole: %v", err)
+	}
+
+	// Confirm the stale impersonate rule is gone.
+	for _, rule := range updated.Rules {
+		for _, v := range rule.Verbs {
+			if v == "impersonate" {
+				t.Errorf("shared ClusterRole still contains impersonate after update: %+v", rule)
+			}
+		}
+	}
+
+	// Confirm the updated object matches the desired rules.
+	if len(updated.Rules) != len(desired.Rules) {
+		t.Errorf("expected %d rules after update, got %d", len(desired.Rules), len(updated.Rules))
+	}
+}
