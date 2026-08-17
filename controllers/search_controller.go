@@ -156,9 +156,19 @@ func (r *SearchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		log.Error(err, "SearchServiceAccount setup failed")
 		return *result, err
 	}
+	result, err = r.createSearchServiceAccount(ctx, r.SearchAPIServiceAccount(instance))
+	if result != nil {
+		log.Error(err, "SearchAPIServiceAccount setup failed")
+		return *result, err
+	}
 	result, err = r.createUpdateRoles(ctx, r.ClusterRole(instance))
 	if result != nil {
 		log.Error(err, "ClusterRole setup failed")
+		return *result, err
+	}
+	result, err = r.createUpdateRoles(ctx, r.APIClusterRole(instance))
+	if result != nil {
+		log.Error(err, "APIClusterRole setup failed")
 		return *result, err
 	}
 	result, err = r.createUpdateRoles(ctx, r.AddonClusterRole(instance))
@@ -174,6 +184,11 @@ func (r *SearchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	result, err = r.createRoleBinding(ctx, r.ClusterRoleBinding(instance))
 	if result != nil {
 		log.Error(err, "ClusterRoleBinding setup failed")
+		return *result, err
+	}
+	result, err = r.createRoleBinding(ctx, r.APIClusterRoleBinding(instance))
+	if result != nil {
+		log.Error(err, "APIClusterRoleBinding setup failed")
 		return *result, err
 	}
 	if err := r.ensureWebhookCAInjection(ctx); err != nil {
