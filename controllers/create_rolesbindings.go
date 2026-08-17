@@ -32,13 +32,14 @@ func (r *SearchReconciler) createUpdateRoles(ctx context.Context,
 		log.Info("Created clusterrole " + crole.Name)
 		log.V(9).Info("Created clusterrole ", "clusterrole", crole)
 	} else if !equality.Semantic.DeepEqual(existingClusterRole.Rules, crole.Rules) {
-		err = r.Update(ctx, crole)
+		existingClusterRole.Rules = crole.Rules
+		err = r.Update(ctx, existingClusterRole)
 		if err != nil {
 			log.Error(err, "Could not update clusterrole "+crole.Name)
 			return &reconcile.Result{}, err
 		}
 		log.Info("Updated clusterrole " + crole.Name)
-		log.V(9).Info("Updated clusterrole ", "clusterrole", crole)
+		log.V(9).Info("Updated clusterrole ", "clusterrole", existingClusterRole)
 	}
 	return nil, nil
 }
