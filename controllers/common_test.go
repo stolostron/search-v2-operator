@@ -46,6 +46,18 @@ func TestSharedClusterRoleHasNoImpersonate(t *testing.T) {
 	}
 }
 
+// TestPostgresServiceAccountIsIsolated verifies that the postgres SA uses a dedicated
+// name distinct from the shared search SA. Postgres makes no Kubernetes API calls so
+// it intentionally carries no RBAC rules — this test asserts identity isolation only.
+func TestPostgresServiceAccountIsIsolated(t *testing.T) {
+	pgSA := getPostgresServiceAccountName()
+	if pgSA == getServiceAccountName() {
+		t.Fatalf("postgres must not share the generic search-serviceaccount (%q)", pgSA)
+	}
+	if pgSA == "" {
+		t.Fatal("postgres SA name must not be empty")
+	}
+}
 func TestGetDeploymentConfigForNil(t *testing.T) {
 	instance := &searchv1alpha1.Search{
 		Spec: searchv1alpha1.SearchSpec{
