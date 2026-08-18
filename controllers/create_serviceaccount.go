@@ -106,6 +106,27 @@ func (r *SearchReconciler) SearchIndexerServiceAccount(instance *searchv1alpha1.
 	return sa, nil
 }
 
+// SearchCollectorServiceAccount builds the dedicated SA for the search-collector
+// deployment. It is bound only to the search-collector ClusterRole, which grants
+// read-only access to all cluster resources and lease management. It does not
+// carry any write permissions beyond leases.
+func (r *SearchReconciler) SearchCollectorServiceAccount(instance *searchv1alpha1.Search) *corev1.ServiceAccount {
+	sa := &corev1.ServiceAccount{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "ServiceAccount",
+			APIVersion: corev1.SchemeGroupVersion.String(),
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      getCollectorServiceAccountName(),
+			Namespace: instance.GetNamespace(),
+		},
+	}
+	if err := controllerutil.SetControllerReference(instance, sa, r.Scheme); err != nil {
+		log.V(2).Info("Could not set control for ", "serviceaccount", getCollectorServiceAccountName())
+	}
+	return sa
+}
+
 // SearchAPIServiceAccount builds the dedicated SA for the search-api
 // deployment. It is the only subject bound to the search-api ClusterRole
 // carrying impersonate rights.
