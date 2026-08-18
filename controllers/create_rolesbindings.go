@@ -219,7 +219,11 @@ func (r *SearchReconciler) IndexerClusterRoleBinding(instance *searchv1alpha1.Se
 // manage its own lease (for heartbeat). It does not need impersonate, write access
 // to secrets/services/deployments, or any auth review verbs.
 func (r *SearchReconciler) CollectorClusterRole(instance *searchv1alpha1.Search) *rbacv1.ClusterRole {
-	cr := &rbacv1.ClusterRole{
+	// Note: SetControllerReference is intentionally omitted. ClusterRole is cluster-scoped;
+	// Search is namespaced. Kubernetes forbids a namespaced owner on a cluster-scoped
+	// dependent, so the reference would always fail. Cleanup is handled explicitly in
+	// finalizeSearch via deleteClusterRole.
+	return &rbacv1.ClusterRole{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "ClusterRole",
 			APIVersion: rbacv1.SchemeGroupVersion.String(),
@@ -229,14 +233,12 @@ func (r *SearchReconciler) CollectorClusterRole(instance *searchv1alpha1.Search)
 		},
 		Rules: getCollectorRules(),
 	}
-	if err := controllerutil.SetControllerReference(instance, cr, r.Scheme); err != nil {
-		log.Info("Could not set control for ClusterRole " + cr.Name)
-	}
-	return cr
 }
 
 func (r *SearchReconciler) CollectorClusterRoleBinding(instance *searchv1alpha1.Search) *rbacv1.ClusterRoleBinding {
-	crb := &rbacv1.ClusterRoleBinding{
+	// Note: SetControllerReference is intentionally omitted for the same reason as
+	// CollectorClusterRole. Cleanup is handled explicitly in finalizeSearch.
+	return &rbacv1.ClusterRoleBinding{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "ClusterRoleBinding",
 			APIVersion: rbacv1.SchemeGroupVersion.String(),
@@ -255,10 +257,6 @@ func (r *SearchReconciler) CollectorClusterRoleBinding(instance *searchv1alpha1.
 			Namespace: instance.GetNamespace(),
 		}},
 	}
-	if err := controllerutil.SetControllerReference(instance, crb, r.Scheme); err != nil {
-		log.Info("Could not set control for ClusterRoleBinding " + crb.Name)
-	}
-	return crb
 }
 
 func (r *SearchReconciler) AddonClusterRole(instance *searchv1alpha1.Search) *rbacv1.ClusterRole {
