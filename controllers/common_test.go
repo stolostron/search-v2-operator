@@ -247,7 +247,7 @@ func TestCollectorClusterRoleMinimumPermissions(t *testing.T) {
 func TestCollectorWorkloadIdentityContract(t *testing.T) {
 	namespace := "test-ns"
 	instance := &searchv1alpha1.Search{
-		ObjectMeta: metav1.ObjectMeta{Name: OperatorName, Namespace: namespace},
+		ObjectMeta: metav1.ObjectMeta{Name: "search-v2-operator", Namespace: namespace},
 	}
 	s := scheme.Scheme
 	if err := searchv1alpha1.SchemeBuilder.AddToScheme(s); err != nil {
@@ -266,7 +266,7 @@ func TestCollectorWorkloadIdentityContract(t *testing.T) {
 	}
 
 	// CollectorDeployment ServiceAccountName must reference the collector SA.
-	deploy := r.CollectorDeployment(context.TODO(), instance)
+	deploy := r.CollectorDeployment(instance)
 	if deploy.Spec.Template.Spec.ServiceAccountName != getCollectorServiceAccountName() {
 		t.Errorf("CollectorDeployment ServiceAccountName = %q; want %q",
 			deploy.Spec.Template.Spec.ServiceAccountName, getCollectorServiceAccountName())
