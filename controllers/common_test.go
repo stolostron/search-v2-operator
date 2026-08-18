@@ -161,7 +161,7 @@ func TestIndexerWorkloadIdentityContract(t *testing.T) {
 	}
 
 	// IndexerDeployment ServiceAccountName must reference the indexer SA.
-	deploy := r.IndexerDeployment(instance, nil)
+	deploy := r.IndexerDeployment(instance)
 	if deploy.Spec.Template.Spec.ServiceAccountName != getIndexerServiceAccountName() {
 		t.Errorf("IndexerDeployment ServiceAccountName = %q; want %q",
 			deploy.Spec.Template.Spec.ServiceAccountName, getIndexerServiceAccountName())
