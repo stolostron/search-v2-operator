@@ -241,6 +241,47 @@ func TestCollectorClusterRoleMinimumPermissions(t *testing.T) {
 		t.Fatal("collector must use a dedicated ServiceAccount, not the search-api SA")
 	}
 }
+
+// TestCollectorWorkloadIdentityContract verifies that both the ClusterRoleBinding
+// subject and the CollectorDeployment ServiceAccountName reference
+// getCollectorServiceAccountName(), and that the SA is distinct from the shared account.
+func TestCollectorWorkloadIdentityContract(t *testing.T) {
+	namespace := "test-ns"
+	instance := &searchv1alpha1.Search{
+		ObjectMeta: metav1.ObjectMeta{Name: OperatorName, Namespace: namespace},
+	}
+	s := scheme.Scheme
+	if err := searchv1alpha1.SchemeBuilder.AddToScheme(s); err != nil {
+		t.Fatalf("scheme: %v", err)
+	}
+	r := &SearchReconciler{Client: fake.NewClientBuilder().WithScheme(s).Build(), Scheme: s, DynamicClient: fakeDynClient()}
+
+	// CollectorClusterRoleBinding subject must reference the collector SA.
+	crb := r.CollectorClusterRoleBinding(instance)
+	if len(crb.Subjects) != 1 {
+		t.Fatalf("CollectorClusterRoleBinding expected 1 subject, got %d", len(crb.Subjects))
+	}
+	if crb.Subjects[0].Name != getCollectorServiceAccountName() {
+		t.Errorf("CollectorClusterRoleBinding subject name = %q; want %q",
+			crb.Subjects[0].Name, getCollectorServiceAccountName())
+	}
+
+	// CollectorDeployment ServiceAccountName must reference the collector SA.
+	deploy := r.CollectorDeployment(context.TODO(), instance, nil)
+	if deploy.Spec.Template.Spec.ServiceAccountName != getCollectorServiceAccountName() {
+		t.Errorf("CollectorDeployment ServiceAccountName = %q; want %q",
+			deploy.Spec.Template.Spec.ServiceAccountName, getCollectorServiceAccountName())
+	}
+
+	// SA must be distinct from the shared account.
+	if getCollectorServiceAccountName() == getServiceAccountName() {
+		t.Fatal("collector must not share the generic search-serviceaccount")
+	}
+	if getCollectorServiceAccountName() == "" {
+		t.Fatal("collector SA name must not be empty")
+	}
+}
+
 func TestGetDeploymentConfigForNil(t *testing.T) {
 	instance := &searchv1alpha1.Search{
 		Spec: searchv1alpha1.SearchSpec{
