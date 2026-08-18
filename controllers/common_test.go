@@ -716,7 +716,7 @@ func TestPGDeploymentRejectsInvalidWorkMem(t *testing.T) {
 
 	cl := fake.NewClientBuilder().WithRuntimeObjects(search).Build()
 	r := &SearchReconciler{Client: cl, Scheme: s}
-	dep := r.PGDeployment(search, "testhash")
+	dep := r.PGDeployment(search)
 
 	for _, env := range dep.Spec.Template.Spec.Containers[0].Env {
 		if env.Name == "WORK_MEM" {
