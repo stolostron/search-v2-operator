@@ -83,6 +83,29 @@ func (r *SearchReconciler) SearchPostgresServiceAccount(instance *searchv1alpha1
 	return sa, nil
 }
 
+// SearchIndexerServiceAccount builds the dedicated SA for the search-indexer
+// deployment. It is bound only to the search-indexer ClusterRole, which grants
+// the minimum permissions required: TokenReview create, lease management, and
+// read access to the ACM cluster-sync resources.
+// An error is returned when the owner reference cannot be set so that the
+// reconcile loop can abort before creating an ownerless ServiceAccount.
+func (r *SearchReconciler) SearchIndexerServiceAccount(instance *searchv1alpha1.Search) (*corev1.ServiceAccount, error) {
+	sa := &corev1.ServiceAccount{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "ServiceAccount",
+			APIVersion: corev1.SchemeGroupVersion.String(),
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      getIndexerServiceAccountName(),
+			Namespace: instance.GetNamespace(),
+		},
+	}
+	if err := controllerutil.SetControllerReference(instance, sa, r.Scheme); err != nil {
+		return nil, err
+	}
+	return sa, nil
+}
+
 // SearchAPIServiceAccount builds the dedicated SA for the search-api
 // deployment. It is the only subject bound to the search-api ClusterRole
 // carrying impersonate rights.
