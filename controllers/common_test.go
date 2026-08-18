@@ -176,6 +176,112 @@ func TestIndexerWorkloadIdentityContract(t *testing.T) {
 		t.Fatal("indexer SA name must not be empty")
 	}
 }
+
+// TestCollectorClusterRoleMinimumPermissions verifies that the collector ClusterRole:
+//  1. carries no write verbs other than those needed for lease management,
+//  2. does not carry impersonate,
+//  3. does not grant secrets/services/deployments write access,
+//  4. uses a dedicated ServiceAccount distinct from the shared and API ones.
+func TestCollectorClusterRoleMinimumPermissions(t *testing.T) {
+	// Verbs the collector must never hold.
+	forbidden := map[string]bool{
+		"impersonate":      true,
+		"create":           false, // allowed only for leases — checked per-resource below
+		"update":           false, // allowed only for leases
+		"patch":            true,  // collector never patches anything
+		"delete":           true,
+		"deletecollection": true,
+	}
+	// Write verbs that are only acceptable on coordination.k8s.io/leases.
+	leaseWriteVerbs := map[string]bool{"create": true, "update": true}
+
+	for _, rule := range getCollectorRules() {
+		for _, verb := range rule.Verbs {
+			if forbidden[verb] {
+				t.Errorf("collector ClusterRole must not grant %q; found on resources %v", verb, rule.Resources)
+				continue
+			}
+			// create/update are only allowed on leases
+			if leaseWriteVerbs[verb] {
+				isLeaseRule := false
+				for _, res := range rule.Resources {
+					if res == "leases" {
+						isLeaseRule = true
+						break
+					}
+				}
+				if !isLeaseRule {
+					t.Errorf("collector ClusterRole grants %q on non-lease resource %v", verb, rule.Resources)
+				}
+			}
+		}
+		// Reject any rule that grants write access to secrets, services, or deployments.
+		writeSensitive := map[string]bool{"secrets": true, "services": true, "deployments": true}
+		hasWriteVerb := false
+		for _, verb := range rule.Verbs {
+			if verb != "get" && verb != "list" && verb != "watch" {
+				hasWriteVerb = true
+				break
+			}
+		}
+		if hasWriteVerb {
+			for _, res := range rule.Resources {
+				if writeSensitive[res] {
+					t.Errorf("collector ClusterRole must not grant write access to %q", res)
+				}
+			}
+		}
+	}
+
+	// The collector must use its own SA.
+	if getCollectorServiceAccountName() == getServiceAccountName() {
+		t.Fatal("collector must use a dedicated ServiceAccount, not the shared search-serviceaccount")
+	}
+	if getCollectorServiceAccountName() == getAPIServiceAccountName() {
+		t.Fatal("collector must use a dedicated ServiceAccount, not the search-api SA")
+	}
+}
+
+// TestCollectorWorkloadIdentityContract verifies that both the ClusterRoleBinding
+// subject and the CollectorDeployment ServiceAccountName reference
+// getCollectorServiceAccountName(), and that the SA is distinct from the shared account.
+func TestCollectorWorkloadIdentityContract(t *testing.T) {
+	namespace := "test-ns"
+	instance := &searchv1alpha1.Search{
+		ObjectMeta: metav1.ObjectMeta{Name: "search-v2-operator", Namespace: namespace},
+	}
+	s := scheme.Scheme
+	if err := searchv1alpha1.SchemeBuilder.AddToScheme(s); err != nil {
+		t.Fatalf("scheme: %v", err)
+	}
+	r := &SearchReconciler{Client: fake.NewClientBuilder().WithScheme(s).Build(), Scheme: s, DynamicClient: fakeDynClient()}
+
+	// CollectorClusterRoleBinding subject must reference the collector SA.
+	crb := r.CollectorClusterRoleBinding(instance)
+	if len(crb.Subjects) != 1 {
+		t.Fatalf("CollectorClusterRoleBinding expected 1 subject, got %d", len(crb.Subjects))
+	}
+	if crb.Subjects[0].Name != getCollectorServiceAccountName() {
+		t.Errorf("CollectorClusterRoleBinding subject name = %q; want %q",
+			crb.Subjects[0].Name, getCollectorServiceAccountName())
+	}
+
+	// CollectorDeployment ServiceAccountName must reference the collector SA.
+	deploy := r.CollectorDeployment(instance)
+	if deploy.Spec.Template.Spec.ServiceAccountName != getCollectorServiceAccountName() {
+		t.Errorf("CollectorDeployment ServiceAccountName = %q; want %q",
+			deploy.Spec.Template.Spec.ServiceAccountName, getCollectorServiceAccountName())
+	}
+
+	// SA must be distinct from the shared account.
+	if getCollectorServiceAccountName() == getServiceAccountName() {
+		t.Fatal("collector must not share the generic search-serviceaccount")
+	}
+	if getCollectorServiceAccountName() == "" {
+		t.Fatal("collector SA name must not be empty")
+	}
+}
+
 func TestGetDeploymentConfigForNil(t *testing.T) {
 	instance := &searchv1alpha1.Search{
 		Spec: searchv1alpha1.SearchSpec{
