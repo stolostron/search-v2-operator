@@ -84,6 +84,16 @@ func getAPIServiceAccountName() string {
 	return "search-api-sa"
 }
 
+// getPostgresServiceAccountName returns the dedicated ServiceAccount for the
+// search-postgres deployment. Postgres is a self-contained database process that
+// makes no Kubernetes API calls at runtime — it only reads its credentials and TLS
+// certificates from volumes that the kubelet mounts. Binding it to its own SA with
+// no ClusterRole grants it the minimum possible privileges (none) while keeping
+// it fully isolated from the write permissions held by the other search components.
+func getPostgresServiceAccountName() string {
+	return "search-postgres-sa"
+}
+
 func getDefaultDBConfig(varName string) string {
 	value, okay := dbDefaultMap[varName]
 	if okay {
