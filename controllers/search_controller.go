@@ -594,6 +594,16 @@ func (r *SearchReconciler) finalizeSearch(instance *searchv1alpha1.Search) error
 	if err != nil {
 		return err
 	}
+	// The API ClusterRole and ClusterRoleBinding are cluster-scoped and cannot carry
+	// an owner reference (Search is namespaced), so they must be deleted explicitly here.
+	err = r.deleteClusterRole(instance, getRoleName()+"-api")
+	if err != nil {
+		return err
+	}
+	err = r.deleteClusterRoleBinding(instance, getRoleBindingName()+"-api")
+	if err != nil {
+		return err
+	}
 	log.Info("Successfully finalized search")
 	return nil
 }
