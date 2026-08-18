@@ -80,7 +80,7 @@ func getServiceAccountName() string {
 // which share the generic search-serviceaccount — cannot escalate to
 // system:masters via their mounted token.
 func getAPIServiceAccountName() string {
-	return "search-api-serviceaccount"
+	return "search-api-sa"
 }
 
 func getDefaultDBConfig(varName string) string {
