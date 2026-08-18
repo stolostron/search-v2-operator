@@ -81,7 +81,7 @@ func (r *SearchReconciler) APIDeployment(instance *searchv1alpha1.Search) *appsv
 	deployment.Spec.Template.Spec.SecurityContext = getPodSecurityContext()
 	deployment.Spec.Template.Spec.Containers = []corev1.Container{apiContainer}
 	deployment.Spec.Template.Spec.Volumes = volumes
-	deployment.Spec.Template.Spec.ServiceAccountName = getAPIServiceAccountName()
+	deployment.Spec.Template.Spec.ServiceAccountName = getServiceAccountName()
 	if getNodeSelector(deploymentName, instance) != nil {
 		deployment.Spec.Template.Spec.NodeSelector = getNodeSelector(deploymentName, instance)
 	}
