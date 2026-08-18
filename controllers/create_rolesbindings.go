@@ -124,7 +124,11 @@ func (r *SearchReconciler) ClusterRoleBinding(instance *searchv1alpha1.Search) *
 // postgres, indexer and collector pods (which share search-serviceaccount)
 // cannot escalate to system:masters via their mounted token.
 func (r *SearchReconciler) APIClusterRole(instance *searchv1alpha1.Search) *rbacv1.ClusterRole {
-	cr := &rbacv1.ClusterRole{
+	// Note: SetControllerReference is intentionally omitted. ClusterRole is cluster-scoped;
+	// Search is namespaced. Kubernetes forbids a namespaced owner on a cluster-scoped
+	// dependent, so the reference would always fail. Cleanup is handled explicitly in
+	// finalizeSearch via deleteClusterRole.
+	return &rbacv1.ClusterRole{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "ClusterRole",
 			APIVersion: rbacv1.SchemeGroupVersion.String(),
@@ -134,14 +138,12 @@ func (r *SearchReconciler) APIClusterRole(instance *searchv1alpha1.Search) *rbac
 		},
 		Rules: getAPIRules(),
 	}
-	if err := controllerutil.SetControllerReference(instance, cr, r.Scheme); err != nil {
-		log.Info("Could not set control for ClusterRole " + cr.Name)
-	}
-	return cr
 }
 
 func (r *SearchReconciler) APIClusterRoleBinding(instance *searchv1alpha1.Search) *rbacv1.ClusterRoleBinding {
-	crb := &rbacv1.ClusterRoleBinding{
+	// Note: SetControllerReference is intentionally omitted for the same reason as
+	// APIClusterRole. Cleanup is handled explicitly in finalizeSearch.
+	return &rbacv1.ClusterRoleBinding{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "ClusterRoleBinding",
 			APIVersion: rbacv1.SchemeGroupVersion.String(),
@@ -160,10 +162,6 @@ func (r *SearchReconciler) APIClusterRoleBinding(instance *searchv1alpha1.Search
 			Namespace: instance.GetNamespace(),
 		}},
 	}
-	if err := controllerutil.SetControllerReference(instance, crb, r.Scheme); err != nil {
-		log.Info("Could not set control for ClusterRoleBinding " + crb.Name)
-	}
-	return crb
 }
 
 func (r *SearchReconciler) AddonClusterRole(instance *searchv1alpha1.Search) *rbacv1.ClusterRole {
