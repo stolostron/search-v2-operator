@@ -90,7 +90,7 @@ func (r *SearchReconciler) CollectorDeployment(ctx context.Context, instance *se
 	deployment.Spec.Template.Spec.SecurityContext = getPodSecurityContext()
 	deployment.Spec.Template.Spec.Containers = []corev1.Container{collectorContainer}
 	deployment.Spec.Template.Spec.Volumes = volumes
-	deployment.Spec.Template.Spec.ServiceAccountName = getServiceAccountName()
+	deployment.Spec.Template.Spec.ServiceAccountName = getCollectorServiceAccountName()
 	if getNodeSelector(deploymentName, instance) != nil {
 		deployment.Spec.Template.Spec.NodeSelector = getNodeSelector(deploymentName, instance)
 	}
