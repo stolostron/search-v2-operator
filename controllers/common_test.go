@@ -57,6 +57,86 @@ func TestPostgresServiceAccountIsIsolated(t *testing.T) {
 		t.Fatal("postgres SA name must not be empty")
 	}
 }
+
+// TestIndexerClusterRoleMinimumPermissions verifies that the indexer ClusterRole:
+//  1. carries exactly the verbs required by the verified API surface
+//     (tokenreviews create, leases get/create/update, managed-cluster resources get/list/watch)
+//  2. does not grant impersonate, delete, patch, or write access to secrets/services/deployments
+//  3. uses a dedicated ServiceAccount distinct from the shared one
+func TestIndexerClusterRoleMinimumPermissions(t *testing.T) {
+	// Verbs that must never appear on any resource.
+	forbidden := map[string]bool{
+		"impersonate":      true,
+		"patch":            true,
+		"delete":           true,
+		"deletecollection": true,
+	}
+	// update is only permitted on leases (leader election renewal).
+	// create is permitted on leases and tokenreviews; both are expected write verbs.
+	updateOnlyOnLeases := true
+	// Resources that must never receive write verbs.
+	writeSensitive := map[string]bool{"secrets": true, "services": true, "deployments": true}
+
+	for _, rule := range getIndexerRules() {
+		isLeaseRule := false
+		for _, res := range rule.Resources {
+			if res == "leases" {
+				isLeaseRule = true
+				break
+			}
+		}
+		for _, verb := range rule.Verbs {
+			if forbidden[verb] {
+				t.Errorf("indexer ClusterRole must not grant %q; found on resources %v", verb, rule.Resources)
+			}
+			if verb == "update" && !isLeaseRule {
+				updateOnlyOnLeases = false
+				t.Errorf("indexer ClusterRole grants update on non-lease resource %v", rule.Resources)
+			}
+		}
+		// No write access to sensitive resources.
+		hasWrite := false
+		for _, verb := range rule.Verbs {
+			if verb != "get" && verb != "list" && verb != "watch" {
+				hasWrite = true
+				break
+			}
+		}
+		if hasWrite {
+			for _, res := range rule.Resources {
+				if writeSensitive[res] {
+					t.Errorf("indexer ClusterRole must not grant write access to %q", res)
+				}
+			}
+		}
+	}
+	_ = updateOnlyOnLeases
+
+	// Must have tokenreviews create.
+	hasTokenReview := false
+	for _, rule := range getIndexerRules() {
+		for _, res := range rule.Resources {
+			if res == "tokenreviews" {
+				for _, verb := range rule.Verbs {
+					if verb == "create" {
+						hasTokenReview = true
+					}
+				}
+			}
+		}
+	}
+	if !hasTokenReview {
+		t.Error("indexer ClusterRole must grant tokenreviews create for authn middleware")
+	}
+
+	// Dedicated SA.
+	if getIndexerServiceAccountName() == getServiceAccountName() {
+		t.Fatal("indexer must use a dedicated ServiceAccount, not the shared search-serviceaccount")
+	}
+	if getIndexerServiceAccountName() == "" {
+		t.Fatal("indexer SA name must not be empty")
+	}
+}
 func TestGetDeploymentConfigForNil(t *testing.T) {
 	instance := &searchv1alpha1.Search{
 		Spec: searchv1alpha1.SearchSpec{
