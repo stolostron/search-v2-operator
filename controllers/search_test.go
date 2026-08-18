@@ -977,7 +977,7 @@ func TestCreateUpdateRoles_UpdatesExistingClusterRole(t *testing.T) {
 	namespace := "test-ns"
 	search := &searchv1alpha1.Search{
 		TypeMeta:   metav1.TypeMeta{Kind: "Search"},
-		ObjectMeta: metav1.ObjectMeta{Name: OperatorName, Namespace: namespace},
+		ObjectMeta: metav1.ObjectMeta{Name: "search-v2-operator", Namespace: namespace},
 	}
 
 	// Pre-existing ClusterRole with stale rules (impersonate still present).
