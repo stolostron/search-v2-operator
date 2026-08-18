@@ -143,7 +143,7 @@ func TestIndexerClusterRoleExactRules(t *testing.T) {
 func TestIndexerWorkloadIdentityContract(t *testing.T) {
 	namespace := "test-ns"
 	instance := &searchv1alpha1.Search{
-		ObjectMeta: metav1.ObjectMeta{Name: OperatorName, Namespace: namespace},
+		ObjectMeta: metav1.ObjectMeta{Name: "search-v2-operator", Namespace: namespace},
 	}
 	s := scheme.Scheme
 	if err := searchv1alpha1.SchemeBuilder.AddToScheme(s); err != nil {
