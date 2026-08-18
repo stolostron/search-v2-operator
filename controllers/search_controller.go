@@ -155,6 +155,16 @@ func (r *SearchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		log.Error(err, "SearchAPIServiceAccount setup failed")
 		return *result, err
 	}
+	postgresSA, err := r.SearchPostgresServiceAccount(instance)
+	if err != nil {
+		log.Error(err, "SearchPostgresServiceAccount build failed")
+		return ctrl.Result{}, err
+	}
+	result, err = r.createSearchServiceAccount(ctx, postgresSA)
+	if result != nil {
+		log.Error(err, "SearchPostgresServiceAccount setup failed")
+		return *result, err
+	}
 	result, err = r.createUpdateRoles(ctx, r.ClusterRole(instance))
 	if result != nil {
 		log.Error(err, "ClusterRole setup failed")
