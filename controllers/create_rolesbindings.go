@@ -23,6 +23,10 @@ func (r *SearchReconciler) createUpdateRoles(ctx context.Context,
 		Name:      crole.Name,
 		Namespace: crole.Namespace,
 	}, existingClusterRole)
+	if err != nil && !errors.IsNotFound(err) {
+		log.Error(err, "Could not get clusterrole", "clusterrole", crole.Name)
+		return &reconcile.Result{}, err
+	}
 	if err != nil && errors.IsNotFound(err) {
 		err = r.Create(ctx, crole)
 		if err != nil {
@@ -32,13 +36,14 @@ func (r *SearchReconciler) createUpdateRoles(ctx context.Context,
 		log.Info("Created clusterrole " + crole.Name)
 		log.V(9).Info("Created clusterrole ", "clusterrole", crole)
 	} else if !equality.Semantic.DeepEqual(existingClusterRole.Rules, crole.Rules) {
-		err = r.Update(ctx, crole)
+		existingClusterRole.Rules = crole.Rules
+		err = r.Update(ctx, existingClusterRole)
 		if err != nil {
 			log.Error(err, "Could not update clusterrole "+crole.Name)
 			return &reconcile.Result{}, err
 		}
 		log.Info("Updated clusterrole " + crole.Name)
-		log.V(9).Info("Updated clusterrole ", "clusterrole", crole)
+		log.V(9).Info("Updated clusterrole ", "clusterrole", existingClusterRole)
 	}
 	return nil, nil
 }
@@ -60,6 +65,13 @@ func (r *SearchReconciler) createRoleBinding(ctx context.Context,
 		}
 		log.Info("Created clusterrolebinding " + rolebinding.Name)
 		log.V(2).Info("Created clusterrolebinding ", "clusterrolebinding", rolebinding)
+	} else if err == nil && !equality.Semantic.DeepEqual(found.Subjects, rolebinding.Subjects) {
+		found.Subjects = rolebinding.Subjects
+		if err = r.Update(ctx, found); err != nil {
+			log.Error(err, "Could not update clusterrolebinding "+rolebinding.Name)
+			return &reconcile.Result{}, err
+		}
+		log.Info("Updated clusterrolebinding " + rolebinding.Name)
 	}
 	return nil, nil
 }
@@ -107,6 +119,51 @@ func (r *SearchReconciler) ClusterRoleBinding(instance *searchv1alpha1.Search) *
 	return crb
 }
 
+// APIClusterRole holds the impersonation rights that only search-api needs.
+// It is bound exclusively to the search-api ServiceAccount so that the
+// postgres, indexer and collector pods (which share search-serviceaccount)
+// cannot escalate to system:masters via their mounted token.
+func (r *SearchReconciler) APIClusterRole(instance *searchv1alpha1.Search) *rbacv1.ClusterRole {
+	// Note: SetControllerReference is intentionally omitted. ClusterRole is cluster-scoped;
+	// Search is namespaced. Kubernetes forbids a namespaced owner on a cluster-scoped
+	// dependent, so the reference would always fail. Cleanup is handled explicitly in
+	// finalizeSearch via deleteClusterRole.
+	return &rbacv1.ClusterRole{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "ClusterRole",
+			APIVersion: rbacv1.SchemeGroupVersion.String(),
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: getRoleName() + "-api",
+		},
+		Rules: getAPIRules(),
+	}
+}
+
+func (r *SearchReconciler) APIClusterRoleBinding(instance *searchv1alpha1.Search) *rbacv1.ClusterRoleBinding {
+	// Note: SetControllerReference is intentionally omitted for the same reason as
+	// APIClusterRole. Cleanup is handled explicitly in finalizeSearch.
+	return &rbacv1.ClusterRoleBinding{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "ClusterRoleBinding",
+			APIVersion: rbacv1.SchemeGroupVersion.String(),
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: getRoleBindingName() + "-api",
+		},
+		RoleRef: rbacv1.RoleRef{
+			Kind:     "ClusterRole",
+			Name:     getRoleName() + "-api",
+			APIGroup: rbacv1.GroupName,
+		},
+		Subjects: []rbacv1.Subject{{
+			Kind:      "ServiceAccount",
+			Name:      getAPIServiceAccountName(),
+			Namespace: instance.GetNamespace(),
+		}},
+	}
+}
+
 func (r *SearchReconciler) AddonClusterRole(instance *searchv1alpha1.Search) *rbacv1.ClusterRole {
 	return &rbacv1.ClusterRole{
 		TypeMeta: metav1.TypeMeta{
@@ -136,11 +193,17 @@ func (r *SearchReconciler) GlobalSearchUserClusterRole(instance *searchv1alpha1.
 }
 
 func getSubjects(namespace string) []rbacv1.Subject {
-	return []rbacv1.Subject{{
-		Kind:      "ServiceAccount",
-		Name:      getServiceAccountName(),
-		Namespace: namespace,
-	},
+	return []rbacv1.Subject{
+		{
+			Kind:      "ServiceAccount",
+			Name:      getServiceAccountName(),
+			Namespace: namespace,
+		},
+		{
+			Kind:      "ServiceAccount",
+			Name:      getAPIServiceAccountName(),
+			Namespace: namespace,
+		},
 	}
 }
 
@@ -177,6 +240,20 @@ func getRules() []rbacv1.PolicyRule {
 			Verbs:     []string{"create"},
 		},
 		{
+			APIGroups: []string{"search.open-cluster-management.io"},
+			Resources: []string{"collectorconfigs/status"},
+			Verbs:     []string{"patch", "update"},
+		},
+	}
+}
+
+// getAPIRules returns the rules bound only to the search-api ServiceAccount.
+// These are layered on top of getRules() (search-api is also bound to the
+// shared "search" ClusterRole) and isolate the impersonation rights that
+// search-api uses for user-scoped query authorization.
+func getAPIRules() []rbacv1.PolicyRule {
+	return []rbacv1.PolicyRule{
+		{
 			APIGroups: []string{"authentication.k8s.io", "authorization.k8s.io"},
 			Resources: []string{"uids",
 				"userextras/authentication.kubernetes.io/credential-id",
@@ -190,11 +267,6 @@ func getRules() []rbacv1.PolicyRule {
 			APIGroups: []string{""},
 			Resources: []string{"users", "serviceaccounts", "groups"},
 			Verbs:     []string{"impersonate"},
-		},
-		{
-			APIGroups: []string{"search.open-cluster-management.io"},
-			Resources: []string{"collectorconfigs/status"},
-			Verbs:     []string{"patch", "update"},
 		},
 	}
 }

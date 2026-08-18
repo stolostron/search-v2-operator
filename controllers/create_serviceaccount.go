@@ -59,3 +59,23 @@ func (r *SearchReconciler) SearchServiceAccount(instance *searchv1alpha1.Search)
 	}
 	return sa
 }
+
+// SearchAPIServiceAccount builds the dedicated SA for the search-api
+// deployment. It is the only subject bound to the search-api ClusterRole
+// carrying impersonate rights.
+func (r *SearchReconciler) SearchAPIServiceAccount(instance *searchv1alpha1.Search) *corev1.ServiceAccount {
+	sa := &corev1.ServiceAccount{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "ServiceAccount",
+			APIVersion: corev1.SchemeGroupVersion.String(),
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      getAPIServiceAccountName(),
+			Namespace: instance.GetNamespace(),
+		},
+	}
+	if err := controllerutil.SetControllerReference(instance, sa, r.Scheme); err != nil {
+		log.V(2).Info("Could not set control for ", "serviceaccount", getAPIServiceAccountName())
+	}
+	return sa
+}
