@@ -171,6 +171,16 @@ func (r *SearchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		log.Error(err, "SearchPostgresServiceAccount setup failed")
 		return *result, err
 	}
+	indexerSA, err := r.SearchIndexerServiceAccount(instance)
+	if err != nil {
+		log.Error(err, "SearchIndexerServiceAccount build failed")
+		return ctrl.Result{}, err
+	}
+	result, err = r.createSearchServiceAccount(ctx, indexerSA)
+	if result != nil {
+		log.Error(err, "SearchIndexerServiceAccount setup failed")
+		return *result, err
+	}
 	result, err = r.createUpdateRoles(ctx, r.ClusterRole(instance))
 	if result != nil {
 		log.Error(err, "ClusterRole setup failed")
@@ -179,6 +189,11 @@ func (r *SearchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	result, err = r.createUpdateRoles(ctx, r.APIClusterRole(instance))
 	if result != nil {
 		log.Error(err, "APIClusterRole setup failed")
+		return *result, err
+	}
+	result, err = r.createUpdateRoles(ctx, r.IndexerClusterRole(instance))
+	if result != nil {
+		log.Error(err, "IndexerClusterRole setup failed")
 		return *result, err
 	}
 	result, err = r.createUpdateRoles(ctx, r.AddonClusterRole(instance))
@@ -199,6 +214,11 @@ func (r *SearchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	result, err = r.createRoleBinding(ctx, r.APIClusterRoleBinding(instance))
 	if result != nil {
 		log.Error(err, "APIClusterRoleBinding setup failed")
+		return *result, err
+	}
+	result, err = r.createRoleBinding(ctx, r.IndexerClusterRoleBinding(instance))
+	if result != nil {
+		log.Error(err, "IndexerClusterRoleBinding setup failed")
 		return *result, err
 	}
 	if err := r.ensureWebhookCAInjection(ctx); err != nil {
