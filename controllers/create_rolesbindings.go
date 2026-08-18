@@ -214,6 +214,53 @@ func (r *SearchReconciler) IndexerClusterRoleBinding(instance *searchv1alpha1.Se
 	}
 }
 
+// CollectorClusterRole holds the minimum permissions required by the search-collector
+// deployment. The collector only needs to watch all resources (for inventory) and
+// manage its own lease (for heartbeat). It does not need impersonate, write access
+// to secrets/services/deployments, or any auth review verbs.
+func (r *SearchReconciler) CollectorClusterRole(instance *searchv1alpha1.Search) *rbacv1.ClusterRole {
+	cr := &rbacv1.ClusterRole{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "ClusterRole",
+			APIVersion: rbacv1.SchemeGroupVersion.String(),
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: getRoleName() + "-collector",
+		},
+		Rules: getCollectorRules(),
+	}
+	if err := controllerutil.SetControllerReference(instance, cr, r.Scheme); err != nil {
+		log.Info("Could not set control for ClusterRole " + cr.Name)
+	}
+	return cr
+}
+
+func (r *SearchReconciler) CollectorClusterRoleBinding(instance *searchv1alpha1.Search) *rbacv1.ClusterRoleBinding {
+	crb := &rbacv1.ClusterRoleBinding{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "ClusterRoleBinding",
+			APIVersion: rbacv1.SchemeGroupVersion.String(),
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: getRoleBindingName() + "-collector",
+		},
+		RoleRef: rbacv1.RoleRef{
+			Kind:     "ClusterRole",
+			Name:     getRoleName() + "-collector",
+			APIGroup: rbacv1.GroupName,
+		},
+		Subjects: []rbacv1.Subject{{
+			Kind:      "ServiceAccount",
+			Name:      getCollectorServiceAccountName(),
+			Namespace: instance.GetNamespace(),
+		}},
+	}
+	if err := controllerutil.SetControllerReference(instance, crb, r.Scheme); err != nil {
+		log.Info("Could not set control for ClusterRoleBinding " + crb.Name)
+	}
+	return crb
+}
+
 func (r *SearchReconciler) AddonClusterRole(instance *searchv1alpha1.Search) *rbacv1.ClusterRole {
 	return &rbacv1.ClusterRole{
 		TypeMeta: metav1.TypeMeta{
@@ -342,6 +389,49 @@ func getAddonRules() []rbacv1.PolicyRule {
 			APIGroups: []string{"coordination.k8s.io"},
 			Resources: []string{"leases"},
 			Verbs:     []string{"create", "get", "list", "watch", "patch", "update"},
+		},
+	}
+}
+
+// getCollectorRules returns the minimum permissions required by the search-collector pod.
+//
+// The collector's API surface (verified from source):
+//   - Dynamic informers:  get/list/watch on all resources (*/*) for cluster inventory.
+//   - Discovery client:   ServerPreferredResources — implicit; covered by the wildcard.
+//   - ConfigMap read:     get on core/v1 ConfigMaps in its own namespace to read
+//     search-collector-config (allow/deny resource filter).
+//   - CollectorConfig:    get/list/watch on collectorconfigs.search.open-cluster-management.io
+//     for configurable collection hot-reload.
+//   - Lease management:   get/create/update on coordination.k8s.io/leases for the heartbeat
+//     signal sent to the addon framework.
+//
+// The collector does NOT use: impersonate, secrets/services/deployments write,
+// tokenreviews, selfsubjectaccessreviews, or collectorconfigs/status patch/update.
+func getCollectorRules() []rbacv1.PolicyRule {
+	return []rbacv1.PolicyRule{
+		// Watch every resource in the cluster for inventory collection.
+		{
+			APIGroups: []string{"*"},
+			Resources: []string{"*"},
+			Verbs:     []string{"get", "list", "watch"},
+		},
+		// Read the search-collector-config ConfigMap (allow/deny filter for resources).
+		{
+			APIGroups: []string{""},
+			Resources: []string{"configmaps"},
+			Verbs:     []string{"get"},
+		},
+		// Watch CollectorConfig CRs for configurable-collection hot-reload.
+		{
+			APIGroups: []string{"search.open-cluster-management.io"},
+			Resources: []string{"collectorconfigs"},
+			Verbs:     []string{"get", "list", "watch"},
+		},
+		// Manage the addon heartbeat lease.
+		{
+			APIGroups: []string{"coordination.k8s.io"},
+			Resources: []string{"leases"},
+			Verbs:     []string{"get", "create", "update"},
 		},
 	}
 }
