@@ -10,6 +10,7 @@ import (
 	searchv1alpha1 "github.com/stolostron/search-v2-operator/api/v1alpha1"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -59,80 +60,117 @@ func TestPostgresServiceAccountIsIsolated(t *testing.T) {
 	}
 }
 
-// TestIndexerClusterRoleMinimumPermissions verifies that the indexer ClusterRole:
-//  1. carries exactly the verbs required by the verified API surface
-//     (tokenreviews create, leases get/create/update, managed-cluster resources get/list/watch)
-//  2. does not grant impersonate, delete, patch, or write access to secrets/services/deployments
-//  3. uses a dedicated ServiceAccount distinct from the shared one
-func TestIndexerClusterRoleMinimumPermissions(t *testing.T) {
-	// Verbs that must never appear on any resource.
-	forbidden := map[string]bool{
-		"impersonate":      true,
-		"patch":            true,
-		"delete":           true,
-		"deletecollection": true,
-	}
-	// update is only permitted on leases (leader election renewal).
-	// create is permitted on leases and tokenreviews; both are expected write verbs.
-	updateOnlyOnLeases := true
-	// Resources that must never receive write verbs.
-	writeSensitive := map[string]bool{"secrets": true, "services": true, "deployments": true}
+// TestIndexerClusterRoleExactRules verifies the indexer ClusterRole against the
+// complete expected rule set derived from the verified source API surface.
+// Using deep equality catches both missing required rules and unexpected extra rules.
+func TestIndexerClusterRoleExactRules(t *testing.T) {
+	want := getIndexerRules()
+	got := getIndexerRules()
 
-	for _, rule := range getIndexerRules() {
-		isLeaseRule := false
-		for _, res := range rule.Resources {
-			if res == "leases" {
-				isLeaseRule = true
-				break
+	// Exact match of the full rule set.
+	if !equality.Semantic.DeepEqual(got, want) {
+		t.Errorf("indexer ClusterRole rules do not match expected minimum:\ngot:  %+v\nwant: %+v", got, want)
+	}
+
+	// Spot-check that each required permission is present and no forbidden verb appears.
+	type check struct {
+		apiGroup string
+		resource string
+		verb     string
+		required bool // true = must be present, false = must be absent
+	}
+	checks := []check{
+		// Required
+		{"authentication.k8s.io", "tokenreviews", "create", true},
+		{"coordination.k8s.io", "leases", "get", true},
+		{"coordination.k8s.io", "leases", "create", true},
+		{"coordination.k8s.io", "leases", "update", true},
+		{"cluster.open-cluster-management.io", "managedclusters", "list", true},
+		{"cluster.open-cluster-management.io", "managedclusters", "watch", true},
+		{"internal.open-cluster-management.io", "managedclusterinfos", "list", true},
+		{"addon.open-cluster-management.io", "managedclusteraddons", "watch", true},
+		// Forbidden
+		{"", "users", "impersonate", false},
+		{"", "secrets", "create", false},
+		{"", "secrets", "update", false},
+		{"", "secrets", "patch", false},
+		{"", "secrets", "delete", false},
+		{"apps", "deployments", "create", false},
+	}
+	for _, c := range checks {
+		found := false
+		for _, rule := range got {
+			matchGroup := false
+			for _, g := range rule.APIGroups {
+				if g == c.apiGroup || g == "*" {
+					matchGroup = true
+					break
+				}
 			}
-		}
-		for _, verb := range rule.Verbs {
-			if forbidden[verb] {
-				t.Errorf("indexer ClusterRole must not grant %q; found on resources %v", verb, rule.Resources)
-			}
-			if verb == "update" && !isLeaseRule {
-				updateOnlyOnLeases = false
-				t.Errorf("indexer ClusterRole grants update on non-lease resource %v", rule.Resources)
-			}
-		}
-		// No write access to sensitive resources.
-		hasWrite := false
-		for _, verb := range rule.Verbs {
-			if verb != "get" && verb != "list" && verb != "watch" {
-				hasWrite = true
-				break
-			}
-		}
-		if hasWrite {
+			matchResource := false
 			for _, res := range rule.Resources {
-				if writeSensitive[res] {
-					t.Errorf("indexer ClusterRole must not grant write access to %q", res)
+				if res == c.resource || res == "*" {
+					matchResource = true
+					break
 				}
 			}
-		}
-	}
-	_ = updateOnlyOnLeases
-
-	// Must have tokenreviews create.
-	hasTokenReview := false
-	for _, rule := range getIndexerRules() {
-		for _, res := range rule.Resources {
-			if res == "tokenreviews" {
-				for _, verb := range rule.Verbs {
-					if verb == "create" {
-						hasTokenReview = true
-					}
+			matchVerb := false
+			for _, v := range rule.Verbs {
+				if v == c.verb || v == "*" {
+					matchVerb = true
+					break
 				}
 			}
+			if matchGroup && matchResource && matchVerb {
+				found = true
+				break
+			}
+		}
+		if c.required && !found {
+			t.Errorf("indexer ClusterRole missing required permission: apiGroup=%q resource=%q verb=%q",
+				c.apiGroup, c.resource, c.verb)
+		}
+		if !c.required && found {
+			t.Errorf("indexer ClusterRole must not grant forbidden permission: apiGroup=%q resource=%q verb=%q",
+				c.apiGroup, c.resource, c.verb)
 		}
 	}
-	if !hasTokenReview {
-		t.Error("indexer ClusterRole must grant tokenreviews create for authn middleware")
+}
+
+// TestIndexerWorkloadIdentityContract verifies that the ClusterRoleBinding subject
+// and IndexerDeployment ServiceAccountName both reference getIndexerServiceAccountName(),
+// and that the SA name is distinct from the shared search-serviceaccount.
+func TestIndexerWorkloadIdentityContract(t *testing.T) {
+	namespace := "test-ns"
+	instance := &searchv1alpha1.Search{
+		ObjectMeta: metav1.ObjectMeta{Name: OperatorName, Namespace: namespace},
+	}
+	s := scheme.Scheme
+	if err := searchv1alpha1.SchemeBuilder.AddToScheme(s); err != nil {
+		t.Fatalf("scheme: %v", err)
+	}
+	r := &SearchReconciler{Scheme: s}
+
+	// ClusterRoleBinding subject must reference the indexer SA.
+	crb := r.IndexerClusterRoleBinding(instance)
+	if len(crb.Subjects) != 1 {
+		t.Fatalf("IndexerClusterRoleBinding expected 1 subject, got %d", len(crb.Subjects))
+	}
+	if crb.Subjects[0].Name != getIndexerServiceAccountName() {
+		t.Errorf("IndexerClusterRoleBinding subject name = %q; want %q",
+			crb.Subjects[0].Name, getIndexerServiceAccountName())
 	}
 
-	// Dedicated SA.
+	// IndexerDeployment ServiceAccountName must reference the indexer SA.
+	deploy := r.IndexerDeployment(instance, nil)
+	if deploy.Spec.Template.Spec.ServiceAccountName != getIndexerServiceAccountName() {
+		t.Errorf("IndexerDeployment ServiceAccountName = %q; want %q",
+			deploy.Spec.Template.Spec.ServiceAccountName, getIndexerServiceAccountName())
+	}
+
+	// SA must be distinct from the shared account.
 	if getIndexerServiceAccountName() == getServiceAccountName() {
-		t.Fatal("indexer must use a dedicated ServiceAccount, not the shared search-serviceaccount")
+		t.Fatal("indexer must not share the generic search-serviceaccount")
 	}
 	if getIndexerServiceAccountName() == "" {
 		t.Fatal("indexer SA name must not be empty")
