@@ -181,6 +181,11 @@ func (r *SearchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		log.Error(err, "SearchIndexerServiceAccount setup failed")
 		return *result, err
 	}
+	result, err = r.createSearchServiceAccount(ctx, r.SearchCollectorServiceAccount(instance))
+	if result != nil {
+		log.Error(err, "SearchCollectorServiceAccount setup failed")
+		return *result, err
+	}
 	result, err = r.createUpdateRoles(ctx, r.ClusterRole(instance))
 	if result != nil {
 		log.Error(err, "ClusterRole setup failed")
@@ -194,6 +199,11 @@ func (r *SearchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	result, err = r.createUpdateRoles(ctx, r.IndexerClusterRole(instance))
 	if result != nil {
 		log.Error(err, "IndexerClusterRole setup failed")
+		return *result, err
+	}
+	result, err = r.createUpdateRoles(ctx, r.CollectorClusterRole(instance))
+	if result != nil {
+		log.Error(err, "CollectorClusterRole setup failed")
 		return *result, err
 	}
 	result, err = r.createUpdateRoles(ctx, r.AddonClusterRole(instance))
@@ -219,6 +229,11 @@ func (r *SearchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	result, err = r.createRoleBinding(ctx, r.IndexerClusterRoleBinding(instance))
 	if result != nil {
 		log.Error(err, "IndexerClusterRoleBinding setup failed")
+		return *result, err
+	}
+	result, err = r.createRoleBinding(ctx, r.CollectorClusterRoleBinding(instance))
+	if result != nil {
+		log.Error(err, "CollectorClusterRoleBinding setup failed")
 		return *result, err
 	}
 	if err := r.ensureWebhookCAInjection(ctx); err != nil {
