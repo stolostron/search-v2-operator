@@ -21,7 +21,7 @@ func TestSharedClusterRoleHasNoImpersonate(t *testing.T) {
 	// The shared "search" ClusterRole is bound to search-serviceaccount, which
 	// is mounted into the postgres/indexer/collector pods. It must not carry
 	// impersonate; that verb is isolated on the search-api ClusterRole which is
-	// bound only to search-api-serviceaccount.
+	// bound only to search-api-sa.
 	for _, rule := range getRules() {
 		for _, v := range rule.Verbs {
 			if v == "impersonate" {
