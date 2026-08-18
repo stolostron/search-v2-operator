@@ -91,6 +91,16 @@ func getIndexerServiceAccountName() string {
 	return "search-indexer-sa"
 }
 
+// getCollectorServiceAccountName returns the dedicated ServiceAccount for the
+// search-collector deployment. The collector only needs read access (get/list/watch)
+// on all cluster resources plus lease management for its heartbeat. Keeping it
+// separate from the shared search-serviceaccount ensures that a compromise of the
+// collector pod cannot be used to exercise the write permissions needed by other
+// components (postgres, indexer).
+func getCollectorServiceAccountName() string {
+	return "search-collector-sa"
+}
+
 func getDefaultDBConfig(varName string) string {
 	value, okay := dbDefaultMap[varName]
 	if okay {
