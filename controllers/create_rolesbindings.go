@@ -23,6 +23,10 @@ func (r *SearchReconciler) createUpdateRoles(ctx context.Context,
 		Name:      crole.Name,
 		Namespace: crole.Namespace,
 	}, existingClusterRole)
+	if err != nil && !errors.IsNotFound(err) {
+		log.Error(err, "Could not get clusterrole", "clusterrole", crole.Name)
+		return &reconcile.Result{}, err
+	}
 	if err != nil && errors.IsNotFound(err) {
 		err = r.Create(ctx, crole)
 		if err != nil {
