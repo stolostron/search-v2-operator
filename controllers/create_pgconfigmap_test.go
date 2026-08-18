@@ -34,7 +34,7 @@ func TestPostgresConfigmapRejectsInvalidWorkMem(t *testing.T) {
 	cl := fake.NewClientBuilder().WithRuntimeObjects(search).Build()
 	r := &SearchReconciler{Client: cl, Scheme: s}
 
-	configMap := r.PostgresConfigmap(search, PostgresTLSConfig{})
+	configMap := r.PostgresConfigmap(search)
 	startScript := configMap.Data["postgresql-start.sh"]
 
 	assert.NotContains(t, startScript, "touch /tmp/pwned",
