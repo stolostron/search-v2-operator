@@ -267,7 +267,7 @@ func TestCollectorWorkloadIdentityContract(t *testing.T) {
 	}
 
 	// CollectorDeployment ServiceAccountName must reference the collector SA.
-	deploy := r.CollectorDeployment(context.TODO(), instance, nil)
+	deploy := r.CollectorDeployment(context.TODO(), instance)
 	if deploy.Spec.Template.Spec.ServiceAccountName != getCollectorServiceAccountName() {
 		t.Errorf("CollectorDeployment ServiceAccountName = %q; want %q",
 			deploy.Spec.Template.Spec.ServiceAccountName, getCollectorServiceAccountName())
