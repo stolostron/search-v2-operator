@@ -60,6 +60,29 @@ func (r *SearchReconciler) SearchServiceAccount(instance *searchv1alpha1.Search)
 	return sa
 }
 
+// SearchPostgresServiceAccount builds the dedicated SA for the search-postgres
+// deployment. Postgres makes no Kubernetes API calls, so no ClusterRole is bound
+// to this SA — it exists solely to isolate the pod identity from the other
+// search components.
+// An error is returned when the owner reference cannot be set so that the
+// reconcile loop can abort before creating an ownerless ServiceAccount.
+func (r *SearchReconciler) SearchPostgresServiceAccount(instance *searchv1alpha1.Search) (*corev1.ServiceAccount, error) {
+	sa := &corev1.ServiceAccount{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "ServiceAccount",
+			APIVersion: corev1.SchemeGroupVersion.String(),
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      getPostgresServiceAccountName(),
+			Namespace: instance.GetNamespace(),
+		},
+	}
+	if err := controllerutil.SetControllerReference(instance, sa, r.Scheme); err != nil {
+		return nil, err
+	}
+	return sa, nil
+}
+
 // SearchAPIServiceAccount builds the dedicated SA for the search-api
 // deployment. It is the only subject bound to the search-api ClusterRole
 // carrying impersonate rights.
