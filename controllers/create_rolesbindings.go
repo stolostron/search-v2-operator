@@ -164,6 +164,56 @@ func (r *SearchReconciler) APIClusterRoleBinding(instance *searchv1alpha1.Search
 	}
 }
 
+// IndexerClusterRole holds the minimum permissions required by the search-indexer pod.
+// Verified from source (pkg/server/authn.go, pkg/clustersync/leaderElection.go,
+// pkg/clustersync/clusterSync.go):
+//   - TokenReviews create — authn middleware validates incoming collector bearer tokens
+//   - Leases get/create/update — leader election lock
+//   - ManagedClusters, ManagedClusterInfos, ManagedClusterAddons get/list/watch — cluster-sync
+//   - Discovery (ServerResourcesForGroupVersion) — CRD presence probes (covered by wildcard)
+//
+// The indexer does NOT use impersonate, secrets/configmap writes, or deployment verbs.
+func (r *SearchReconciler) IndexerClusterRole(instance *searchv1alpha1.Search) *rbacv1.ClusterRole {
+	// Note: SetControllerReference is intentionally omitted. ClusterRole is cluster-scoped;
+	// Search is namespaced. Kubernetes forbids a namespaced owner on a cluster-scoped
+	// dependent, so the reference would always fail. Cleanup is handled explicitly in
+	// finalizeSearch via deleteClusterRole.
+	return &rbacv1.ClusterRole{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "ClusterRole",
+			APIVersion: rbacv1.SchemeGroupVersion.String(),
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: getRoleName() + "-indexer",
+		},
+		Rules: getIndexerRules(),
+	}
+}
+
+func (r *SearchReconciler) IndexerClusterRoleBinding(instance *searchv1alpha1.Search) *rbacv1.ClusterRoleBinding {
+	// Note: SetControllerReference is intentionally omitted for the same reason as
+	// IndexerClusterRole. Cleanup is handled explicitly in finalizeSearch.
+	return &rbacv1.ClusterRoleBinding{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "ClusterRoleBinding",
+			APIVersion: rbacv1.SchemeGroupVersion.String(),
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: getRoleBindingName() + "-indexer",
+		},
+		RoleRef: rbacv1.RoleRef{
+			Kind:     "ClusterRole",
+			Name:     getRoleName() + "-indexer",
+			APIGroup: rbacv1.GroupName,
+		},
+		Subjects: []rbacv1.Subject{{
+			Kind:      "ServiceAccount",
+			Name:      getIndexerServiceAccountName(),
+			Namespace: instance.GetNamespace(),
+		}},
+	}
+}
+
 func (r *SearchReconciler) AddonClusterRole(instance *searchv1alpha1.Search) *rbacv1.ClusterRole {
 	return &rbacv1.ClusterRole{
 		TypeMeta: metav1.TypeMeta{
@@ -302,6 +352,50 @@ func getGlobalSearchUserRules() []rbacv1.PolicyRule {
 			APIGroups: []string{"search.open-cluster-management.io"},
 			Resources: []string{"searches", "searches/allManagedData"},
 			Verbs:     []string{"get"},
+		},
+	}
+}
+
+// getIndexerRules returns the minimum permissions required by the search-indexer pod.
+//
+// Verified from source:
+//   - pkg/server/authn.go:          TokenReviews().Create() — validates collector bearer tokens
+//   - pkg/clustersync/leaderElection.go: LeaseLock — leader election
+//   - pkg/clustersync/clusterSync.go:    dynamic informers + List for stale-cluster cleanup
+//     watching ManagedClusters, ManagedClusterInfos, ManagedClusterAddons
+//   - pkg/clustersync/clusterSync.go:    ServerResourcesForGroupVersion — CRD presence probe
+//     (covered by the wildcard get/list/watch below)
+//
+// The indexer does NOT use impersonate, secret/configmap writes, or deployment verbs.
+func getIndexerRules() []rbacv1.PolicyRule {
+	return []rbacv1.PolicyRule{
+		// Authenticate incoming collector bearer tokens.
+		{
+			APIGroups: []string{"authentication.k8s.io"},
+			Resources: []string{"tokenreviews"},
+			Verbs:     []string{"create"},
+		},
+		// Leader election lock.
+		{
+			APIGroups: []string{"coordination.k8s.io"},
+			Resources: []string{"leases"},
+			Verbs:     []string{"get", "create", "update"},
+		},
+		// Cluster-sync: watch managed-cluster objects and check CRD presence via discovery.
+		{
+			APIGroups: []string{"cluster.open-cluster-management.io"},
+			Resources: []string{"managedclusters"},
+			Verbs:     []string{"get", "list", "watch"},
+		},
+		{
+			APIGroups: []string{"internal.open-cluster-management.io"},
+			Resources: []string{"managedclusterinfos"},
+			Verbs:     []string{"get", "list", "watch"},
+		},
+		{
+			APIGroups: []string{"addon.open-cluster-management.io"},
+			Resources: []string{"managedclusteraddons"},
+			Verbs:     []string{"get", "list", "watch"},
 		},
 	}
 }

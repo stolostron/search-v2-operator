@@ -165,6 +165,16 @@ func (r *SearchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		log.Error(err, "SearchPostgresServiceAccount setup failed")
 		return *result, err
 	}
+	indexerSA, err := r.SearchIndexerServiceAccount(instance)
+	if err != nil {
+		log.Error(err, "SearchIndexerServiceAccount build failed")
+		return ctrl.Result{}, err
+	}
+	result, err = r.createSearchServiceAccount(ctx, indexerSA)
+	if result != nil {
+		log.Error(err, "SearchIndexerServiceAccount setup failed")
+		return *result, err
+	}
 	result, err = r.createUpdateRoles(ctx, r.ClusterRole(instance))
 	if result != nil {
 		log.Error(err, "ClusterRole setup failed")
@@ -173,6 +183,11 @@ func (r *SearchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	result, err = r.createUpdateRoles(ctx, r.APIClusterRole(instance))
 	if result != nil {
 		log.Error(err, "APIClusterRole setup failed")
+		return *result, err
+	}
+	result, err = r.createUpdateRoles(ctx, r.IndexerClusterRole(instance))
+	if result != nil {
+		log.Error(err, "IndexerClusterRole setup failed")
 		return *result, err
 	}
 	result, err = r.createUpdateRoles(ctx, r.AddonClusterRole(instance))
@@ -193,6 +208,11 @@ func (r *SearchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	result, err = r.createRoleBinding(ctx, r.APIClusterRoleBinding(instance))
 	if result != nil {
 		log.Error(err, "APIClusterRoleBinding setup failed")
+		return *result, err
+	}
+	result, err = r.createRoleBinding(ctx, r.IndexerClusterRoleBinding(instance))
+	if result != nil {
+		log.Error(err, "IndexerClusterRoleBinding setup failed")
 		return *result, err
 	}
 	result, err = r.createSecret(ctx, r.PGSecret(instance))
@@ -416,6 +436,16 @@ func (r *SearchReconciler) finalizeSearch(instance *searchv1alpha1.Search) error
 		return err
 	}
 	err = r.deleteClusterRoleBinding(instance, getRoleBindingName()+"-api")
+	if err != nil {
+		return err
+	}
+	// The indexer ClusterRole and ClusterRoleBinding are cluster-scoped and cannot carry
+	// an owner reference (Search is namespaced), so they must be deleted explicitly here.
+	err = r.deleteClusterRole(instance, getRoleName()+"-indexer")
+	if err != nil {
+		return err
+	}
+	err = r.deleteClusterRoleBinding(instance, getRoleBindingName()+"-indexer")
 	if err != nil {
 		return err
 	}

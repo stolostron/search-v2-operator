@@ -78,6 +78,19 @@ func getPostgresServiceAccountName() string {
 	return "search-postgres-sa"
 }
 
+// getIndexerServiceAccountName returns the dedicated ServiceAccount for the
+// search-indexer deployment. The indexer's verified API surface is:
+//   - TokenReviews create    — authenticates incoming collector bearer tokens
+//   - Leases get/create/update — leader election lock
+//   - ManagedClusters, ManagedClusterInfos, ManagedClusterAddons get/list/watch — cluster-sync
+//   - Discovery (ServerResourcesForGroupVersion) — CRD presence checks (covered by wildcard)
+//
+// It does not use impersonate, configmap/secret writes, or any deployment-level
+// write verbs, so it is isolated from the shared search-serviceaccount.
+func getIndexerServiceAccountName() string {
+	return "search-indexer-sa"
+}
+
 func getDefaultDBConfig(varName string) string {
 	value, okay := dbDefaultMap[varName]
 	if okay {
