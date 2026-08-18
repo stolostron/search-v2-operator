@@ -14,6 +14,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -1017,17 +1018,9 @@ func TestCreateUpdateRoles_UpdatesExistingClusterRole(t *testing.T) {
 		t.Fatalf("get updated ClusterRole: %v", err)
 	}
 
-	// Confirm the stale impersonate rule is gone.
-	for _, rule := range updated.Rules {
-		for _, v := range rule.Verbs {
-			if v == "impersonate" {
-				t.Errorf("shared ClusterRole still contains impersonate after update: %+v", rule)
-			}
-		}
-	}
-
-	// Confirm the updated object matches the desired rules.
-	if len(updated.Rules) != len(desired.Rules) {
-		t.Errorf("expected %d rules after update, got %d", len(desired.Rules), len(updated.Rules))
+	// Confirm the updated object matches the desired rules exactly (full semantic equality,
+	// not just length — catches cases where count matches but content differs).
+	if !equality.Semantic.DeepEqual(updated.Rules, desired.Rules) {
+		t.Errorf("ClusterRole rules after update do not match desired:\ngot:  %+v\nwant: %+v", updated.Rules, desired.Rules)
 	}
 }
