@@ -76,6 +76,13 @@ help: ## Display this help.
 manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
 	$(CONTROLLER_GEN) rbac:roleName=manager-role crd webhook paths="./..." output:crd:artifacts:config=config/crd/bases
 
+install-operand-rbac: ## Apply the pre-provisioned search-api and search-collector ClusterRoles to the cluster.
+	# These ClusterRoles have fixed names that must not carry the kustomize namePrefix,
+	# so they are intentionally excluded from config/rbac/kustomization.yaml and applied
+	# here directly.  In OLM deployments they are applied from bundle/manifests/.
+	kubectl apply -f config/rbac/search_api_clusterrole.yaml
+	kubectl apply -f config/rbac/search_collector_clusterrole.yaml
+
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
 

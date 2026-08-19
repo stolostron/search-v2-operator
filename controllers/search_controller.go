@@ -34,7 +34,6 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
-	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -65,11 +64,14 @@ var once sync.Once
 var cleanOnce sync.Once
 
 //+kubebuilder:rbac:groups=*,resources=*,verbs=list;get;watch
-//+kubebuilder:rbac:groups="",resources=groups;secrets;serviceaccounts;services;users,verbs=create;get;list;watch;patch;update;delete;impersonate
+//+kubebuilder:rbac:groups="",resources=secrets;serviceaccounts;services,verbs=create;get;list;watch;patch;update;delete
 //+kubebuilder:rbac:groups="",resources=configmaps,verbs=get;update
 //+kubebuilder:rbac:groups=apps,resources=deployments,verbs=create;delete;get;list;patch;update;watch
+// 'bind' on the pre-provisioned search-api and search-collector ClusterRoles lets the
+// operator create their ClusterRoleBindings without holding 'impersonate' or wildcard
+// read. Both ClusterRoles are static manifests; the operator never creates or updates them.
+//+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=clusterroles,verbs=bind,resourceNames=search-api;search-collector
 //+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=roles;rolebindings;clusterroles;clusterrolebindings,verbs=create;get;list;update;delete
-//+kubebuilder:rbac:groups=authentication.k8s.io;authorization.k8s.io,resources=uids;userextras/authentication.kubernetes.io/credential-id;userextras/authentication.kubernetes.io/node-name;userextras/authentication.kubernetes.io/node-uid;userextras/authentication.kubernetes.io/pod-uid;userextras/authentication.kubernetes.io/pod-name,verbs=impersonate
 //+kubebuilder:rbac:groups=coordination.k8s.io,resources=leases,verbs=get;list;create;update;patch;watch
 //+kubebuilder:rbac:groups=monitoring.coreos.com,resources=servicemonitors,verbs=create;delete;get;list
 //+kubebuilder:rbac:groups=monitoring.coreos.com,resources=prometheusrules,verbs=create;get;update
@@ -151,12 +153,7 @@ func (r *SearchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 			}, nil
 		}
 	}
-	result, err := r.createSearchServiceAccount(ctx, r.SearchServiceAccount(instance))
-	if result != nil {
-		log.Error(err, "SearchServiceAccount setup failed")
-		return *result, err
-	}
-	result, err = r.createSearchServiceAccount(ctx, r.SearchAPIServiceAccount(instance))
+	result, err := r.createSearchServiceAccount(ctx, r.SearchAPIServiceAccount(instance))
 	if result != nil {
 		log.Error(err, "SearchAPIServiceAccount setup failed")
 		return *result, err
@@ -186,24 +183,12 @@ func (r *SearchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		log.Error(err, "SearchCollectorServiceAccount setup failed")
 		return *result, err
 	}
-	result, err = r.createUpdateRoles(ctx, r.ClusterRole(instance))
-	if result != nil {
-		log.Error(err, "ClusterRole setup failed")
-		return *result, err
-	}
-	result, err = r.createUpdateRoles(ctx, r.APIClusterRole(instance))
-	if result != nil {
-		log.Error(err, "APIClusterRole setup failed")
-		return *result, err
-	}
+	// "search-api" and "search-collector" ClusterRoles are pre-provisioned as static
+	// manifests and must exist before the operator starts.  Only their ClusterRoleBindings
+	// are reconciled here.
 	result, err = r.createUpdateRoles(ctx, r.IndexerClusterRole(instance))
 	if result != nil {
 		log.Error(err, "IndexerClusterRole setup failed")
-		return *result, err
-	}
-	result, err = r.createUpdateRoles(ctx, r.CollectorClusterRole(instance))
-	if result != nil {
-		log.Error(err, "CollectorClusterRole setup failed")
 		return *result, err
 	}
 	result, err = r.createUpdateRoles(ctx, r.AddonClusterRole(instance))
@@ -216,24 +201,19 @@ func (r *SearchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		log.Error(err, "GlobalSearchUserClusterRole setup failed")
 		return *result, err
 	}
-	result, err = r.createRoleBinding(ctx, r.ClusterRoleBinding(instance))
-	if result != nil {
-		log.Error(err, "ClusterRoleBinding setup failed")
-		return *result, err
-	}
 	result, err = r.createRoleBinding(ctx, r.APIClusterRoleBinding(instance))
 	if result != nil {
 		log.Error(err, "APIClusterRoleBinding setup failed")
 		return *result, err
 	}
-	result, err = r.createRoleBinding(ctx, r.IndexerClusterRoleBinding(instance))
-	if result != nil {
-		log.Error(err, "IndexerClusterRoleBinding setup failed")
-		return *result, err
-	}
 	result, err = r.createRoleBinding(ctx, r.CollectorClusterRoleBinding(instance))
 	if result != nil {
 		log.Error(err, "CollectorClusterRoleBinding setup failed")
+		return *result, err
+	}
+	result, err = r.createRoleBinding(ctx, r.IndexerClusterRoleBinding(instance))
+	if result != nil {
+		log.Error(err, "IndexerClusterRoleBinding setup failed")
 		return *result, err
 	}
 	if err := r.ensureWebhookCAInjection(ctx); err != nil {
@@ -485,21 +465,6 @@ func (r *SearchReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 			}),
 		).
-		Watches(&rbacv1.ClusterRole{}, handler.EnqueueRequestsFromMapFunc(
-			func(ctx context.Context, a client.Object) []reconcile.Request {
-				if a.GetName() == getRoleName() {
-					return []reconcile.Request{
-						{
-							NamespacedName: types.NamespacedName{
-								Name:      "ClusterRole/" + a.GetName(),
-								Namespace: os.Getenv("WATCH_NAMESPACE"),
-							},
-						},
-					}
-				}
-				return nil
-			}),
-		).
 		Watches(&clusterv1.ManagedCluster{}, handler.EnqueueRequestsFromMapFunc(
 			func(ctx context.Context, a client.Object) []reconcile.Request {
 				// Only trigger reconcile for managedHub clusters
@@ -629,23 +594,15 @@ func (r *SearchReconciler) finalizeSearch(instance *searchv1alpha1.Search) error
 	if err != nil {
 		return err
 	}
-	searchCRName := getRoleName()
-	err = r.deleteClusterRole(instance, searchCRName)
-	if err != nil {
-		return err
-	}
-	searchCRBName := getRoleBindingName()
-	err = r.deleteClusterRoleBinding(instance, searchCRBName)
-	if err != nil {
-		return err
-	}
-	// The API ClusterRole and ClusterRoleBinding are cluster-scoped and cannot carry
-	// an owner reference (Search is namespaced), so they must be deleted explicitly here.
-	err = r.deleteClusterRole(instance, getRoleName()+"-api")
-	if err != nil {
-		return err
-	}
+	// "search-api" ClusterRole is pre-provisioned as a static manifest — do NOT delete it.
+	// Delete only the ClusterRoleBinding the operator created.
 	err = r.deleteClusterRoleBinding(instance, getRoleBindingName()+"-api")
+	if err != nil {
+		return err
+	}
+	// "search-collector" ClusterRole is pre-provisioned as a static manifest — do NOT delete it.
+	// Delete only the ClusterRoleBinding the operator created.
+	err = r.deleteClusterRoleBinding(instance, getRoleBindingName()+"-collector")
 	if err != nil {
 		return err
 	}
@@ -656,16 +613,6 @@ func (r *SearchReconciler) finalizeSearch(instance *searchv1alpha1.Search) error
 		return err
 	}
 	err = r.deleteClusterRoleBinding(instance, getRoleBindingName()+"-indexer")
-	if err != nil {
-		return err
-	}
-	// The collector ClusterRole and ClusterRoleBinding are cluster-scoped and cannot carry
-	// an owner reference (Search is namespaced), so they must be deleted explicitly here.
-	err = r.deleteClusterRole(instance, getRoleName()+"-collector")
-	if err != nil {
-		return err
-	}
-	err = r.deleteClusterRoleBinding(instance, getRoleBindingName()+"-collector")
 	if err != nil {
 		return err
 	}

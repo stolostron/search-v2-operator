@@ -72,10 +72,6 @@ func generateLabels(key, val string) map[string]string {
 	return allLabels
 }
 
-func getServiceAccountName() string {
-	return "search-serviceaccount"
-}
-
 // getAPIServiceAccountName returns the dedicated ServiceAccount used only by
 // the search-api deployment. Impersonation rights (users/groups/serviceaccounts)
 // are bound to this SA alone so that the postgres, indexer and collector pods —
