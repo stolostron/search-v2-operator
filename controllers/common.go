@@ -212,6 +212,16 @@ func getContainerArgs(deploymentName string, instance *searchv1alpha1.Search) []
 	return result
 }
 
+// operatorManagedSecrets is the set of secrets created by the operator.
+// CR-supplied env vars with valueFrom.secretKeyRef are only allowed to
+// reference secrets in this set, preventing CR editors from mounting
+// arbitrary namespace secrets into search containers.
+var operatorManagedSecrets = map[string]struct{}{
+	"search-postgres":     {},
+	apiReadonlySecretName: {},
+	mcpReadonlySecretName: {},
+}
+
 func getContainerEnvVar(deploymentName string, instance *searchv1alpha1.Search) []corev1.EnvVar {
 	var result []corev1.EnvVar
 	deploymentConfig := getDeploymentConfig(deploymentName, instance)
@@ -223,6 +233,14 @@ func getContainerEnvVar(deploymentName string, instance *searchv1alpha1.Search) 
 	for _, e := range deploymentConfig.Env {
 		if deploymentName == postgresDeploymentName && e.Name == "WORK_MEM" {
 			continue
+		}
+		// Drop env vars that reference secrets the operator didn't create.
+		if e.ValueFrom != nil && e.ValueFrom.SecretKeyRef != nil {
+			if _, ok := operatorManagedSecrets[e.ValueFrom.SecretKeyRef.Name]; !ok {
+				log.Info("Dropping env var referencing non-operator secret",
+					"name", e.Name, "secret", e.ValueFrom.SecretKeyRef.Name)
+				continue
+			}
 		}
 		result = append(result, e)
 	}
