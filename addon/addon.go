@@ -11,6 +11,7 @@ import (
 
 	"github.com/cloudflare/cfssl/log"
 	searchv1alpha1 "github.com/stolostron/search-v2-operator/api/v1alpha1"
+	imagevalidation "github.com/stolostron/search-v2-operator/internal"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -134,6 +135,22 @@ func getValue(cluster *clusterv1.ManagedCluster,
 	return values, nil
 }
 
+// validateImageOverride is registered as the last GetValuesFunc so that
+// image overrides injected via the per-cluster ManagedClusterAddOn values
+// annotation are validated against the trusted-registry allowlist. Any image
+// that does not originate from a trusted registry is replaced with the
+// operator-controlled SearchCollectorImage.
+func validateImageOverride(_ *clusterv1.ManagedCluster,
+	_ *addonapiv1alpha1.ManagedClusterAddOn) (addonfactory.Values, error) {
+	return addonfactory.Values{
+		"global": map[string]interface{}{
+			"imageOverrides": map[string]interface{}{
+				"search_collector": SearchCollectorImage,
+			},
+		},
+	}, nil
+}
+
 func newRegistrationOption(kubeClient kubernetes.Interface, addonName string) *agent.RegistrationOption {
 	return &agent.RegistrationOption{
 		CSRConfigurations: agent.KubeClientSignerConfigurations(addonName, addonName),
@@ -223,6 +240,7 @@ func NewAddonManager(kubeConfig *rest.Config) (addonmanager.AddonManager, error)
 		addonfactory.GetAddOnDeploymentConfigValues(
 			utils.NewAddOnDeploymentConfigGetter(addonClient),
 			addonfactory.ToAddOnNodePlacementValues),
+		validateImageOverride,
 	).WithAgentRegistrationOption(newRegistrationOption(kubeClient, SearchAddonName)).
 		BuildHelmAgentAddon()
 	if err != nil {
@@ -258,8 +276,12 @@ No need to start every reconcile
 */
 func CreateAddonOnce(ctx context.Context, instance *searchv1alpha1.Search) {
 	log.Info("Starting Search Addon")
-	if instance.Spec.Deployments.Collector.ImageOverride != "" {
-		SearchCollectorImage = instance.Spec.Deployments.Collector.ImageOverride
+	if override := instance.Spec.Deployments.Collector.ImageOverride; override != "" {
+		if err := imagevalidation.ValidateImageRepo(override); err != nil {
+			klog.Errorf("Ignoring invalid collector image override: %v", err)
+		} else {
+			SearchCollectorImage = override
+		}
 	}
 	go startAddon(ctx)
 }
