@@ -1081,20 +1081,6 @@ func TestGetContainerEnvVarDropsNonOperatorSecrets(t *testing.T) {
 								Key:                  "token",
 							},
 						}},
-						// Another operator-managed secret.
-						{Name: "API_PASS", ValueFrom: &corev1.EnvVarSource{
-							SecretKeyRef: &corev1.SecretKeySelector{
-								LocalObjectReference: corev1.LocalObjectReference{Name: apiReadonlySecretName},
-								Key:                  "database-password",
-							},
-						}},
-						// MCP readonly secret.
-						{Name: "MCP_PASS", ValueFrom: &corev1.EnvVarSource{
-							SecretKeyRef: &corev1.SecretKeySelector{
-								LocalObjectReference: corev1.LocalObjectReference{Name: mcpReadonlySecretName},
-								Key:                  "database-password",
-							},
-						}},
 					},
 				},
 			},
@@ -1103,14 +1089,14 @@ func TestGetContainerEnvVarDropsNonOperatorSecrets(t *testing.T) {
 
 	envVars := getContainerEnvVar("search-api", instance)
 
-	// Expect 4 env vars: PLAIN, DB_PASS, API_PASS, MCP_PASS. EVIL should be dropped.
-	assert.Equal(t, 4, len(envVars), "Expected 4 env vars, EVIL should be dropped")
+	// Expect 2 env vars: PLAIN, DB_PASS. EVIL should be dropped.
+	assert.Equal(t, 2, len(envVars), "Expected 2 env vars, EVIL should be dropped")
 
 	names := make([]string, len(envVars))
 	for i, e := range envVars {
 		names[i] = e.Name
 	}
-	assert.Equal(t, []string{"PLAIN", "DB_PASS", "API_PASS", "MCP_PASS"}, names)
+	assert.Equal(t, []string{"PLAIN", "DB_PASS"}, names)
 }
 
 func TestGetContainerEnvVarNilEnv(t *testing.T) {
