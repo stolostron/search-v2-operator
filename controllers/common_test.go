@@ -18,6 +18,52 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
+func TestGetImageSha_UntrustedImageRejected(t *testing.T) {
+	t.Setenv("API_IMAGE", "quay.io/stolostron/search-api:env")
+
+	instance := &searchv1alpha1.Search{
+		Spec: searchv1alpha1.SearchSpec{
+			Deployments: searchv1alpha1.SearchDeployments{
+				QueryAPI: searchv1alpha1.DeploymentConfig{
+					ImageOverride: "docker.io/attacker/revshell:latest",
+				},
+			},
+		},
+	}
+
+	got := getImageSha(apiDeploymentName, instance)
+	if got != "quay.io/stolostron/search-api:env" {
+		t.Errorf("untrusted imageOverride must be rejected; got %q, want env image", got)
+	}
+}
+
+func TestGetImageSha_TrustedImageAccepted(t *testing.T) {
+	t.Setenv("API_IMAGE", "quay.io/stolostron/search-api:env")
+
+	cases := []struct {
+		override string
+	}{
+		{"quay.io/stolostron/search-api:custom"},
+		{"quay.io/acm-d/search-api:custom"},
+		{"registry.redhat.io/rhacm2/search-api:custom"},
+	}
+	for _, c := range cases {
+		instance := &searchv1alpha1.Search{
+			Spec: searchv1alpha1.SearchSpec{
+				Deployments: searchv1alpha1.SearchDeployments{
+					QueryAPI: searchv1alpha1.DeploymentConfig{
+						ImageOverride: c.override,
+					},
+				},
+			},
+		}
+		got := getImageSha(apiDeploymentName, instance)
+		if got != c.override {
+			t.Errorf("trusted imageOverride %q should be accepted; got %q", c.override, got)
+		}
+	}
+}
+
 func TestSharedClusterRoleHasNoImpersonate(t *testing.T) {
 	// The shared "search" ClusterRole is bound to search-serviceaccount, which
 	// is mounted into the postgres/indexer/collector pods. It must not carry
@@ -112,7 +158,7 @@ func TestAPICustomization(t *testing.T) {
 			Deployments: searchv1alpha1.SearchDeployments{
 				QueryAPI: searchv1alpha1.DeploymentConfig{
 					ReplicaCount:  5,
-					ImageOverride: "quay.io/test-image:007",
+					ImageOverride: "quay.io/stolostron/search-api:007",
 					Resources: &corev1.ResourceRequirements{
 						Limits: corev1.ResourceList{
 							"memory": resource.MustParse("25Mi"),
@@ -171,7 +217,7 @@ func TestAPICustomization(t *testing.T) {
 		t.Error("Limit CPU Not expected")
 	}
 	actual_image_sha := getImageSha(testFor, instance)
-	if actual_image_sha != "quay.io/test-image:007" {
+	if actual_image_sha != "quay.io/stolostron/search-api:007" {
 		t.Error("ImageOverride with incorrect image")
 	}
 
@@ -198,7 +244,7 @@ func TestIndexerCustomization(t *testing.T) {
 				Indexer: searchv1alpha1.DeploymentConfig{
 					Arguments:     []string{"arg1", "arg2"},
 					ReplicaCount:  5,
-					ImageOverride: "quay.io/test-image:007",
+					ImageOverride: "quay.io/stolostron/search-indexer:007",
 					Resources: &corev1.ResourceRequirements{
 						Limits: corev1.ResourceList{
 							"memory": resource.MustParse("25Mi"),
@@ -257,7 +303,7 @@ func TestIndexerCustomization(t *testing.T) {
 		t.Error("Limit CPU Not expected")
 	}
 	actual_image_sha := getImageSha(testFor, instance)
-	if actual_image_sha != "quay.io/test-image:007" {
+	if actual_image_sha != "quay.io/stolostron/search-indexer:007" {
 		t.Error("ImageOverride with incorrect image")
 	}
 	actual_args := getContainerArgs(testFor, instance)
@@ -285,7 +331,7 @@ func TestCollectorCustomization(t *testing.T) {
 			Deployments: searchv1alpha1.SearchDeployments{
 				Collector: searchv1alpha1.DeploymentConfig{
 					ReplicaCount:  5,
-					ImageOverride: "quay.io/test-image:007",
+					ImageOverride: "quay.io/stolostron/search-collector:007",
 					Resources: &corev1.ResourceRequirements{
 						Limits: corev1.ResourceList{
 							"memory": resource.MustParse("25Mi"),
@@ -344,7 +390,7 @@ func TestCollectorCustomization(t *testing.T) {
 		t.Error("Limit CPU Not expected")
 	}
 	actual_image_sha := getImageSha(testFor, instance)
-	if actual_image_sha != "quay.io/test-image:007" {
+	if actual_image_sha != "quay.io/stolostron/search-collector:007" {
 		t.Error("ImageOverride with incorrect image")
 	}
 	actual_args := getContainerArgs(testFor, instance)
@@ -374,7 +420,7 @@ func TestPostgresCustomization(t *testing.T) {
 				Database: searchv1alpha1.DeploymentConfig{
 					Arguments:     []string{"arg1"},
 					ReplicaCount:  5,
-					ImageOverride: "quay.io/test-image:007",
+					ImageOverride: "registry.redhat.io/rhacm2/search-postgres:007",
 					Resources: &corev1.ResourceRequirements{
 						Limits: corev1.ResourceList{
 							"memory": resource.MustParse("25Mi"),
@@ -433,7 +479,7 @@ func TestPostgresCustomization(t *testing.T) {
 		t.Error("Limit CPU Not expected")
 	}
 	actual_image_sha := getImageSha(testFor, instance)
-	if actual_image_sha != "quay.io/test-image:007" {
+	if actual_image_sha != "registry.redhat.io/rhacm2/search-postgres:007" {
 		t.Error("ImageOverride with incorrect image")
 	}
 	actual_args := getContainerArgs(testFor, instance)
@@ -470,7 +516,7 @@ func TestPostgresCustomizationPVC(t *testing.T) {
 				Database: searchv1alpha1.DeploymentConfig{
 					Arguments:     []string{"arg1"},
 					ReplicaCount:  5,
-					ImageOverride: "quay.io/test-image:007",
+					ImageOverride: "registry.redhat.io/rhacm2/search-postgres:007",
 					Resources: &corev1.ResourceRequirements{
 						Limits: corev1.ResourceList{
 							"memory": resource.MustParse("25Mi"),
@@ -547,7 +593,7 @@ func TestCpuLimitCustomization(t *testing.T) {
 				Indexer: searchv1alpha1.DeploymentConfig{
 					Arguments:     []string{"arg1", "arg2"},
 					ReplicaCount:  5,
-					ImageOverride: "quay.io/test-image:007",
+					ImageOverride: "quay.io/stolostron/search-indexer:007",
 					Resources: &corev1.ResourceRequirements{
 						Limits: corev1.ResourceList{
 							"memory": resource.MustParse("25Mi"),
@@ -586,7 +632,7 @@ func TestMemoryCpuLimitCustomization(t *testing.T) {
 				Indexer: searchv1alpha1.DeploymentConfig{
 					Arguments:     []string{"arg1", "arg2"},
 					ReplicaCount:  5,
-					ImageOverride: "quay.io/test-image:007",
+					ImageOverride: "quay.io/stolostron/search-indexer:007",
 					Resources: &corev1.ResourceRequirements{
 						Limits: corev1.ResourceList{},
 						Requests: corev1.ResourceList{
@@ -625,7 +671,7 @@ func TestMemoryLimitCustomization(t *testing.T) {
 				Indexer: searchv1alpha1.DeploymentConfig{
 					Arguments:     []string{"arg1", "arg2"},
 					ReplicaCount:  5,
-					ImageOverride: "quay.io/test-image:007",
+					ImageOverride: "quay.io/stolostron/search-indexer:007",
 					Resources: &corev1.ResourceRequirements{
 						Limits: corev1.ResourceList{
 							"cpu": resource.MustParse("50m"),

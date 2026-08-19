@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	searchv1alpha1 "github.com/stolostron/search-v2-operator/api/v1alpha1"
+	imagevalidation "github.com/stolostron/search-v2-operator/internal"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
@@ -349,28 +350,34 @@ func getReplicaCount(deploymentName string, instance *searchv1alpha1.Search) *in
 	return &count
 
 }
+
+// getImageSha returns the container image to use for the given deployment.
+// If spec.deployments.*.imageOverride is set and comes from a trusted registry
+// (quay.io/stolostron, quay.io/acm-d, or registry.redhat.io) it is honoured;
+// otherwise the operator-supplied environment-variable image is used and a
+// warning is logged so the operator has visibility into the rejection.
 func getImageSha(deploymentName string, instance *searchv1alpha1.Search) string {
+	trustedOverride := func(override, envImage string) string {
+		if override == "" {
+			return envImage
+		}
+		if imagevalidation.IsTrustedImage(override) {
+			return override
+		}
+		log.Info("Ignoring untrusted imageOverride on Search CR; image must come from quay.io/stolostron, quay.io/acm-d, or registry.redhat.io",
+			"deployment", deploymentName, "imageOverride", override)
+		return envImage
+	}
+
 	switch deploymentName {
 	case apiDeploymentName:
-		if instance.Spec.Deployments.QueryAPI.ImageOverride != "" {
-			return instance.Spec.Deployments.QueryAPI.ImageOverride
-		}
-		return os.Getenv("API_IMAGE")
+		return trustedOverride(instance.Spec.Deployments.QueryAPI.ImageOverride, os.Getenv("API_IMAGE"))
 	case collectorDeploymentName:
-		if instance.Spec.Deployments.Collector.ImageOverride != "" {
-			return instance.Spec.Deployments.Collector.ImageOverride
-		}
-		return os.Getenv("COLLECTOR_IMAGE")
+		return trustedOverride(instance.Spec.Deployments.Collector.ImageOverride, os.Getenv("COLLECTOR_IMAGE"))
 	case indexerDeploymentName:
-		if instance.Spec.Deployments.Indexer.ImageOverride != "" {
-			return instance.Spec.Deployments.Indexer.ImageOverride
-		}
-		return os.Getenv("INDEXER_IMAGE")
+		return trustedOverride(instance.Spec.Deployments.Indexer.ImageOverride, os.Getenv("INDEXER_IMAGE"))
 	case postgresDeploymentName:
-		if instance.Spec.Deployments.Database.ImageOverride != "" {
-			return instance.Spec.Deployments.Database.ImageOverride
-		}
-		return os.Getenv("POSTGRES_IMAGE")
+		return trustedOverride(instance.Spec.Deployments.Database.ImageOverride, os.Getenv("POSTGRES_IMAGE"))
 	}
 	log.V(2).Info("Unknown deployment ", "name", deploymentName)
 	return ""
