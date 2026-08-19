@@ -217,9 +217,7 @@ func getContainerArgs(deploymentName string, instance *searchv1alpha1.Search) []
 // reference secrets in this set, preventing CR editors from mounting
 // arbitrary namespace secrets into search containers.
 var operatorManagedSecrets = map[string]struct{}{
-	"search-postgres":     {},
-	apiReadonlySecretName: {},
-	mcpReadonlySecretName: {},
+	"search-postgres": {},
 }
 
 func getContainerEnvVar(deploymentName string, instance *searchv1alpha1.Search) []corev1.EnvVar {
