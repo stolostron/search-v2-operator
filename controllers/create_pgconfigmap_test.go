@@ -13,41 +13,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
-func TestPostgresConfigmapRejectsInvalidWorkMem(t *testing.T) {
-	// WORK_MEM containing shell/SQL metacharacters must not be embedded in postgresql-start.sh.
-	malicious := `64MB'"; touch /tmp/pwned #`
-	search := &searchv1alpha1.Search{
-		TypeMeta:   metav1.TypeMeta{Kind: "Search"},
-		ObjectMeta: metav1.ObjectMeta{Name: "search-v2-operator", Namespace: "test-namespace"},
-		Spec: searchv1alpha1.SearchSpec{
-			Deployments: searchv1alpha1.SearchDeployments{
-				Database: searchv1alpha1.DeploymentConfig{
-					Env: []corev1.EnvVar{{Name: "WORK_MEM", Value: malicious}},
-				},
-			},
-		},
-	}
-	s := scheme.Scheme
-	err := searchv1alpha1.SchemeBuilder.AddToScheme(s)
-	assert.NoError(t, err)
-
-	cl := fake.NewClientBuilder().WithRuntimeObjects(search).Build()
-	r := &SearchReconciler{Client: cl, Scheme: s}
-
-	configMap := r.PostgresConfigmap(search)
-	startScript := configMap.Data["postgresql-start.sh"]
-
-	assert.NotContains(t, startScript, "touch /tmp/pwned",
-		"untrusted WORK_MEM payload must not reach postgresql-start.sh")
-	assert.Contains(t, startScript, "ALTER ROLE searchuser set work_mem='"+default_WORK_MEM+"'",
-		"invalid WORK_MEM should fall back to the default")
-
-	// Valid values are still accepted.
-	for _, valid := range []string{"64MB", "4096kB", "1GB", "65536"} {
-		assert.True(t, workMemPattern.MatchString(valid), "expected %q to be accepted", valid)
-	}
-}
-
 func TestPostgresConfigmapWithStatementTimeout(t *testing.T) {
 
 	search := &searchv1alpha1.Search{

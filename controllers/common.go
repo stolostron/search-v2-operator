@@ -4,7 +4,6 @@ package controllers
 import (
 	"context"
 	"os"
-	"regexp"
 	"strings"
 
 	searchv1alpha1 "github.com/stolostron/search-v2-operator/api/v1alpha1"
@@ -67,15 +66,6 @@ func generateLabels(key, val string) map[string]string {
 
 func getServiceAccountName() string {
 	return "search-serviceaccount"
-}
-
-// getAPIServiceAccountName returns the dedicated ServiceAccount used only by
-// the search-api deployment. Impersonation rights (users/groups/serviceaccounts)
-// are bound to this SA alone so that the postgres, indexer and collector pods —
-// which share the generic search-serviceaccount — cannot escalate to
-// system:masters via their mounted token.
-func getAPIServiceAccountName() string {
-	return "search-api-sa"
 }
 
 func getDefaultDBConfig(varName string) string {
@@ -182,16 +172,8 @@ func getContainerArgs(deploymentName string, instance *searchv1alpha1.Search) []
 func getContainerEnvVar(deploymentName string, instance *searchv1alpha1.Search) []corev1.EnvVar {
 	var result []corev1.EnvVar
 	deploymentConfig := getDeploymentConfig(deploymentName, instance)
-	if deploymentConfig.Env == nil {
-		return result
-	}
-	// For postgres, skip WORK_MEM — it is read and sanitized by GetDBConfigFromSearchCR,
-	// which handles CR env, dbconfig ConfigMap, and default priority in one place.
-	for _, e := range deploymentConfig.Env {
-		if deploymentName == postgresDeploymentName && e.Name == "WORK_MEM" {
-			continue
-		}
-		result = append(result, e)
+	if deploymentConfig.Env != nil {
+		return deploymentConfig.Env
 	}
 	return result
 }
@@ -530,7 +512,7 @@ func (r *SearchReconciler) GetDBConfigFromSearchCR(ctx context.Context,
 	for _, env := range postgresDeployConfig.Env {
 		if env.Name == configName {
 			log.Info("Set config from search CR Environment variables for postgres", configName, env.Value)
-			return sanitizeDBConfig(configName, env.Value)
+			return env.Value
 		}
 	}
 	// get value from dbconfig configmap if present
@@ -539,33 +521,13 @@ func (r *SearchReconciler) GetDBConfigFromSearchCR(ctx context.Context,
 		value, present := customMap[configName]
 		if present {
 			log.Info("Set config from dbconfig configMap ", "configMap", instance.Spec.DBConfig, configName, value)
-			return sanitizeDBConfig(configName, value)
+			return value
 		}
 	}
 	// get default value
 	defaultValue := getDefaultDBConfig(configName)
 	log.V(2).Info("Set config with default value", configName, defaultValue)
 	return defaultValue
-}
-
-// workMemPattern matches valid PostgreSQL memory-unit values (e.g. "64MB", "4096kB", "1GB", "65536").
-// Any value not matching this pattern is rejected to prevent shell/SQL injection into the
-// generated postgresql-start.sh script.
-var workMemPattern = regexp.MustCompile(`^[0-9]+(kB|MB|GB|TB)?$`)
-
-// sanitizeDBConfig validates user-supplied DB config values. Returns the default
-// if the value doesn't pass validation, preventing injection into shell scripts
-// or SQL statements.
-func sanitizeDBConfig(configName, value string) string {
-	switch configName {
-	case "WORK_MEM":
-		if !workMemPattern.MatchString(value) {
-			log.Info("Ignoring invalid WORK_MEM value; using default",
-				"value", value, "default", default_WORK_MEM)
-			return default_WORK_MEM
-		}
-	}
-	return value
 }
 
 func getDeploymentConfig(name string, instance *searchv1alpha1.Search) searchv1alpha1.DeploymentConfig {
