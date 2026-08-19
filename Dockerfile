@@ -16,6 +16,7 @@ COPY api/ api/
 COPY controllers/ controllers/
 COPY addon/ addon/
 COPY config/ config/
+COPY internal/ internal/
 
 # Build
 RUN CGO_ENABLED=1 go build -a -o manager main.go
