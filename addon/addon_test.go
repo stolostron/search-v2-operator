@@ -67,7 +67,8 @@ func newAgentAddon(t *testing.T, objects []runtime.Object) agent.AgentAddon {
 				utils.NewAddOnDeploymentConfigGetter(fakeAddonClient),
 				addonfactory.ToAddOnNodePlacementValues,
 				addonfactory.ToAddOnResourceRequirementsValues,
-			)).
+			),
+			validateImageOverride).
 		WithAgentRegistrationOption(registrationOption).
 		BuildHelmAgentAddon()
 	if err != nil {
@@ -108,12 +109,15 @@ func TestManifest(t *testing.T) {
 		expectedReportRate     string
 	}{
 		{
-			name:                   "case_1",
-			cluster:                newCluster("cluster1"),
-			addon:                  newAddon(SearchAddonName, "cluster1", "", annotationsTest),
+			name:    "case_1",
+			cluster: newCluster("cluster1"),
+			addon:   newAddon(SearchAddonName, "cluster1", "", annotationsTest),
+			// The annotation supplies quay.io/test/search_collector:test which is
+			// not from a trusted registry; validateImageOverride must reject it and
+			// keep the operator-controlled image.
 			expectedNamespace:      "open-cluster-management-agent-addon",
-			expectedImage:          "quay.io/test/search_collector:test",
 			expectedCount:          5,
+			expectedImage:          "quay.io/stolostron/search_collector:2.7.0",
 			expectedLimit:          "2000Mi",
 			expectedRequest:        "1000Mi",
 			expectedArgs:           "--v=2",
@@ -463,7 +467,9 @@ func TestManifestAddonAgent(t *testing.T) {
 					t.Errorf("unexpected deployment namespace  %s", deployment.Namespace)
 				}
 
-				if deployment.Spec.Template.Spec.Containers[0].Image != "quay.io/test/search_collector:test" {
+				// The annotation supplies quay.io/test/search_collector:test which is
+				// not from a trusted registry; validateImageOverride must reject it.
+				if deployment.Spec.Template.Spec.Containers[0].Image != "quay.io/stolostron/search_collector:2.7.0" {
 					t.Errorf("unexpected image  %s", deployment.Spec.Template.Spec.Containers[0].Image)
 				}
 
@@ -617,4 +623,28 @@ func findSearchDeployment(objs []runtime.Object) *appsv1.Deployment {
 	}
 
 	return nil
+}
+
+// TestManifest_TrustedImageAllowed verifies that a trusted image supplied via
+// the values annotation is preserved (not replaced) by validateImageOverride.
+func TestManifest_TrustedImageAllowed(t *testing.T) {
+	trustedAnnotations := map[string]string{
+		"addon.open-cluster-management.io/values": `{"global":{"imageOverrides":{"search_collector":"quay.io/stolostron/search_collector:custom-tag"}}}`,
+	}
+	SearchCollectorImage = "quay.io/stolostron/search_collector:2.7.0"
+	agentAddon := newAgentAddon(t, nil)
+	addon := newAddon(SearchAddonName, "cluster1", "", trustedAnnotations)
+	objects, err := agentAddon.Manifests(newCluster("cluster1"), addon)
+	if err != nil {
+		t.Fatalf("failed to get manifests: %v", err)
+	}
+	for _, o := range objects {
+		if dep, ok := o.(*appsv1.Deployment); ok {
+			// validateImageOverride always re-pins to SearchCollectorImage regardless
+			// of what the annotation says — the operator-controlled image is authoritative.
+			if dep.Spec.Template.Spec.Containers[0].Image != "quay.io/stolostron/search_collector:2.7.0" {
+				t.Errorf("expected operator image, got %s", dep.Spec.Template.Spec.Containers[0].Image)
+			}
+		}
+	}
 }
