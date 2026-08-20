@@ -14,7 +14,9 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: open-cluster-management:search-v2-operator:search-api
+# The multiclusterhub-operator bundle-automation script renames this role to
+#   name: '{{ .Values.org }}:{{ .Chart.Name }}:search-api'
+  name: search-api
 rules:
 # User-extra impersonation — required to forward the full user identity
 # (credential ID, node name, pod name, etc.) through the Kubernetes API server

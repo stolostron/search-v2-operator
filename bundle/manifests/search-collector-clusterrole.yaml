@@ -25,7 +25,9 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: open-cluster-management:search-v2-operator:search-collector
+# The multiclusterhub-operator bundle-automation script renames this role to
+#   name: '{{ .Values.org }}:{{ .Chart.Name }}:search-collector'
+  name: search-collector
 rules:
 # Watch every resource in the cluster for inventory collection.
 # This wildcard rule also covers configmaps (allow/deny filter) and
