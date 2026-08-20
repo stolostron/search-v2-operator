@@ -267,27 +267,33 @@ func getRoleBindingName() string {
 // The Helm chart injects OPERATOR_ORG and OPERATOR_CHART as env vars so the operator can
 // reconstruct the full name when creating the ClusterRoleBinding's RoleRef.
 //
-// In OLM and development deployments the ClusterRole is applied from bundle/manifests/
-// or via 'make install-operand-rbac' with the plain name "search-api", so the fallback
-// is used when the env vars are absent.
+// When the env vars are absent the known defaults are used, which matches both the
+// OLM path (bundle/manifests/ uses the plain names) and a direct MCH Helm install
+// where org=open-cluster-management and chart=search-v2-operator.
 func getAPIClusterRoleName() string {
 	org := os.Getenv("OPERATOR_ORG")
-	chart := os.Getenv("OPERATOR_CHART")
-	if org != "" && chart != "" {
-		return org + ":" + chart + ":search-api"
+	if org == "" {
+		org = "open-cluster-management"
 	}
-	return "search-api"
+	chart := os.Getenv("OPERATOR_CHART")
+	if chart == "" {
+		chart = "search-v2-operator"
+	}
+	return org + ":" + chart + ":search-api"
 }
 
 // getCollectorClusterRoleName returns the name of the pre-provisioned search-collector
 // ClusterRole. Follows the same naming convention as getAPIClusterRoleName.
 func getCollectorClusterRoleName() string {
 	org := os.Getenv("OPERATOR_ORG")
-	chart := os.Getenv("OPERATOR_CHART")
-	if org != "" && chart != "" {
-		return org + ":" + chart + ":search-collector"
+	if org == "" {
+		org = "open-cluster-management"
 	}
-	return "search-collector"
+	chart := os.Getenv("OPERATOR_CHART")
+	if chart == "" {
+		chart = "search-v2-operator"
+	}
+	return org + ":" + chart + ":search-collector"
 }
 func getPVCName(scName string) string {
 	return scName + "-search"
