@@ -377,6 +377,39 @@ func (r *SearchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		if err != nil {
 			log.Error(err, "Failed to remove Search ownerRef from ClusterManagementAddon")
 		}
+
+		// Remove legacy shared RBAC objects left on clusters upgraded from pre-ACM-34432 releases.
+		// Before ACM 2.X the operator created a shared "search" ClusterRole (carrying impersonate),
+		// a matching "search" ClusterRoleBinding, and a "search-serviceaccount" ServiceAccount.
+		// These are no longer used — every component now has a dedicated ServiceAccount and the
+		// operator SA no longer holds impersonate. Cleaning them up closes the lingering
+		// privilege escalation path on upgraded clusters.
+		// The previously operator-managed "search-api" and "search-collector" ClusterRoles are now
+		// pre-provisioned static manifests. OLM will reconcile the existing objects against the
+		// bundle manifests; for non-OLM installs, 'make install-operand-rbac' replaces them.
+		legacyObjects := []struct{ kind, name string }{
+			{"ClusterRole", getRoleName()},
+			{"ClusterRoleBinding", getRoleBindingName()},
+		}
+		for _, obj := range legacyObjects {
+			switch obj.kind {
+			case "ClusterRole":
+				if delErr := r.deleteClusterRole(instance, obj.name); delErr != nil {
+					log.Error(delErr, "Failed to delete legacy ClusterRole", "name", obj.name)
+				}
+			case "ClusterRoleBinding":
+				if delErr := r.deleteClusterRoleBinding(instance, obj.name); delErr != nil {
+					log.Error(delErr, "Failed to delete legacy ClusterRoleBinding", "name", obj.name)
+				}
+			}
+		}
+		// Delete the legacy shared ServiceAccount.
+		legacySA := &corev1.ServiceAccount{}
+		legacySA.Name = "search-serviceaccount"
+		legacySA.Namespace = instance.GetNamespace()
+		if delErr := r.Delete(ctx, legacySA); delErr != nil && !errors.IsNotFound(delErr) {
+			log.Error(delErr, "Failed to delete legacy ServiceAccount", "name", "search-serviceaccount")
+		}
 	})
 
 	return ctrl.Result{}, nil

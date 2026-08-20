@@ -11,6 +11,7 @@ import (
 	searchv1alpha1 "github.com/stolostron/search-v2-operator/api/v1alpha1"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -18,6 +19,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/yaml"
 )
 
 func TestGetImageSha_UntrustedImageRejected(t *testing.T) {
@@ -66,33 +68,91 @@ func TestGetImageSha_TrustedImageAccepted(t *testing.T) {
 	}
 }
 
-// TestSearchAPIClusterRoleCarriesImpersonate verifies the security invariant of the
-// pre-provisioned search-api ClusterRole: it must carry impersonate (so search-api
-// can enforce per-user RBAC) and must not be granted to other component SAs.
-func TestSearchAPIClusterRoleCarriesImpersonate(t *testing.T) {
-	stripComments := func(raw []byte) string {
-		var kept []string
-		for _, line := range strings.Split(string(raw), "\n") {
-			if !strings.HasPrefix(strings.TrimSpace(line), "#") {
-				kept = append(kept, line)
+// loadClusterRole decodes a ClusterRole from a YAML file, stripping comment lines first.
+func loadClusterRole(t *testing.T, path string) rbacv1.ClusterRole {
+	t.Helper()
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("could not read %s: %v", path, err)
+	}
+	// Strip YAML comment lines so the decoder is not confused by them.
+	var kept []string
+	for _, line := range strings.Split(string(raw), "\n") {
+		if !strings.HasPrefix(strings.TrimSpace(line), "#") {
+			kept = append(kept, line)
+		}
+	}
+	var cr rbacv1.ClusterRole
+	if err := yaml.Unmarshal([]byte(strings.Join(kept, "\n")), &cr); err != nil {
+		t.Fatalf("could not unmarshal ClusterRole from %s: %v", path, err)
+	}
+	return cr
+}
+
+// hasVerb returns true when any rule in the ClusterRole grants the given verb
+// on (at least one of) the given resources under the given apiGroup.
+// An empty apiGroup or resource string matches any value.
+func hasVerb(cr rbacv1.ClusterRole, apiGroup, resource, verb string) bool {
+	for _, rule := range cr.Rules {
+		groupMatch := apiGroup == ""
+		for _, g := range rule.APIGroups {
+			if g == apiGroup || g == "*" {
+				groupMatch = true
+				break
 			}
 		}
-		return strings.Join(kept, "\n")
+		resMatch := resource == ""
+		for _, r := range rule.Resources {
+			if r == resource || r == "*" {
+				resMatch = true
+				break
+			}
+		}
+		verbMatch := false
+		for _, v := range rule.Verbs {
+			if v == verb || v == "*" {
+				verbMatch = true
+				break
+			}
+		}
+		if groupMatch && resMatch && verbMatch {
+			return true
+		}
 	}
-	apiYAML, err := os.ReadFile("../config/rbac/search_api_clusterrole.yaml")
-	if err != nil {
-		t.Fatalf("could not read search_api_clusterrole.yaml: %v", err)
+	return false
+}
+
+// TestSearchAPIClusterRoleCarriesImpersonate verifies the security invariant of the
+// pre-provisioned search-api ClusterRole: it must carry impersonate on the correct
+// resources, and the search-collector ClusterRole must not carry it at all.
+func TestSearchAPIClusterRoleCarriesImpersonate(t *testing.T) {
+	apiCR := loadClusterRole(t, "../config/rbac/search_api_clusterrole.yaml")
+
+	// search-api must grant impersonate on users/serviceaccounts/groups.
+	for _, res := range []string{"users", "serviceaccounts", "groups"} {
+		if !hasVerb(apiCR, "", res, "impersonate") {
+			t.Errorf("search-api ClusterRole must grant impersonate on %q", res)
+		}
 	}
-	if !strings.Contains(stripComments(apiYAML), "impersonate") {
-		t.Fatal("search-api ClusterRole must carry impersonate")
+	// search-api must grant impersonate on user-extra resources.
+	for _, res := range []string{
+		"uids",
+		"userextras/authentication.kubernetes.io/credential-id",
+		"userextras/authentication.kubernetes.io/node-name",
+		"userextras/authentication.kubernetes.io/node-uid",
+		"userextras/authentication.kubernetes.io/pod-name",
+		"userextras/authentication.kubernetes.io/pod-uid",
+	} {
+		if !hasVerb(apiCR, "authentication.k8s.io", res, "impersonate") &&
+			!hasVerb(apiCR, "authorization.k8s.io", res, "impersonate") {
+			t.Errorf("search-api ClusterRole must grant impersonate on %q", res)
+		}
 	}
-	// Collector manifest must NOT carry impersonate.
-	collectorYAML, err := os.ReadFile("../config/rbac/search_collector_clusterrole.yaml")
-	if err != nil {
-		t.Fatalf("could not read search_collector_clusterrole.yaml: %v", err)
-	}
-	if strings.Contains(stripComments(collectorYAML), "impersonate") {
-		t.Fatal("search-collector ClusterRole must not carry impersonate")
+
+	// search-collector must NOT carry impersonate.
+	collectorCR := loadClusterRole(t, "../config/rbac/search_collector_clusterrole.yaml")
+	if hasVerb(collectorCR, "", "", "impersonate") {
+		t.Error("search-collector ClusterRole must not grant impersonate on any resource")
 	}
 }
 
@@ -228,45 +288,40 @@ func TestIndexerWorkloadIdentityContract(t *testing.T) {
 }
 
 // TestCollectorClusterRoleMinimumPermissions verifies security invariants on the
-// pre-provisioned search-collector ClusterRole static YAML manifest.
+// pre-provisioned search-collector ClusterRole by decoding the static YAML manifest
+// into an rbacv1.ClusterRole and asserting per-rule verb/resource constraints.
 func TestCollectorClusterRoleMinimumPermissions(t *testing.T) {
-	// The search-collector ClusterRole is now a pre-provisioned static manifest.
-	// Verify the security invariants directly on the YAML file.
-	collectorYAML, err := os.ReadFile("../config/rbac/search_collector_clusterrole.yaml")
-	if err != nil {
-		t.Fatalf("could not read search_collector_clusterrole.yaml: %v", err)
-	}
-	raw := string(collectorYAML)
+	cr := loadClusterRole(t, "../config/rbac/search_collector_clusterrole.yaml")
 
-	// Strip comment lines before checking.
-	stripComments := func(s string) string {
-		var kept []string
-		for _, line := range strings.Split(s, "\n") {
-			if !strings.HasPrefix(strings.TrimSpace(line), "#") {
-				kept = append(kept, line)
+	forbiddenVerbs := []string{"impersonate", "delete", "deletecollection"}
+	// Resources that must never have write verbs (create/update/patch/delete).
+	sensitiveResources := map[string]bool{"secrets": true, "services": true, "deployments": true}
+	writeVerbs := map[string]bool{"create": true, "update": true, "patch": true, "delete": true, "deletecollection": true}
+
+	for _, rule := range cr.Rules {
+		for _, verb := range rule.Verbs {
+			// Forbidden verbs on any resource.
+			for _, forbidden := range forbiddenVerbs {
+				if verb == forbidden {
+					t.Errorf("collector ClusterRole must not grant %q; found on resources %v", verb, rule.Resources)
+				}
 			}
-		}
-		return strings.Join(kept, "\n")
-	}
-	content := stripComments(raw)
-
-	// Must never carry impersonate, delete, or deletecollection.
-	for _, forbidden := range []string{"impersonate", "delete", "deletecollection"} {
-		if strings.Contains(content, "- "+forbidden) {
-			t.Errorf("collector ClusterRole must not grant %q", forbidden)
-		}
-	}
-
-	// patch/update are allowed only on collectorconfigs/status (sync-status reporting).
-	// Verify they are not present on any other resource.
-	if strings.Contains(content, "- patch") && !strings.Contains(content, "collectorconfigs/status") {
-		t.Error("collector ClusterRole grants 'patch' but collectorconfigs/status is missing — patch should only appear on that subresource")
-	}
-
-	// Must not grant write access to secrets, services, or deployments.
-	for _, sensitive := range []string{"secrets", "services", "deployments"} {
-		if strings.Contains(content, "- "+sensitive) {
-			t.Errorf("collector ClusterRole must not reference %q with write verbs", sensitive)
+			// Write verbs are only allowed on collectorconfigs/status.
+			if writeVerbs[verb] {
+				for _, res := range rule.Resources {
+					if res != "collectorconfigs/status" && res != "leases" {
+						t.Errorf("collector ClusterRole grants write verb %q on unexpected resource %q", verb, res)
+					}
+				}
+			}
+			// Sensitive resources must never receive write verbs.
+			if writeVerbs[verb] {
+				for _, res := range rule.Resources {
+					if sensitiveResources[res] {
+						t.Errorf("collector ClusterRole must not grant write verb %q on sensitive resource %q", verb, res)
+					}
+				}
+			}
 		}
 	}
 
