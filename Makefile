@@ -154,16 +154,31 @@ endef
 .PHONY: operator-sdk
 OPERATOR_SDK_VERSION = v1.37.0
 OPERATOR_SDK = $(shell pwd)/bin/operator-sdk
-operator-sdk: ## Download operator-sdk v1.37.0 locally if necessary.
-ifeq (,$(wildcard $(OPERATOR_SDK)))
+operator-sdk: ## Download operator-sdk locally if necessary, validating version and checksum.
 	@{ \
 	set -e ;\
+	OS=$(shell go env GOHOSTOS) && ARCH=$(shell go env GOHOSTARCH) && \
+	if [ -f "$(OPERATOR_SDK)" ] && $(OPERATOR_SDK) version 2>/dev/null | grep -q "$(OPERATOR_SDK_VERSION)"; then \
+		echo "operator-sdk $(OPERATOR_SDK_VERSION) already present"; \
+		exit 0; \
+	fi; \
 	mkdir -p $(dir $(OPERATOR_SDK)) ;\
-	OS=$(shell go env GOOS) && ARCH=$(shell go env GOARCH) && \
-	curl -sSLo $(OPERATOR_SDK) https://github.com/operator-framework/operator-sdk/releases/download/$(OPERATOR_SDK_VERSION)/operator-sdk_$${OS}_$${ARCH} ;\
+	TMP_SDK=$$(mktemp) ;\
+	TMP_SUMS=$$(mktemp) ;\
+	curl -fLo "$${TMP_SDK}" "https://github.com/operator-framework/operator-sdk/releases/download/$(OPERATOR_SDK_VERSION)/operator-sdk_$${OS}_$${ARCH}" ;\
+	curl -fLo "$${TMP_SUMS}" "https://github.com/operator-framework/operator-sdk/releases/download/$(OPERATOR_SDK_VERSION)/checksums.txt" ;\
+	EXPECTED=$$(grep "operator-sdk_$${OS}_$${ARCH}$$" "$${TMP_SUMS}" | awk '{print $$1}') ;\
+	ACTUAL=$$(sha256sum "$${TMP_SDK}" 2>/dev/null || shasum -a 256 "$${TMP_SDK}") ;\
+	ACTUAL=$$(echo "$${ACTUAL}" | awk '{print $$1}') ;\
+	if [ "$${EXPECTED}" != "$${ACTUAL}" ]; then \
+		echo "ERROR: operator-sdk checksum mismatch (expected=$${EXPECTED} actual=$${ACTUAL})"; \
+		rm -f "$${TMP_SDK}" "$${TMP_SUMS}"; \
+		exit 1; \
+	fi; \
+	mv "$${TMP_SDK}" $(OPERATOR_SDK) ;\
 	chmod +x $(OPERATOR_SDK) ;\
+	rm -f "$${TMP_SUMS}" ;\
 	}
-endif
 
 .PHONY: bundle
 bundle: manifests kustomize operator-sdk ## Generate bundle manifests and metadata.
