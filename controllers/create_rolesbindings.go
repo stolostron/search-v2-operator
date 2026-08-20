@@ -64,13 +64,30 @@ func (r *SearchReconciler) createRoleBinding(ctx context.Context,
 		}
 		log.Info("Created clusterrolebinding " + rolebinding.Name)
 		log.V(2).Info("Created clusterrolebinding ", "clusterrolebinding", rolebinding)
-	} else if err == nil && !equality.Semantic.DeepEqual(found.Subjects, rolebinding.Subjects) {
-		found.Subjects = rolebinding.Subjects
-		if err = r.Update(ctx, found); err != nil {
-			log.Error(err, "Could not update clusterrolebinding "+rolebinding.Name)
-			return &reconcile.Result{}, err
+	} else if err == nil {
+		// ClusterRoleBinding.roleRef is immutable in Kubernetes. If the desired RoleRef
+		// differs from the existing one (e.g. OPERATOR_ORG / OPERATOR_CHART changed between
+		// releases), we must delete and recreate rather than update.
+		if !equality.Semantic.DeepEqual(found.RoleRef, rolebinding.RoleRef) {
+			log.Info("RoleRef changed — deleting and recreating clusterrolebinding", "name", rolebinding.Name,
+				"old", found.RoleRef.Name, "new", rolebinding.RoleRef.Name)
+			if err = r.Delete(ctx, found); err != nil {
+				log.Error(err, "Could not delete stale clusterrolebinding "+rolebinding.Name)
+				return &reconcile.Result{}, err
+			}
+			if err = r.Create(ctx, rolebinding); err != nil {
+				log.Error(err, "Could not recreate clusterrolebinding "+rolebinding.Name)
+				return &reconcile.Result{}, err
+			}
+			log.Info("Recreated clusterrolebinding " + rolebinding.Name)
+		} else if !equality.Semantic.DeepEqual(found.Subjects, rolebinding.Subjects) {
+			found.Subjects = rolebinding.Subjects
+			if err = r.Update(ctx, found); err != nil {
+				log.Error(err, "Could not update clusterrolebinding "+rolebinding.Name)
+				return &reconcile.Result{}, err
+			}
+			log.Info("Updated clusterrolebinding " + rolebinding.Name)
 		}
-		log.Info("Updated clusterrolebinding " + rolebinding.Name)
 	}
 	return nil, nil
 }
