@@ -151,18 +151,33 @@ rm -rf $$TMP_DIR ;\
 }
 endef
 
+.PHONY: operator-sdk
+OPERATOR_SDK_VERSION = v1.37.0
+OPERATOR_SDK = $(shell pwd)/bin/operator-sdk
+operator-sdk: ## Download operator-sdk v1.37.0 locally if necessary.
+ifeq (,$(wildcard $(OPERATOR_SDK)))
+	@{ \
+	set -e ;\
+	mkdir -p $(dir $(OPERATOR_SDK)) ;\
+	OS=$(shell go env GOOS) && ARCH=$(shell go env GOARCH) && \
+	curl -sSLo $(OPERATOR_SDK) https://github.com/operator-framework/operator-sdk/releases/download/$(OPERATOR_SDK_VERSION)/operator-sdk_$${OS}_$${ARCH} ;\
+	chmod +x $(OPERATOR_SDK) ;\
+	}
+endif
+
 .PHONY: bundle
-bundle: manifests kustomize ## Generate bundle manifests and metadata.
-	operator-sdk generate kustomize manifests -q
+bundle: manifests kustomize operator-sdk ## Generate bundle manifests and metadata.
+	$(OPERATOR_SDK) generate kustomize manifests -q
 	cd config/manager && $(KUSTOMIZE) edit set image controller=$(IMG)
-	$(KUSTOMIZE) build config/manifests | operator-sdk generate bundle -q --overwrite --version $(VERSION) $(BUNDLE_METADATA_OPTS)
+	$(KUSTOMIZE) build config/manifests | $(OPERATOR_SDK) generate bundle -q --overwrite --version $(VERSION) $(BUNDLE_METADATA_OPTS)
 	# Workaround: operator-sdk v1.34+ copies the kustomize-prefixed SA name into the CSV.
 	# The production SA is search-v2-operator, not search-v2-operator-controller-manager.
-	sed -i 's/serviceAccountName: search-v2-operator-controller-manager/serviceAccountName: search-v2-operator/g' bundle/manifests/search-v2-operator.clusterserviceversion.yaml
+	sed -i.bak 's/serviceAccountName: search-v2-operator-controller-manager/serviceAccountName: search-v2-operator/g' bundle/manifests/search-v2-operator.clusterserviceversion.yaml
+	rm -f bundle/manifests/search-v2-operator.clusterserviceversion.yaml.bak
 
 .PHONY: bundle-validate
-bundle-validate: ## Validate the bundle (informational — ClusterManagementAddOn triggers a known false-positive warning).
-	operator-sdk bundle validate ./bundle
+bundle-validate: operator-sdk ## Validate the bundle (informational — ClusterManagementAddOn triggers a known false-positive warning).
+	$(OPERATOR_SDK) bundle validate ./bundle
 
 .PHONY: bundle-build
 bundle-build: ## Build the bundle image.
