@@ -72,10 +72,6 @@ func generateLabels(key, val string) map[string]string {
 	return allLabels
 }
 
-func getServiceAccountName() string {
-	return "search-serviceaccount"
-}
-
 // getAPIServiceAccountName returns the dedicated ServiceAccount used only by
 // the search-api deployment. Impersonation rights (users/groups/serviceaccounts)
 // are bound to this SA alone so that the postgres, indexer and collector pods —
@@ -262,6 +258,42 @@ func getRoleName() string {
 }
 func getRoleBindingName() string {
 	return "search"
+}
+
+// getAPIClusterRoleName returns the name of the pre-provisioned search-api ClusterRole.
+//
+// In Helm deployments (multiclusterhub-operator), the ClusterRole is created with a
+// prefixed name: "<org>:<chart>:search-api" (e.g. "open-cluster-management:search-v2-operator:search-api").
+// The Helm chart injects OPERATOR_ORG and OPERATOR_CHART as env vars so the operator can
+// reconstruct the full name when creating the ClusterRoleBinding's RoleRef.
+//
+// When the env vars are absent the known defaults are used, which matches both the
+// OLM path (bundle/manifests/ uses the plain names) and a direct MCH Helm install
+// where org=open-cluster-management and chart=search-v2-operator.
+func getAPIClusterRoleName() string {
+	org := os.Getenv("OPERATOR_ORG")
+	if org == "" {
+		org = "open-cluster-management"
+	}
+	chart := os.Getenv("OPERATOR_CHART")
+	if chart == "" {
+		chart = "search-v2-operator"
+	}
+	return org + ":" + chart + ":search-api"
+}
+
+// getCollectorClusterRoleName returns the name of the pre-provisioned search-collector
+// ClusterRole. Follows the same naming convention as getAPIClusterRoleName.
+func getCollectorClusterRoleName() string {
+	org := os.Getenv("OPERATOR_ORG")
+	if org == "" {
+		org = "open-cluster-management"
+	}
+	chart := os.Getenv("OPERATOR_CHART")
+	if chart == "" {
+		chart = "search-v2-operator"
+	}
+	return org + ":" + chart + ":search-collector"
 }
 func getPVCName(scName string) string {
 	return scName + "-search"
