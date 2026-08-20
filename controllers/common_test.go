@@ -11,12 +11,14 @@ import (
 	searchv1alpha1 "github.com/stolostron/search-v2-operator/api/v1alpha1"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/yaml"
 )
 
 func TestGetImageSha_UntrustedImageRejected(t *testing.T) {
@@ -65,41 +67,134 @@ func TestGetImageSha_TrustedImageAccepted(t *testing.T) {
 	}
 }
 
-func TestSharedClusterRoleHasNoImpersonate(t *testing.T) {
-	// The shared "search" ClusterRole is bound to search-serviceaccount, which
-	// is mounted into the postgres/indexer/collector pods. It must not carry
-	// impersonate; that verb is isolated on the search-api ClusterRole which is
-	// bound only to search-api-sa.
-	for _, rule := range getRules() {
-		for _, v := range rule.Verbs {
-			if v == "impersonate" {
-				t.Fatalf("shared search ClusterRole must not grant impersonate; found on %v", rule.Resources)
-			}
+// loadClusterRole decodes a ClusterRole from a YAML file, stripping comment lines first.
+func loadClusterRole(t *testing.T, path string) rbacv1.ClusterRole {
+	t.Helper()
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("could not read %s: %v", path, err)
+	}
+	// Strip YAML comment lines so the decoder is not confused by them.
+	var kept []string
+	for _, line := range strings.Split(string(raw), "\n") {
+		if !strings.HasPrefix(strings.TrimSpace(line), "#") {
+			kept = append(kept, line)
 		}
 	}
-	hasImpersonate := false
-	for _, rule := range getAPIRules() {
-		for _, v := range rule.Verbs {
-			if v == "impersonate" {
-				hasImpersonate = true
+	var cr rbacv1.ClusterRole
+	if err := yaml.Unmarshal([]byte(strings.Join(kept, "\n")), &cr); err != nil {
+		t.Fatalf("could not unmarshal ClusterRole from %s: %v", path, err)
+	}
+	return cr
+}
+
+// hasVerb returns true when any rule in the ClusterRole grants the given verb
+// on (at least one of) the given resources under the given apiGroup.
+// apiGroup must match exactly — "" is the Kubernetes core API group, not a wildcard.
+// A wildcard rule in the manifest ("*") satisfies any requested apiGroup or resource.
+func hasVerb(cr rbacv1.ClusterRole, apiGroup, resource, verb string) bool {
+	for _, rule := range cr.Rules {
+		groupMatch := false
+		for _, g := range rule.APIGroups {
+			if g == apiGroup || g == "*" {
+				groupMatch = true
+				break
 			}
 		}
+		resMatch := resource == ""
+		for _, r := range rule.Resources {
+			if r == resource || r == "*" {
+				resMatch = true
+				break
+			}
+		}
+		verbMatch := false
+		for _, v := range rule.Verbs {
+			if v == verb || v == "*" {
+				verbMatch = true
+				break
+			}
+		}
+		if groupMatch && resMatch && verbMatch {
+			return true
+		}
 	}
-	if !hasImpersonate {
-		t.Fatal("search-api ClusterRole expected to carry impersonate")
+	return false
+}
+
+// hasVerbAnyGroup returns true when any rule in the ClusterRole grants the given verb
+// on the given resource in any API group (including wildcard groups).
+// Use this only for prohibition checks where the goal is to detect any grant
+// regardless of which API group it appears in.
+func hasVerbAnyGroup(cr rbacv1.ClusterRole, resource, verb string) bool {
+	for _, rule := range cr.Rules {
+		resMatch := resource == ""
+		for _, r := range rule.Resources {
+			if r == resource || r == "*" {
+				resMatch = true
+				break
+			}
+		}
+		verbMatch := false
+		for _, v := range rule.Verbs {
+			if v == verb || v == "*" {
+				verbMatch = true
+				break
+			}
+		}
+		if resMatch && verbMatch {
+			return true
+		}
 	}
-	if getAPIServiceAccountName() == getServiceAccountName() {
-		t.Fatal("search-api must use a dedicated ServiceAccount")
+	return false
+}
+
+// TestSearchAPIClusterRoleCarriesImpersonate verifies the security invariant of the
+// pre-provisioned search-api ClusterRole: it must carry impersonate on the correct
+// resources, and the search-collector ClusterRole must not carry it at all.
+func TestSearchAPIClusterRoleCarriesImpersonate(t *testing.T) {
+	apiCR := loadClusterRole(t, "../config/rbac/search_api_clusterrole.yaml")
+
+	// search-api must grant impersonate on users/serviceaccounts/groups.
+	for _, res := range []string{"users", "serviceaccounts", "groups"} {
+		if !hasVerb(apiCR, "", res, "impersonate") {
+			t.Errorf("search-api ClusterRole must grant impersonate on %q", res)
+		}
+	}
+	// search-api must grant impersonate on user-extra resources.
+	for _, res := range []string{
+		"uids",
+		"userextras/authentication.kubernetes.io/credential-id",
+		"userextras/authentication.kubernetes.io/node-name",
+		"userextras/authentication.kubernetes.io/node-uid",
+		"userextras/authentication.kubernetes.io/pod-name",
+		"userextras/authentication.kubernetes.io/pod-uid",
+	} {
+		if !hasVerb(apiCR, "authentication.k8s.io", res, "impersonate") &&
+			!hasVerb(apiCR, "authorization.k8s.io", res, "impersonate") {
+			t.Errorf("search-api ClusterRole must grant impersonate on %q", res)
+		}
+	}
+
+	// search-collector must NOT carry impersonate in any API group.
+	collectorCR := loadClusterRole(t, "../config/rbac/search_collector_clusterrole.yaml")
+	if hasVerbAnyGroup(collectorCR, "", "impersonate") {
+		t.Error("search-collector ClusterRole must not grant impersonate on any resource")
 	}
 }
 
 // TestPostgresServiceAccountIsIsolated verifies that the postgres SA uses a dedicated
-// name distinct from the shared search SA. Postgres makes no Kubernetes API calls so
-// it intentionally carries no RBAC rules — this test asserts identity isolation only.
+// name distinct from all other search component SAs.
 func TestPostgresServiceAccountIsIsolated(t *testing.T) {
 	pgSA := getPostgresServiceAccountName()
-	if pgSA == getServiceAccountName() {
-		t.Fatalf("postgres must not share the generic search-serviceaccount (%q)", pgSA)
+	for _, other := range []string{
+		getAPIServiceAccountName(),
+		getCollectorServiceAccountName(),
+		getIndexerServiceAccountName(),
+	} {
+		if pgSA == other {
+			t.Fatalf("postgres SA %q must not be shared with another component", pgSA)
+		}
 	}
 	if pgSA == "" {
 		t.Fatal("postgres SA name must not be empty")
@@ -185,7 +280,7 @@ func TestIndexerClusterRoleExactRules(t *testing.T) {
 
 // TestIndexerWorkloadIdentityContract verifies that the ClusterRoleBinding subject
 // and IndexerDeployment ServiceAccountName both reference getIndexerServiceAccountName(),
-// and that the SA name is distinct from the shared search-serviceaccount.
+// and that the SA name is distinct from all other component SAs.
 func TestIndexerWorkloadIdentityContract(t *testing.T) {
 	namespace := "test-ns"
 	instance := &searchv1alpha1.Search{
@@ -214,83 +309,73 @@ func TestIndexerWorkloadIdentityContract(t *testing.T) {
 			deploy.Spec.Template.Spec.ServiceAccountName, getIndexerServiceAccountName())
 	}
 
-	// SA must be distinct from the shared account.
-	if getIndexerServiceAccountName() == getServiceAccountName() {
-		t.Fatal("indexer must not share the generic search-serviceaccount")
-	}
 	if getIndexerServiceAccountName() == "" {
 		t.Fatal("indexer SA name must not be empty")
 	}
 }
 
-// TestCollectorClusterRoleMinimumPermissions verifies that the collector ClusterRole:
-//  1. carries no write verbs other than those needed for lease management,
-//  2. does not carry impersonate,
-//  3. does not grant secrets/services/deployments write access,
-//  4. uses a dedicated ServiceAccount distinct from the shared and API ones.
+// TestCollectorClusterRoleMinimumPermissions verifies security invariants on the
+// pre-provisioned search-collector ClusterRole by decoding the static YAML manifest
+// into an rbacv1.ClusterRole and asserting per-rule verb/resource constraints.
 func TestCollectorClusterRoleMinimumPermissions(t *testing.T) {
-	// Verbs the collector must never hold.
-	forbidden := map[string]bool{
-		"impersonate":      true,
-		"create":           false, // allowed only for leases — checked per-resource below
-		"update":           false, // allowed only for leases
-		"patch":            true,  // collector never patches anything
-		"delete":           true,
-		"deletecollection": true,
-	}
-	// Write verbs that are only acceptable on coordination.k8s.io/leases.
-	leaseWriteVerbs := map[string]bool{"create": true, "update": true}
+	cr := loadClusterRole(t, "../config/rbac/search_collector_clusterrole.yaml")
 
-	for _, rule := range getCollectorRules() {
+	forbiddenVerbs := []string{"impersonate", "delete", "deletecollection"}
+	// Resources that must never have write verbs.
+	sensitiveResources := map[string]bool{"secrets": true, "services": true, "deployments": true}
+	writeVerbs := map[string]bool{"create": true, "update": true, "patch": true, "delete": true, "deletecollection": true}
+
+	for _, rule := range cr.Rules {
 		for _, verb := range rule.Verbs {
-			if forbidden[verb] {
-				t.Errorf("collector ClusterRole must not grant %q; found on resources %v", verb, rule.Resources)
-				continue
+			// Forbidden verbs on any resource in any API group.
+			for _, forbidden := range forbiddenVerbs {
+				if verb == forbidden {
+					t.Errorf("collector ClusterRole must not grant %q; found on resources %v apiGroups %v",
+						verb, rule.Resources, rule.APIGroups)
+				}
 			}
-			// create/update are only allowed on leases
-			if leaseWriteVerbs[verb] {
-				isLeaseRule := false
+			if writeVerbs[verb] {
 				for _, res := range rule.Resources {
+					// collectorconfigs/status writes are only legitimate under the search API group.
+					// Exactly one API group is required — empty or wildcard slices are rejected.
+					if res == "collectorconfigs/status" {
+						if len(rule.APIGroups) != 1 || rule.APIGroups[0] != "search.open-cluster-management.io" {
+							t.Errorf("collector ClusterRole grants write verb %q on collectorconfigs/status with apiGroups %v", verb, rule.APIGroups)
+						}
+						continue
+					}
+					// leases writes are only legitimate under coordination.k8s.io — not a wildcard group.
+					// Exactly one API group is required — empty or wildcard slices are rejected.
 					if res == "leases" {
-						isLeaseRule = true
-						break
+						if len(rule.APIGroups) != 1 || rule.APIGroups[0] != "coordination.k8s.io" {
+							t.Errorf("collector ClusterRole grants write verb %q on leases with apiGroups %v", verb, rule.APIGroups)
+						}
+						continue
+					}
+					// All other resources must not receive write verbs.
+					t.Errorf("collector ClusterRole grants write verb %q on unexpected resource %q (apiGroups %v)", verb, res, rule.APIGroups)
+				}
+			}
+			// Sensitive resources must never receive write verbs (belt-and-suspenders).
+			if writeVerbs[verb] {
+				for _, res := range rule.Resources {
+					if sensitiveResources[res] {
+						t.Errorf("collector ClusterRole must not grant write verb %q on sensitive resource %q", verb, res)
 					}
 				}
-				if !isLeaseRule {
-					t.Errorf("collector ClusterRole grants %q on non-lease resource %v", verb, rule.Resources)
-				}
-			}
-		}
-		// Reject any rule that grants write access to secrets, services, or deployments.
-		writeSensitive := map[string]bool{"secrets": true, "services": true, "deployments": true}
-		hasWriteVerb := false
-		for _, verb := range rule.Verbs {
-			if verb != "get" && verb != "list" && verb != "watch" {
-				hasWriteVerb = true
-				break
-			}
-		}
-		if hasWriteVerb {
-			for _, res := range rule.Resources {
-				if writeSensitive[res] {
-					t.Errorf("collector ClusterRole must not grant write access to %q", res)
-				}
 			}
 		}
 	}
 
-	// The collector must use its own SA.
-	if getCollectorServiceAccountName() == getServiceAccountName() {
-		t.Fatal("collector must use a dedicated ServiceAccount, not the shared search-serviceaccount")
-	}
+	// The collector must use its own SA, distinct from search-api's.
 	if getCollectorServiceAccountName() == getAPIServiceAccountName() {
-		t.Fatal("collector must use a dedicated ServiceAccount, not the search-api SA")
+		t.Fatal("collector SA must not match search-api SA")
 	}
 }
 
 // TestCollectorWorkloadIdentityContract verifies that both the ClusterRoleBinding
 // subject and the CollectorDeployment ServiceAccountName reference
-// getCollectorServiceAccountName(), and that the SA is distinct from the shared account.
+// getCollectorServiceAccountName(), and that the SA is distinct from all other SAs.
 func TestCollectorWorkloadIdentityContract(t *testing.T) {
 	namespace := "test-ns"
 	instance := &searchv1alpha1.Search{
@@ -319,10 +404,6 @@ func TestCollectorWorkloadIdentityContract(t *testing.T) {
 			deploy.Spec.Template.Spec.ServiceAccountName, getCollectorServiceAccountName())
 	}
 
-	// SA must be distinct from the shared account.
-	if getCollectorServiceAccountName() == getServiceAccountName() {
-		t.Fatal("collector must not share the generic search-serviceaccount")
-	}
 	if getCollectorServiceAccountName() == "" {
 		t.Fatal("collector SA name must not be empty")
 	}
