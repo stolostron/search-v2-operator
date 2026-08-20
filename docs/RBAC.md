@@ -157,3 +157,39 @@ Once we have the access rules for the user, we use the data to query the databas
 ### Status Changes: 
 COMPLETED (February 8, 2023 - ACM 2.7)   
 DRAFT (April 22, 2022)
+
+---
+
+## search-api ClusterRole (pre-provisioned static manifest)
+
+The `search-api` ClusterRole is applied as a static install-time manifest (`bundle/manifests/search-api-clusterrole.yaml`) and is **never created or modified by the operator at runtime**. The operator only creates the `ClusterRoleBinding` that binds this role to `search-api-sa`, using the narrower `bind` verb.
+
+### Rules
+
+| API Group | Resources | Verbs | Purpose |
+|---|---|---|---|
+| `authentication.k8s.io`, `authorization.k8s.io` | `uids`, `userextras/authentication.kubernetes.io/credential-id`, `userextras/authentication.kubernetes.io/node-name`, `userextras/authentication.kubernetes.io/node-uid`, `userextras/authentication.kubernetes.io/pod-name`, `userextras/authentication.kubernetes.io/pod-uid` | `impersonate` | Forward the full user identity (credential ID, node name, pod name, etc.) through the Kubernetes API server when executing `SelfSubjectRulesReviews` on behalf of the end user. |
+| `""` (core) | `users`, `serviceaccounts`, `groups` | `impersonate` | Issue requests as the authenticated user for per-user RBAC enforcement. |
+| `""` (core) | `secrets` | `get` | Read the named `search-global` Secret in each managed-hub namespace for the federated query path (`search-v2-api/pkg/federated/fedConfig.go`). The operator SA creates and manages Secrets and Services; the API pod only reads this one Secret. |
+| `authentication.k8s.io` | `tokenreviews` | `create` | Authenticate the end user's bearer token before impersonating them for RBAC-filtered query results. |
+| `authorization.k8s.io` | `selfsubjectaccessreviews`, `selfsubjectrulesreviews` | `create` | Evaluate per-user RBAC rules for filtering search results to resources the requesting user may access. |
+
+### Why pre-provisioned?
+
+Kubernetes RBAC escalation prevention blocks creating a ClusterRole with permissions the creator does not hold. Because `search-api` carries `impersonate`, the operator SA would have to hold `impersonate` itself — granting it cluster-admin-equivalent access — just to satisfy the admission check. Pre-provisioning the ClusterRole as a static manifest (applied by OLM or `make install-operand-rbac`) removes this dependency.
+
+---
+
+## search-collector ClusterRole (pre-provisioned static manifest)
+
+The `search-collector` ClusterRole is applied as a static install-time manifest (`bundle/manifests/search-collector-clusterrole.yaml`) following the same pattern as `search-api`.
+
+### Rules
+
+| API Group | Resources | Verbs | Purpose |
+|---|---|---|---|
+| `*` | `*` | `get`, `list`, `watch` | Watch every resource in the cluster for inventory collection. |
+| `search.open-cluster-management.io` | `collectorconfigs/status` | `patch`, `update` | Write the collector's sync status back via the `collectorconfigs/status` subresource. |
+| `coordination.k8s.io` | `leases` | `get`, `create`, `update` | Manage the addon heartbeat lease. |
+
+The collector does **not** hold `impersonate`, write access to `secrets`/`services`/`deployments`, `tokenreviews`, or `selfsubjectaccessreviews`.
