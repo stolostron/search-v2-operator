@@ -151,18 +151,48 @@ rm -rf $$TMP_DIR ;\
 }
 endef
 
+.PHONY: operator-sdk
+OPERATOR_SDK_VERSION = v1.37.0
+OPERATOR_SDK = $(shell pwd)/bin/operator-sdk
+operator-sdk: ## Download operator-sdk locally if necessary, validating version and checksum.
+	@{ \
+	set -e ;\
+	OS=$(shell go env GOHOSTOS) && ARCH=$(shell go env GOHOSTARCH) && \
+	if [ -f "$(OPERATOR_SDK)" ] && $(OPERATOR_SDK) version 2>/dev/null | grep -q "$(OPERATOR_SDK_VERSION)"; then \
+		echo "operator-sdk $(OPERATOR_SDK_VERSION) already present"; \
+		exit 0; \
+	fi; \
+	mkdir -p $(dir $(OPERATOR_SDK)) ;\
+	TMP_SDK=$$(mktemp) ;\
+	TMP_SUMS=$$(mktemp) ;\
+	curl -fLo "$${TMP_SDK}" "https://github.com/operator-framework/operator-sdk/releases/download/$(OPERATOR_SDK_VERSION)/operator-sdk_$${OS}_$${ARCH}" ;\
+	curl -fLo "$${TMP_SUMS}" "https://github.com/operator-framework/operator-sdk/releases/download/$(OPERATOR_SDK_VERSION)/checksums.txt" ;\
+	EXPECTED=$$(grep "operator-sdk_$${OS}_$${ARCH}$$" "$${TMP_SUMS}" | awk '{print $$1}') ;\
+	ACTUAL=$$(sha256sum "$${TMP_SDK}" 2>/dev/null || shasum -a 256 "$${TMP_SDK}") ;\
+	ACTUAL=$$(echo "$${ACTUAL}" | awk '{print $$1}') ;\
+	if [ "$${EXPECTED}" != "$${ACTUAL}" ]; then \
+		echo "ERROR: operator-sdk checksum mismatch (expected=$${EXPECTED} actual=$${ACTUAL})"; \
+		rm -f "$${TMP_SDK}" "$${TMP_SUMS}"; \
+		exit 1; \
+	fi; \
+	mv "$${TMP_SDK}" $(OPERATOR_SDK) ;\
+	chmod +x $(OPERATOR_SDK) ;\
+	rm -f "$${TMP_SUMS}" ;\
+	}
+
 .PHONY: bundle
-bundle: manifests kustomize ## Generate bundle manifests and metadata.
-	operator-sdk generate kustomize manifests -q
+bundle: manifests kustomize operator-sdk ## Generate bundle manifests and metadata.
+	$(OPERATOR_SDK) generate kustomize manifests -q
 	cd config/manager && $(KUSTOMIZE) edit set image controller=$(IMG)
-	$(KUSTOMIZE) build config/manifests | operator-sdk generate bundle -q --overwrite --version $(VERSION) $(BUNDLE_METADATA_OPTS)
+	$(KUSTOMIZE) build config/manifests | $(OPERATOR_SDK) generate bundle -q --overwrite --version $(VERSION) $(BUNDLE_METADATA_OPTS)
 	# Workaround: operator-sdk v1.34+ copies the kustomize-prefixed SA name into the CSV.
 	# The production SA is search-v2-operator, not search-v2-operator-controller-manager.
-	sed -i 's/serviceAccountName: search-v2-operator-controller-manager/serviceAccountName: search-v2-operator/g' bundle/manifests/search-v2-operator.clusterserviceversion.yaml
+	sed -i.bak 's/serviceAccountName: search-v2-operator-controller-manager/serviceAccountName: search-v2-operator/g' bundle/manifests/search-v2-operator.clusterserviceversion.yaml
+	rm -f bundle/manifests/search-v2-operator.clusterserviceversion.yaml.bak
 
 .PHONY: bundle-validate
-bundle-validate: ## Validate the bundle (informational — ClusterManagementAddOn triggers a known false-positive warning).
-	operator-sdk bundle validate ./bundle
+bundle-validate: operator-sdk ## Validate the bundle (informational — ClusterManagementAddOn triggers a known false-positive warning).
+	$(OPERATOR_SDK) bundle validate ./bundle
 
 .PHONY: bundle-build
 bundle-build: ## Build the bundle image.
