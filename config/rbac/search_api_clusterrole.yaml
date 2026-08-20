@@ -1,6 +1,6 @@
 # search-api ClusterRole — bound exclusively to search-api-sa.
 # Contains all permissions specific to the search-api pod: impersonation rights
-# for per-user RBAC enforcement, Secret/Service access for mTLS cert management,
+# for per-user RBAC enforcement, and Secret get access for federated hub config.
 # and authorization review verbs for RBAC-filtered query results.
 #
 # Pre-provisioned as a static manifest so the operator SA never needs to hold
@@ -40,19 +40,16 @@ rules:
   - groups
   verbs:
   - impersonate
-# Secret and Service access — required by search-api to manage its mTLS certs.
+# Secret get — required by the federated query path to read the named search-global
+# Secret in each managed-hub namespace (search-v2-api/pkg/federated/fedConfig.go).
+# The operator SA creates and manages Secrets and Services; the API pod only reads
+# this one named Secret.
 - apiGroups:
   - ""
   resources:
   - secrets
-  - services
   verbs:
-  - create
   - get
-  - list
-  - patch
-  - update
-  - watch
 # TokenReview — required to authenticate the end user's bearer token before
 # impersonating them for RBAC-filtered query results.
 - apiGroups:

@@ -170,7 +170,7 @@ The `search-api` ClusterRole is applied as a static install-time manifest (`bund
 |---|---|---|---|
 | `authentication.k8s.io`, `authorization.k8s.io` | `uids`, `userextras/authentication.kubernetes.io/credential-id`, `userextras/authentication.kubernetes.io/node-name`, `userextras/authentication.kubernetes.io/node-uid`, `userextras/authentication.kubernetes.io/pod-name`, `userextras/authentication.kubernetes.io/pod-uid` | `impersonate` | Forward the full user identity (credential ID, node name, pod name, etc.) through the Kubernetes API server when executing `SelfSubjectRulesReviews` on behalf of the end user. |
 | `""` (core) | `users`, `serviceaccounts`, `groups` | `impersonate` | Issue requests as the authenticated user for per-user RBAC enforcement. |
-| `""` (core) | `secrets`, `services` | `create`, `get`, `list`, `patch`, `update`, `watch` | Manage the mTLS certificates used by the search-api pod. |
+| `""` (core) | `secrets` | `get` | Read the named `search-global` Secret in each managed-hub namespace for the federated query path (`search-v2-api/pkg/federated/fedConfig.go`). The operator SA creates and manages Secrets and Services; the API pod only reads this one Secret. |
 | `authentication.k8s.io` | `tokenreviews` | `create` | Authenticate the end user's bearer token before impersonating them for RBAC-filtered query results. |
 | `authorization.k8s.io` | `selfsubjectaccessreviews`, `selfsubjectrulesreviews` | `create` | Evaluate per-user RBAC rules for filtering search results to resources the requesting user may access. |
 
