@@ -80,7 +80,9 @@ func TestSearch_controller(t *testing.T) {
 	}
 	objs := []runtime.Object{search}
 	// Create a fake client to mock API calls.
-	cl := fake.NewClientBuilder().WithStatusSubresource(search).WithRuntimeObjects(objs...).Build()
+	// WithScheme(s) is required so the fake client can handle rbacv1 ClusterRole/Binding
+	// objects created by the reconcile loop.
+	cl := fake.NewClientBuilder().WithScheme(s).WithStatusSubresource(search).WithRuntimeObjects(objs...).Build()
 
 	r := &SearchReconciler{Client: cl, DynamicClient: fakeDynClient(), Scheme: s}
 
@@ -176,35 +178,16 @@ func TestSearch_controller(t *testing.T) {
 	verifyConfigmapDataContent(t, configmap3, "postgresql-start.sh", "CREATE SCHEMA IF NOT EXISTS search")
 	verifyConfigmapDataContent(t, configmap3, "custom-postgresql.conf", "# Customizations appended to postgresql.conf")
 
-	//check for Service Account
-	serviceaccount := &corev1.ServiceAccount{}
-	err = cl.Get(context.TODO(), types.NamespacedName{
-		Name:      getServiceAccountName(),
-		Namespace: namespace,
-	}, serviceaccount)
-	if err != nil {
-		t.Errorf("Failed to get serviceaccount %s: %v", getServiceAccountName(), err)
-	}
-
-	//check for Role
-	role := &rbacv1.ClusterRole{}
-	err = cl.Get(context.TODO(), types.NamespacedName{
-		Name:      getRoleName(),
-		Namespace: namespace,
-	}, role)
-	if err != nil {
-		t.Errorf("Failed to get role %s: %v", getRoleName(), err)
-	}
-
-	//check for RoleBinding
+	// The "search" ClusterRole and its shared ServiceAccount have been removed.
+	// "search-api" and "search-collector" ClusterRoles are pre-provisioned static manifests;
+	// only their ClusterRoleBindings are created by the reconcile loop.
+	// ClusterRoleBindings are cluster-scoped — look up without namespace.
 	rolebinding := &rbacv1.ClusterRoleBinding{}
 	err = cl.Get(context.TODO(), types.NamespacedName{
-		Name:      getRoleBindingName(),
-		Namespace: namespace,
+		Name: getRoleBindingName() + "-api",
 	}, rolebinding)
-
 	if err != nil {
-		t.Errorf("Failed to get serviceaccount %s: %v", getRoleBindingName(), err)
+		t.Errorf("Failed to get clusterrolebinding %s: %v", getRoleBindingName()+"-api", err)
 	}
 
 	//check for PVC
@@ -278,43 +261,30 @@ func TestSearch_controller(t *testing.T) {
 	}
 
 	// We should expect Addon ClusterRole deleted by Finalizer
+	addonRole := &rbacv1.ClusterRole{}
 	err = cl.Get(context.TODO(), types.NamespacedName{
 		Name:      getAddonRoleName(),
 		Namespace: namespace,
-	}, role)
-
+	}, addonRole)
 	if !errors.IsNotFound(err) {
-		t.Errorf("Failed to delete Clusterrole %s", getAddonRoleName())
+		t.Errorf("Failed to delete ClusterRole %s", getAddonRoleName())
 	}
 
-	// We should expect Addon ClusterRolebinding deleted by Finalizer
+	// We should expect Addon ClusterRoleBinding deleted by Finalizer
 	err = cl.Get(context.TODO(), types.NamespacedName{
 		Name:      getAddonRoleName(),
 		Namespace: namespace,
 	}, rolebinding)
-
 	if !errors.IsNotFound(err) {
 		t.Errorf("Failed to delete ClusterRoleBinding %s", getAddonRoleName())
 	}
 
-	// We should expect Search ClusterRole deleted by Finalizer
+	// The "search-api" ClusterRoleBinding (which the operator created) should be gone.
 	err = cl.Get(context.TODO(), types.NamespacedName{
-		Name:      getRoleName(),
-		Namespace: namespace,
-	}, role)
-
-	if !errors.IsNotFound(err) {
-		t.Errorf("Failed to delete Clusterrole %s", getRoleName())
-	}
-
-	// We should expect Search ClusterRolebinding deleted by Finalizer
-	err = cl.Get(context.TODO(), types.NamespacedName{
-		Name:      getRoleBindingName(),
-		Namespace: namespace,
+		Name: getRoleBindingName() + "-api",
 	}, rolebinding)
-
 	if !errors.IsNotFound(err) {
-		t.Errorf("Failed to delete ClusterRoleBinding %s", getRoleBindingName())
+		t.Errorf("Finalizer should have deleted ClusterRoleBinding %s", getRoleBindingName()+"-api")
 	}
 
 }
@@ -967,11 +937,10 @@ func TestSearch_controller_DBConfigAndEnvOverlap(t *testing.T) {
 }
 
 // TestCreateUpdateRoles_UpdatesExistingClusterRole verifies that when a pre-existing
-// ClusterRole has stale rules (e.g. still carries impersonate on the shared role),
-// createUpdateRoles copies the desired rules onto the fetched object and updates it.
-// This exercises the resourceVersion-preserving path: the fetched existingClusterRole
-// is updated rather than the freshly constructed crole, which has no resourceVersion
-// and would be rejected by the API server.
+// ClusterRole has stale rules, createUpdateRoles copies the desired rules onto the
+// fetched object and updates it. This exercises the resourceVersion-preserving path:
+// the fetched existingClusterRole is updated rather than the freshly constructed crole,
+// which has no resourceVersion and would be rejected by the API server.
 func TestCreateUpdateRoles_UpdatesExistingClusterRole(t *testing.T) {
 	namespace := "test-ns"
 	search := &searchv1alpha1.Search{
@@ -979,17 +948,17 @@ func TestCreateUpdateRoles_UpdatesExistingClusterRole(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{Name: "search-v2-operator", Namespace: namespace},
 	}
 
-	// Pre-existing ClusterRole with stale rules (impersonate still present).
+	// Use the indexer ClusterRole (still managed dynamically by the operator).
+	// Pre-populate it with a stale rule to exercise the update path.
 	staleRule := rbacv1.PolicyRule{
 		APIGroups: []string{""},
-		Resources: []string{"users", "serviceaccounts", "groups"},
-		Verbs:     []string{"impersonate"},
+		Resources: []string{"secrets"},
+		Verbs:     []string{"delete"},
 	}
 	existing := &rbacv1.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:            getRoleName(),
-			Namespace:       namespace, // match the namespace set by ClusterRole() builder
-			ResourceVersion: "999",    // simulates a server-assigned value
+			Name:            getRoleName() + "-indexer",
+			ResourceVersion: "999", // simulates a server-assigned value
 		},
 		Rules: []rbacv1.PolicyRule{staleRule},
 	}
@@ -1004,8 +973,7 @@ func TestCreateUpdateRoles_UpdatesExistingClusterRole(t *testing.T) {
 	cl := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(existing).Build()
 	r := &SearchReconciler{Client: cl, Scheme: s}
 
-	// Build the desired ClusterRole (no impersonate in getRules()).
-	desired := r.ClusterRole(search)
+	desired := r.IndexerClusterRole(search)
 
 	result, err := r.createUpdateRoles(context.TODO(), desired)
 	if result != nil || err != nil {
@@ -1013,12 +981,11 @@ func TestCreateUpdateRoles_UpdatesExistingClusterRole(t *testing.T) {
 	}
 
 	updated := &rbacv1.ClusterRole{}
-	if err := cl.Get(context.TODO(), types.NamespacedName{Name: getRoleName(), Namespace: namespace}, updated); err != nil {
+	if err := cl.Get(context.TODO(), types.NamespacedName{Name: getRoleName() + "-indexer"}, updated); err != nil {
 		t.Fatalf("get updated ClusterRole: %v", err)
 	}
 
-	// Confirm the updated object matches the desired rules exactly (full semantic equality,
-	// not just length — catches cases where count matches but content differs).
+	// Confirm the updated object matches the desired rules exactly.
 	if !equality.Semantic.DeepEqual(updated.Rules, desired.Rules) {
 		t.Errorf("ClusterRole rules after update do not match desired:\ngot:  %+v\nwant: %+v", updated.Rules, desired.Rules)
 	}
