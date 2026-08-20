@@ -1296,6 +1296,58 @@ func TestCreateOrUpdateConfigMap_PostgresNoCustomConfig(t *testing.T) {
 	assert.Equal(t, expectedCustomConf, updated.Data["custom-postgresql.conf"])
 }
 
+func TestGetContainerEnvVarDropsNonOperatorSecrets(t *testing.T) {
+	instance := &searchv1alpha1.Search{
+		Spec: searchv1alpha1.SearchSpec{
+			Deployments: searchv1alpha1.SearchDeployments{
+				QueryAPI: searchv1alpha1.DeploymentConfig{
+					Env: []corev1.EnvVar{
+						{Name: "PLAIN", Value: "plainvalue"},
+						// Operator-managed secret — should be kept.
+						{Name: "DB_PASS", ValueFrom: &corev1.EnvVarSource{
+							SecretKeyRef: &corev1.SecretKeySelector{
+								LocalObjectReference: corev1.LocalObjectReference{Name: "search-postgres"},
+								Key:                  "database-password",
+							},
+						}},
+						// Non-operator secret — should be dropped.
+						{Name: "EVIL", ValueFrom: &corev1.EnvVarSource{
+							SecretKeyRef: &corev1.SecretKeySelector{
+								LocalObjectReference: corev1.LocalObjectReference{Name: "attacker-secret"},
+								Key:                  "token",
+							},
+						}},
+					},
+				},
+			},
+		},
+	}
+
+	envVars := getContainerEnvVar("search-api", instance)
+
+	// Expect 2 env vars: PLAIN, DB_PASS. EVIL should be dropped.
+	assert.Equal(t, 2, len(envVars), "Expected 2 env vars, EVIL should be dropped")
+
+	names := make([]string, len(envVars))
+	for i, e := range envVars {
+		names[i] = e.Name
+	}
+	assert.Equal(t, []string{"PLAIN", "DB_PASS"}, names)
+}
+
+func TestGetContainerEnvVarNilEnv(t *testing.T) {
+	instance := &searchv1alpha1.Search{
+		Spec: searchv1alpha1.SearchSpec{
+			Deployments: searchv1alpha1.SearchDeployments{
+				QueryAPI: searchv1alpha1.DeploymentConfig{},
+			},
+		},
+	}
+
+	envVars := getContainerEnvVar("search-api", instance)
+	assert.Equal(t, 0, len(envVars), "Nil env should return empty slice")
+}
+
 func TestGetPrometheusAlertMaxAppsCount(t *testing.T) {
 	search := &searchv1alpha1.Search{
 		TypeMeta:   metav1.TypeMeta{Kind: "Search"},
