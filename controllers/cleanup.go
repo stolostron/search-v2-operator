@@ -72,14 +72,14 @@ func (r *SearchReconciler) deleteClusterRole(instance *searchv1alpha1.Search, re
 
 func (r *SearchReconciler) deleteClusterRoleBinding(instance *searchv1alpha1.Search, resourceName string) error {
 	log.V(2).Info("Deleting ClusterRoleBinding ", "resourceName", resourceName)
+	// ClusterRoleBindings are cluster-scoped — no namespace.
 	crb := &rbacv1.ClusterRoleBinding{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "ClusterRoleBinding",
 			APIVersion: rbacv1.SchemeGroupVersion.String(),
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      resourceName,
-			Namespace: instance.GetNamespace(),
+			Name: resourceName,
 		},
 	}
 	err := r.Delete(context.TODO(), crb)
