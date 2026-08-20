@@ -14,7 +14,7 @@ metadata:
         }
       ]
     capabilities: Basic Install
-    createdAt: "2025-08-27T19:14:13Z"
+    createdAt: "2026-08-20T19:06:56Z"
     operators.operatorframework.io/builder: operator-sdk-v1.37.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
   name: search-v2-operator.v0.0.1
@@ -47,16 +47,13 @@ spec:
         - apiGroups:
           - ""
           resources:
-          - groups
           - secrets
           - serviceaccounts
           - services
-          - users
           verbs:
           - create
           - delete
           - get
-          - impersonate
           - list
           - patch
           - update
@@ -115,18 +112,6 @@ spec:
           - tokenreviews
           verbs:
           - create
-        - apiGroups:
-          - authentication.k8s.io
-          - authorization.k8s.io
-          resources:
-          - uids
-          - userextras/authentication.kubernetes.io/credential-id
-          - userextras/authentication.kubernetes.io/node-name
-          - userextras/authentication.kubernetes.io/node-uid
-          - userextras/authentication.kubernetes.io/pod-name
-          - userextras/authentication.kubernetes.io/pod-uid
-          verbs:
-          - impersonate
         - apiGroups:
           - authentication.open-cluster-management.io
           resources:
@@ -209,7 +194,6 @@ spec:
           - rbac.authorization.k8s.io
           resources:
           - clusterrolebindings
-          - clusterroles
           - rolebindings
           - roles
           verbs:
@@ -218,6 +202,25 @@ spec:
           - get
           - list
           - update
+        - apiGroups:
+          - rbac.authorization.k8s.io
+          resources:
+          - clusterroles
+          verbs:
+          - bind
+          - create
+          - delete
+          - get
+          - list
+          - update
+        - apiGroups:
+          - rbac.open-cluster-management.io
+          resources:
+          - clusterpermissions
+          verbs:
+          - create
+          - delete
+          - get
         - apiGroups:
           - search.open-cluster-management.io
           resources:
@@ -321,6 +324,10 @@ spec:
                   value: quay.io/stolostron/search-collector:2.7.0-de589fdba4effc06198db8250c1ae3118125d685
                 - name: API_IMAGE
                   value: quay.io/stolostron/search-v2-api:2.7.0-69590634c2de51ceec786af47ca5fb00f42a631a
+                - name: OPERATOR_ORG
+                  value: '{{ .Values.org }}'
+                - name: OPERATOR_CHART
+                  value: '{{ .Chart.Name }}'
                 image: quay.io/stolostron/search-v2-operator:2.7.0-dc0fc8c59239b6a0a3f440b7752101523d87f597
                 livenessProbe:
                   httpGet:
