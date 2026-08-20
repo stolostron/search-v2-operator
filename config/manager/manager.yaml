@@ -42,6 +42,10 @@ spec:
           value: quay.io/stolostron/search-collector:2.7.0-de589fdba4effc06198db8250c1ae3118125d685
         - name: API_IMAGE
           value: quay.io/stolostron/search-v2-api:2.7.0-69590634c2de51ceec786af47ca5fb00f42a631a
+        - name: OPERATOR_ORG
+          value: '{{ .Values.org }}'
+        - name: OPERATOR_CHART
+          value: '{{ .Chart.Name }}'
         args:
         - --leader-elect
         image: controller:latest
