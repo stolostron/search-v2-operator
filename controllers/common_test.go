@@ -338,20 +338,18 @@ func TestCollectorClusterRoleMinimumPermissions(t *testing.T) {
 			if writeVerbs[verb] {
 				for _, res := range rule.Resources {
 					// collectorconfigs/status writes are only legitimate under the search API group.
+					// Exactly one API group is required — empty or wildcard slices are rejected.
 					if res == "collectorconfigs/status" {
-						for _, g := range rule.APIGroups {
-							if g != "search.open-cluster-management.io" {
-								t.Errorf("collector ClusterRole grants write verb %q on collectorconfigs/status in unexpected apiGroup %q", verb, g)
-							}
+						if len(rule.APIGroups) != 1 || rule.APIGroups[0] != "search.open-cluster-management.io" {
+							t.Errorf("collector ClusterRole grants write verb %q on collectorconfigs/status with apiGroups %v", verb, rule.APIGroups)
 						}
 						continue
 					}
 					// leases writes are only legitimate under coordination.k8s.io — not a wildcard group.
+					// Exactly one API group is required — empty or wildcard slices are rejected.
 					if res == "leases" {
-						for _, g := range rule.APIGroups {
-							if g == "*" || g != "coordination.k8s.io" {
-								t.Errorf("collector ClusterRole grants write verb %q on leases in unexpected apiGroup %q", verb, g)
-							}
+						if len(rule.APIGroups) != 1 || rule.APIGroups[0] != "coordination.k8s.io" {
+							t.Errorf("collector ClusterRole grants write verb %q on leases with apiGroups %v", verb, rule.APIGroups)
 						}
 						continue
 					}
