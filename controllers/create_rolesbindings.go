@@ -92,7 +92,7 @@ func (r *SearchReconciler) APIClusterRoleBinding(instance *searchv1alpha1.Search
 		},
 		RoleRef: rbacv1.RoleRef{
 			Kind:     "ClusterRole",
-			Name:     getRoleName() + "-api",
+			Name:     getAPIClusterRoleName(),
 			APIGroup: rbacv1.GroupName,
 		},
 		Subjects: []rbacv1.Subject{{
@@ -168,7 +168,7 @@ func (r *SearchReconciler) CollectorClusterRoleBinding(instance *searchv1alpha1.
 		},
 		RoleRef: rbacv1.RoleRef{
 			Kind:     "ClusterRole",
-			Name:     getRoleName() + "-collector",
+			Name:     getCollectorClusterRoleName(),
 			APIGroup: rbacv1.GroupName,
 		},
 		Subjects: []rbacv1.Subject{{

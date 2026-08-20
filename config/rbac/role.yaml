@@ -203,9 +203,6 @@ rules:
   - update
 - apiGroups:
   - rbac.authorization.k8s.io
-  resourceNames:
-  - search-api
-  - search-collector
   resources:
   - clusterroles
   verbs:

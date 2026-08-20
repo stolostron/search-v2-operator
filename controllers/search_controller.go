@@ -68,9 +68,15 @@ var cleanOnce sync.Once
 //+kubebuilder:rbac:groups="",resources=configmaps,verbs=get;update
 //+kubebuilder:rbac:groups=apps,resources=deployments,verbs=create;delete;get;list;patch;update;watch
 // 'bind' on the pre-provisioned search-api and search-collector ClusterRoles lets the
-// operator create their ClusterRoleBindings without holding 'impersonate' or wildcard
-// read. Both ClusterRoles are static manifests; the operator never creates or updates them.
-//+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=clusterroles,verbs=bind,resourceNames=search-api;search-collector
+// operator create their ClusterRoleBindings without holding 'impersonate' or wildcard read.
+// Both ClusterRoles are static manifests; the operator never creates or updates them.
+// The operator resolves the actual ClusterRole name at runtime via getAPIClusterRoleName() /
+// getCollectorClusterRoleName(), which read OPERATOR_ORG and OPERATOR_CHART env vars.
+// In Helm deployments the ClusterRoles carry an org:chart: prefix so resourceNames cannot
+// be set statically here. 'bind' on clusterroles without resourceNames is intentional and
+// safe — 'bind' only allows creating a ClusterRoleBinding that references an existing role;
+// it does not grant the permissions that role contains.
+//+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=clusterroles,verbs=bind
 //+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=roles;rolebindings;clusterroles;clusterrolebindings,verbs=create;get;list;update;delete
 //+kubebuilder:rbac:groups=coordination.k8s.io,resources=leases,verbs=get;list;create;update;patch;watch
 //+kubebuilder:rbac:groups=monitoring.coreos.com,resources=servicemonitors,verbs=create;delete;get;list
