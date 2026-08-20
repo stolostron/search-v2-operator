@@ -40,26 +40,6 @@ func (r *SearchReconciler) createSearchServiceAccount(ctx context.Context,
 	return nil, nil
 }
 
-func (r *SearchReconciler) SearchServiceAccount(instance *searchv1alpha1.Search) *corev1.ServiceAccount {
-
-	sa := &corev1.ServiceAccount{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "ServiceAccount",
-			APIVersion: corev1.SchemeGroupVersion.String(),
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      getServiceAccountName(),
-			Namespace: instance.GetNamespace(),
-		},
-	}
-
-	err := controllerutil.SetControllerReference(instance, sa, r.Scheme)
-	if err != nil {
-		log.V(2).Info("Could not set control for ", "serviceaccount", getServiceAccountName())
-	}
-	return sa
-}
-
 // SearchPostgresServiceAccount builds the dedicated SA for the search-postgres
 // deployment. Postgres makes no Kubernetes API calls, so no ClusterRole is bound
 // to this SA — it exists solely to isolate the pod identity from the other

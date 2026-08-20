@@ -18,3 +18,10 @@ resources:
 - auth_proxy_role.yaml
 - auth_proxy_role_binding.yaml
 - auth_proxy_client_clusterrole.yaml
+# NOTE: search_api_clusterrole.yaml and search_collector_clusterrole.yaml are
+# deliberately NOT listed here.  These ClusterRoles have fixed canonical names
+# ("search-api", "search-collector") that must not receive the search-v2-operator-
+# namePrefix applied by config/default/kustomization.yaml.
+#
+# OLM path  : Both files are in bundle/manifests/ and applied by OLM at install time.
+# Development: Run `make install-operand-rbac` to apply them directly to the cluster.
