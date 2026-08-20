@@ -625,14 +625,101 @@ func TestIndexerCustomization(t *testing.T) {
 		t.Error("ImageOverride with incorrect image")
 	}
 	actual_args := getContainerArgs(testFor, instance)
-	if actual_args == nil || len(actual_args) != 2 || actual_args[0] != "arg1" || actual_args[1] != "arg2" {
-		t.Error("Incorrect Args parsed")
+	if len(actual_args) != 0 {
+		t.Errorf("Expected non-verbosity args to be dropped, got %v", actual_args)
 	}
 	envVars := getContainerEnvVar(testFor, instance)
 	if len(envVars) != 2 || envVars[0].Name != "env1" || envVars[0].Value != "value1" {
 		t.Errorf("Env vars not set for %s", testFor)
 	}
 }
+// TestGetContainerArgsAllowsVerbosity verifies that -v= and --v= arguments pass through the allowlist.
+func TestGetContainerArgsAllowsVerbosity(t *testing.T) {
+	for _, arg := range []string{"-v=5", "--v=5"} {
+		t.Run(arg, func(t *testing.T) {
+			instance := &searchv1alpha1.Search{
+				Spec: searchv1alpha1.SearchSpec{
+					Deployments: searchv1alpha1.SearchDeployments{
+						Indexer: searchv1alpha1.DeploymentConfig{
+							Arguments: []string{arg},
+						},
+					},
+				},
+			}
+			args := getContainerArgs("search-indexer", instance)
+			if len(args) != 1 || args[0] != arg {
+				t.Errorf("expected [%s], got %v", arg, args)
+			}
+		})
+	}
+}
+
+// TestGetContainerArgsRejectsNonVerbosity verifies that arguments other than -v= are dropped.
+func TestGetContainerArgsRejectsNonVerbosity(t *testing.T) {
+	cases := []struct {
+		name string
+		args []string
+	}{
+		{"postgres flag", []string{"-c", "ssl=off"}},
+		{"config file", []string{"-c", "./evil.json"}},
+		{"kubeconfig", []string{"-kubeconfig=/tmp/kubeconfig"}},
+		{"arbitrary flag", []string{"--log_dir=/tmp/exfil"}},
+		{"mixed valid and invalid", []string{"-v=3", "-c", "hba_file=/dev/null", "-v=5"}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			instance := &searchv1alpha1.Search{
+				Spec: searchv1alpha1.SearchSpec{
+					Deployments: searchv1alpha1.SearchDeployments{
+						Database: searchv1alpha1.DeploymentConfig{
+							Arguments: tc.args,
+						},
+					},
+				},
+			}
+			result := getContainerArgs("search-postgres", instance)
+			for _, arg := range result {
+				if !strings.HasPrefix(arg, "-v=") && !strings.HasPrefix(arg, "--v=") {
+					t.Errorf("non-verbosity arg %q was not filtered", arg)
+				}
+			}
+		})
+	}
+}
+
+// TestGetContainerArgsMixedKeepsOnlyVerbosity verifies that when a mix of valid and
+// invalid arguments is provided, only the -v= arguments are kept.
+func TestGetContainerArgsMixedKeepsOnlyVerbosity(t *testing.T) {
+	instance := &searchv1alpha1.Search{
+		Spec: searchv1alpha1.SearchSpec{
+			Deployments: searchv1alpha1.SearchDeployments{
+				Indexer: searchv1alpha1.DeploymentConfig{
+					Arguments: []string{"-v=3", "--log_dir=/tmp", "-v=5", "-c", "ssl=off"},
+				},
+			},
+		},
+	}
+	args := getContainerArgs("search-indexer", instance)
+	if len(args) != 2 || args[0] != "-v=3" || args[1] != "-v=5" {
+		t.Errorf("expected [-v=3 -v=5], got %v", args)
+	}
+}
+
+// TestGetContainerArgsNilReturnsEmpty verifies that nil Arguments returns an empty slice.
+func TestGetContainerArgsNilReturnsEmpty(t *testing.T) {
+	instance := &searchv1alpha1.Search{
+		Spec: searchv1alpha1.SearchSpec{
+			Deployments: searchv1alpha1.SearchDeployments{
+				Indexer: searchv1alpha1.DeploymentConfig{},
+			},
+		},
+	}
+	args := getContainerArgs("search-indexer", instance)
+	if len(args) != 0 {
+		t.Errorf("expected empty args for nil Arguments, got %v", args)
+	}
+}
+
 func TestCollectorCustomization(t *testing.T) {
 	testFor := "search-collector"
 	tol := corev1.Toleration{
@@ -801,8 +888,8 @@ func TestPostgresCustomization(t *testing.T) {
 		t.Error("ImageOverride with incorrect image")
 	}
 	actual_args := getContainerArgs(testFor, instance)
-	if actual_args == nil || len(actual_args) != 1 || actual_args[0] != "arg1" {
-		t.Error("Incorrect Args parsed")
+	if len(actual_args) != 0 {
+		t.Errorf("Expected non-verbosity args to be dropped, got %v", actual_args)
 	}
 
 	actual_volume := getPostgresVolume(instance)
