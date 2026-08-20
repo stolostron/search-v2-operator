@@ -197,8 +197,15 @@ func getPostgresVolume(instance *searchv1alpha1.Search) corev1.Volume {
 func getContainerArgs(deploymentName string, instance *searchv1alpha1.Search) []string {
 	var result []string
 	deploymentConfig := getDeploymentConfig(deploymentName, instance)
-	if deploymentConfig.Arguments != nil {
-		return deploymentConfig.Arguments
+	if deploymentConfig.Arguments == nil {
+		return result
+	}
+	for _, arg := range deploymentConfig.Arguments {
+		if strings.HasPrefix(arg, "-v=") || strings.HasPrefix(arg, "--v=") { // reject any container argument besides log verbosity
+			result = append(result, arg)
+		} else {
+			log.Info("Ignoring unsupported container argument", "deployment", deploymentName, "argument", arg)
+		}
 	}
 	return result
 }
