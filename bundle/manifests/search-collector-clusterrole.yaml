@@ -14,7 +14,13 @@
 # tokenreviews, or selfsubjectaccessreviews.
 #
 # NOTE: This file is NOT managed by controller-gen.  Changes here must be kept
-# in sync with bundle/manifests/search-collector-clusterrole.yaml (OLM path).
+# in sync with config/rbac/search_collector_clusterrole.yaml (dev/kustomize path).
+#
+# HELM PATH (multiclusterhub-operator): the bundle-automation script renames this role to
+#   name: '{{ .Values.org }}:{{ .Chart.Name }}:search-collector'
+# (e.g. "open-cluster-management:search-v2-operator:search-collector").
+# The operator reads OPERATOR_ORG and OPERATOR_CHART env vars injected by the Helm chart
+# to resolve the full name at runtime when creating the ClusterRoleBinding's RoleRef.
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
