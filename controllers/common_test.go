@@ -91,10 +91,11 @@ func loadClusterRole(t *testing.T, path string) rbacv1.ClusterRole {
 
 // hasVerb returns true when any rule in the ClusterRole grants the given verb
 // on (at least one of) the given resources under the given apiGroup.
-// An empty apiGroup or resource string matches any value.
+// apiGroup must match exactly — "" is the Kubernetes core API group, not a wildcard.
+// A wildcard rule in the manifest ("*") satisfies any requested apiGroup or resource.
 func hasVerb(cr rbacv1.ClusterRole, apiGroup, resource, verb string) bool {
 	for _, rule := range cr.Rules {
-		groupMatch := apiGroup == ""
+		groupMatch := false
 		for _, g := range rule.APIGroups {
 			if g == apiGroup || g == "*" {
 				groupMatch = true
@@ -116,6 +117,33 @@ func hasVerb(cr rbacv1.ClusterRole, apiGroup, resource, verb string) bool {
 			}
 		}
 		if groupMatch && resMatch && verbMatch {
+			return true
+		}
+	}
+	return false
+}
+
+// hasVerbAnyGroup returns true when any rule in the ClusterRole grants the given verb
+// on the given resource in any API group (including wildcard groups).
+// Use this only for prohibition checks where the goal is to detect any grant
+// regardless of which API group it appears in.
+func hasVerbAnyGroup(cr rbacv1.ClusterRole, resource, verb string) bool {
+	for _, rule := range cr.Rules {
+		resMatch := resource == ""
+		for _, r := range rule.Resources {
+			if r == resource || r == "*" {
+				resMatch = true
+				break
+			}
+		}
+		verbMatch := false
+		for _, v := range rule.Verbs {
+			if v == verb || v == "*" {
+				verbMatch = true
+				break
+			}
+		}
+		if resMatch && verbMatch {
 			return true
 		}
 	}
@@ -149,9 +177,9 @@ func TestSearchAPIClusterRoleCarriesImpersonate(t *testing.T) {
 		}
 	}
 
-	// search-collector must NOT carry impersonate.
+	// search-collector must NOT carry impersonate in any API group.
 	collectorCR := loadClusterRole(t, "../config/rbac/search_collector_clusterrole.yaml")
-	if hasVerb(collectorCR, "", "", "impersonate") {
+	if hasVerbAnyGroup(collectorCR, "", "impersonate") {
 		t.Error("search-collector ClusterRole must not grant impersonate on any resource")
 	}
 }
@@ -294,27 +322,44 @@ func TestCollectorClusterRoleMinimumPermissions(t *testing.T) {
 	cr := loadClusterRole(t, "../config/rbac/search_collector_clusterrole.yaml")
 
 	forbiddenVerbs := []string{"impersonate", "delete", "deletecollection"}
-	// Resources that must never have write verbs (create/update/patch/delete).
+	// Resources that must never have write verbs.
 	sensitiveResources := map[string]bool{"secrets": true, "services": true, "deployments": true}
 	writeVerbs := map[string]bool{"create": true, "update": true, "patch": true, "delete": true, "deletecollection": true}
 
 	for _, rule := range cr.Rules {
 		for _, verb := range rule.Verbs {
-			// Forbidden verbs on any resource.
+			// Forbidden verbs on any resource in any API group.
 			for _, forbidden := range forbiddenVerbs {
 				if verb == forbidden {
-					t.Errorf("collector ClusterRole must not grant %q; found on resources %v", verb, rule.Resources)
+					t.Errorf("collector ClusterRole must not grant %q; found on resources %v apiGroups %v",
+						verb, rule.Resources, rule.APIGroups)
 				}
 			}
-			// Write verbs are only allowed on collectorconfigs/status.
 			if writeVerbs[verb] {
 				for _, res := range rule.Resources {
-					if res != "collectorconfigs/status" && res != "leases" {
-						t.Errorf("collector ClusterRole grants write verb %q on unexpected resource %q", verb, res)
+					// collectorconfigs/status writes are only legitimate under the search API group.
+					if res == "collectorconfigs/status" {
+						for _, g := range rule.APIGroups {
+							if g != "search.open-cluster-management.io" {
+								t.Errorf("collector ClusterRole grants write verb %q on collectorconfigs/status in unexpected apiGroup %q", verb, g)
+							}
+						}
+						continue
 					}
+					// leases writes are only legitimate under coordination.k8s.io — not a wildcard group.
+					if res == "leases" {
+						for _, g := range rule.APIGroups {
+							if g == "*" || g != "coordination.k8s.io" {
+								t.Errorf("collector ClusterRole grants write verb %q on leases in unexpected apiGroup %q", verb, g)
+							}
+						}
+						continue
+					}
+					// All other resources must not receive write verbs.
+					t.Errorf("collector ClusterRole grants write verb %q on unexpected resource %q (apiGroups %v)", verb, res, rule.APIGroups)
 				}
 			}
-			// Sensitive resources must never receive write verbs.
+			// Sensitive resources must never receive write verbs (belt-and-suspenders).
 			if writeVerbs[verb] {
 				for _, res := range rule.Resources {
 					if sensitiveResources[res] {

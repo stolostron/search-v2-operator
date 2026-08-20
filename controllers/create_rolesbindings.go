@@ -56,7 +56,11 @@ func (r *SearchReconciler) createRoleBinding(ctx context.Context,
 		Name:      rolebinding.Name,
 		Namespace: rolebinding.Namespace,
 	}, found)
-	if err != nil && errors.IsNotFound(err) {
+	if err != nil && !errors.IsNotFound(err) {
+		log.Error(err, "Could not get clusterrolebinding", "name", rolebinding.Name)
+		return &reconcile.Result{}, err
+	}
+	if errors.IsNotFound(err) {
 		err = r.Create(ctx, rolebinding)
 		if err != nil {
 			log.Error(err, "Could not create clusterrolebinding"+rolebinding.Name)
@@ -64,7 +68,7 @@ func (r *SearchReconciler) createRoleBinding(ctx context.Context,
 		}
 		log.Info("Created clusterrolebinding " + rolebinding.Name)
 		log.V(2).Info("Created clusterrolebinding ", "clusterrolebinding", rolebinding)
-	} else if err == nil {
+	} else {
 		// ClusterRoleBinding.roleRef is immutable in Kubernetes. If the desired RoleRef
 		// differs from the existing one (e.g. OPERATOR_ORG / OPERATOR_CHART changed between
 		// releases), we must delete and recreate rather than update.
