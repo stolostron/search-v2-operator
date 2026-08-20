@@ -47,6 +47,10 @@ spec:
           value: quay.io/stolostron/search-collector:placeholder-image-tag
         - name: API_IMAGE
           value: quay.io/stolostron/search-v2-api:placeholder-image-tag
+        - name: OPERATOR_ORG
+          value: '{{ .Values.org }}'
+        - name: OPERATOR_CHART
+          value: '{{ .Chart.Name }}'
         args:
         - --leader-elect
         image: controller:latest
