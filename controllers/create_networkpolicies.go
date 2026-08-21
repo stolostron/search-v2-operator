@@ -248,8 +248,8 @@ func (r *SearchReconciler) CollectorNetworkPolicy(instance *searchv1alpha1.Searc
 //     A ports-only rule (no From selector) is used because OVN-Kubernetes on OCP 4.22+ does
 //     not reliably match hostNetwork traffic even with the documented empty
 //     namespaceSelector+podSelector pattern. This is safe: the webhook is exposed only via a
-//     ClusterIP Service (not reachable from outside the cluster) and authenticates callers
-//     via TLS certificates issued by the API server's CA.
+//     ClusterIP Service (unreachable from outside the cluster) and TLS authenticates the
+//     webhook server to the API server. The rule permits all in-cluster sources.
 //   - Ingress (metrics): Prometheus (openshift-monitoring) scrapes the controller-runtime
 //     metrics port.
 //   - Egress: The operator manages nearly every resource type used by Search (Deployments,
@@ -260,11 +260,12 @@ func (r *SearchReconciler) OperatorNetworkPolicy(instance *searchv1alpha1.Search
 	np := newNetworkPolicy(instance, "search-operator", podLabels)
 	np.Spec.Ingress = []networkingv1.NetworkPolicyIngressRule{
 		{
-			// Webhook port: ports-only rule (no From selector) allows all sources.
-			// OVN-Kubernetes on OCP 4.22+ does not reliably match hostNetwork traffic
-			// (kube-apiserver) even with the documented empty namespaceSelector+podSelector
-			// pattern. A ports-only rule is safe here because the webhook is ClusterIP-only
-			// and uses TLS certificate authentication.
+			// Webhook port: ports-only rule (no From selector) permits all in-cluster
+			// sources. OVN-Kubernetes on OCP 4.22+ does not reliably match hostNetwork
+			// traffic (kube-apiserver) even with the documented empty
+			// namespaceSelector+podSelector pattern. A ports-only rule is safe here
+			// because the webhook is ClusterIP-only (unreachable from outside the
+			// cluster) and TLS authenticates the webhook server to the API server.
 			Ports: tcpPort(operatorWebhookPort),
 		},
 		monitoringIngressRule(operatorMetricsPort),
