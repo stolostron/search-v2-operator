@@ -88,7 +88,7 @@ deny-all ingress — the collector has no legitimate inbound traffic in that cas
 
 | Direction | Peer | Port | Rationale |
 |---|---|---|---|
-| Ingress | *(all sources — ports-only rule, no `From` selector)* | 9443/TCP | The Kubernetes API server calls the operator's `CollectorConfig` admission webhook. The API server uses `hostNetwork: true`, and OVN-Kubernetes on OCP 4.22+ does not reliably match hostNetwork traffic even with the documented empty `namespaceSelector`+`podSelector` pattern. A ports-only rule is safe here: the webhook is exposed only via a ClusterIP Service (not reachable from outside the cluster) and authenticates callers via TLS certificates issued by the API server's CA. |
+| Ingress | *(all in-cluster sources — ports-only rule, no `From` selector)* | 9443/TCP | The Kubernetes API server calls the operator's `CollectorConfig` admission webhook. The API server uses `hostNetwork: true`, and OVN-Kubernetes on OCP 4.22+ does not reliably match hostNetwork traffic even with the documented empty `namespaceSelector`+`podSelector` pattern. A ports-only rule is safe here: the webhook is exposed only via a ClusterIP Service (unreachable from outside the cluster) and TLS authenticates the webhook server to the API server. |
 | Ingress | `openshift-monitoring` namespace | 8080/TCP | Prometheus scrapes controller-runtime metrics. |
 | Egress | *(not restricted — Ingress-only policy)* | — | OVN-Kubernetes handles `kubernetes.default.svc` ClusterIP traffic via the OVN service load balancer before NetworkPolicy evaluation, so no egress rule can match kube-API traffic. Applying an Egress policyType would silently block the operator from reaching the Kubernetes API (it manages Deployments, Services, Secrets, RBAC, addon CRs, etc.). |
 

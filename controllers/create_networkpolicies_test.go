@@ -235,11 +235,12 @@ func TestOperatorNetworkPolicy(t *testing.T) {
 
 	var sawWebhookPortsOnly, sawMetricsOpenToAll, sawMonitoring bool
 	for _, rule := range np.Spec.Ingress {
-		// Webhook rule must be a ports-only rule (no From selector) to allow all sources
-		// including the kube-apiserver (hostNetwork: true). OVN-Kubernetes on OCP 4.22+
-		// does not reliably match hostNetwork traffic even with the documented empty
-		// namespaceSelector+podSelector pattern. A ports-only rule is safe because the
-		// webhook is ClusterIP-only and uses TLS certificate authentication.
+		// Webhook rule must be a ports-only rule (no From selector) permitting all
+		// in-cluster sources including the kube-apiserver (hostNetwork: true).
+		// OVN-Kubernetes on OCP 4.22+ does not reliably match hostNetwork traffic even
+		// with the documented empty namespaceSelector+podSelector pattern. A ports-only
+		// rule is safe because the webhook is ClusterIP-only and TLS authenticates the
+		// webhook server to the API server.
 		if len(rule.From) == 0 && containsTCPPort(rule.Ports, operatorWebhookPort) {
 			sawWebhookPortsOnly = true
 		}
