@@ -244,13 +244,12 @@ func (r *SearchReconciler) CollectorNetworkPolicy(instance *searchv1alpha1.Searc
 //
 // Rationale:
 //   - Ingress (webhook): The Kubernetes API server calls the operator's admission webhook
-//     (CollectorConfig validation) on port 9443. The API server uses hostNetwork: true, so its
-//     traffic cannot be matched by a plain namespaceSelector — OCP/OVN-Kubernetes only matches
-//     hostNetwork traffic when a peer sets BOTH namespaceSelector and podSelector to an empty
-//     LabelSelector (the documented "allow-from-hostnetwork" pattern). An empty namespaceSelector
-//     alone would silently reintroduce this bug. Combined with an empty podSelector, this peer
-//     matches any pod in any namespace plus hostNetwork traffic — i.e. all cluster-internal
-//     traffic, which is the full reachable set for a ClusterIP-only webhook service anyway.
+//     (CollectorConfig validation) on port 9443. The API server uses hostNetwork: true.
+//     A ports-only rule (no From selector) is used because OVN-Kubernetes on OCP 4.22+ does
+//     not reliably match hostNetwork traffic even with the documented empty
+//     namespaceSelector+podSelector pattern. This is safe: the webhook is exposed only via a
+//     ClusterIP Service (unreachable from outside the cluster) and TLS authenticates the
+//     webhook server to the API server. The rule permits all in-cluster sources.
 //   - Ingress (metrics): Prometheus (openshift-monitoring) scrapes the controller-runtime
 //     metrics port.
 //   - Egress: The operator manages nearly every resource type used by Search (Deployments,
@@ -261,16 +260,12 @@ func (r *SearchReconciler) OperatorNetworkPolicy(instance *searchv1alpha1.Search
 	np := newNetworkPolicy(instance, "search-operator", podLabels)
 	np.Spec.Ingress = []networkingv1.NetworkPolicyIngressRule{
 		{
-			// Webhook port: allow from any namespace/pod in the cluster, including
-			// hostNetwork pods. The kube-apiserver uses hostNetwork: true, so an empty
-			// namespaceSelector alone would NOT match it (OCP docs: "Using the
-			// namespaceSelector field without the podSelector field set to {} will not
-			// include hostNetwork pods"). Both selectors must be empty in the same peer
-			// to also match hostNetwork traffic.
-			From: []networkingv1.NetworkPolicyPeer{{
-				NamespaceSelector: &metav1.LabelSelector{},
-				PodSelector:       &metav1.LabelSelector{},
-			}},
+			// Webhook port: ports-only rule (no From selector) permits all in-cluster
+			// sources. OVN-Kubernetes on OCP 4.22+ does not reliably match hostNetwork
+			// traffic (kube-apiserver) even with the documented empty
+			// namespaceSelector+podSelector pattern. A ports-only rule is safe here
+			// because the webhook is ClusterIP-only (unreachable from outside the
+			// cluster) and TLS authenticates the webhook server to the API server.
 			Ports: tcpPort(operatorWebhookPort),
 		},
 		monitoringIngressRule(operatorMetricsPort),
