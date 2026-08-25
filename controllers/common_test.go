@@ -183,6 +183,37 @@ func TestSearchAPIClusterRoleCarriesImpersonate(t *testing.T) {
 	}
 }
 
+// TestSearchAPIClusterRoleHasCachePermissions verifies that the pre-provisioned
+// search-api ClusterRole grants the list/watch permissions on namespaces and
+// managedclusters that are required by cacheValidation and sharedData.
+//
+// These were missing after ACM-34431 split the shared search-serviceaccount into
+// per-component SAs (ACM-42672).
+func TestSearchAPIClusterRoleHasCachePermissions(t *testing.T) {
+	apiCR := loadClusterRole(t, "../config/rbac/search_api_clusterrole.yaml")
+
+	checks := []struct {
+		apiGroup string
+		resource string
+		verb     string
+	}{
+		// namespaces — required by cacheValidation and sharedData
+		{"", "namespaces", "get"},
+		{"", "namespaces", "list"},
+		{"", "namespaces", "watch"},
+		// managedclusters — required by sharedData fleet inventory
+		{"cluster.open-cluster-management.io", "managedclusters", "get"},
+		{"cluster.open-cluster-management.io", "managedclusters", "list"},
+		{"cluster.open-cluster-management.io", "managedclusters", "watch"},
+	}
+	for _, c := range checks {
+		if !hasVerb(apiCR, c.apiGroup, c.resource, c.verb) {
+			t.Errorf("search-api ClusterRole must grant %q on apiGroup=%q resource=%q (needed by cacheValidation/sharedData)",
+				c.verb, c.apiGroup, c.resource)
+		}
+	}
+}
+
 // TestPostgresServiceAccountIsIsolated verifies that the postgres SA uses a dedicated
 // name distinct from all other search component SAs.
 func TestPostgresServiceAccountIsIsolated(t *testing.T) {
