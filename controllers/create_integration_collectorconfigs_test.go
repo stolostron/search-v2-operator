@@ -43,6 +43,8 @@ var expectedIntegrationConfigNames = []string{
 	"app-lifecycle-integration",
 }
 
+// Every embedded integration CollectorConfig must be created with the integration-team label and
+// collection rules, and must NOT carry the backup label — see ACM-42665.
 func TestApplyIntegrationCollectorConfigs_CreatesAllEmbeddedConfigs(t *testing.T) {
 	r := setupReconciler()
 
@@ -330,6 +332,8 @@ func TestApplyOneIntegrationCollectorConfig_GetErrorOtherThanNotFound(t *testing
 	assert.Error(t, err)
 }
 
+// applyIntegrationCollectorConfigs must propagate an error from the client when creating a new
+// integration CollectorConfig fails.
 func TestApplyOneIntegrationCollectorConfig_CreateError(t *testing.T) {
 	base := setupReconciler().Client.(client.WithWatch)
 	failingClient := interceptor.NewClient(base, interceptor.Funcs{
@@ -376,6 +380,8 @@ func TestApplyOneIntegrationCollectorConfig_StripsStaleBackupLabel(t *testing.T)
 		"integration team label must be preserved while stripping the backup label")
 }
 
+// applyIntegrationCollectorConfigs must propagate an error from the client when updating an
+// out-of-date integration CollectorConfig fails.
 func TestApplyOneIntegrationCollectorConfig_UpdateError(t *testing.T) {
 	// Pre-create one config with a spec that differs from the shipped default, so the code
 	// takes the Update path rather than Create.
