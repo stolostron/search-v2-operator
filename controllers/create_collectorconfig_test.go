@@ -28,6 +28,8 @@ func newSearchInstance() *searchv1alpha1.Search {
 	}
 }
 
+// newCollectorConfig builds a bare CollectorConfig fixture with the given name and spec, with no
+// labels or ownerReferences set.
 func newCollectorConfig(name string, spec searchv1alpha1.CollectorConfigSpec) *searchv1alpha1.CollectorConfig {
 	return &searchv1alpha1.CollectorConfig{
 		TypeMeta: metav1.TypeMeta{Kind: "CollectorConfig", APIVersion: searchv1alpha1.GroupVersion.String()},
