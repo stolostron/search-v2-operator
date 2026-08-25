@@ -21,7 +21,7 @@ COPY internal/ internal/
 # Build
 RUN go mod vendor
 RUN CGO_ENABLED=1 go build -a -o manager main.go
-FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
+FROM registry.redhat.io/ubi9/ubi-minimal-pqc:latest
 
 ENV USER_UID=1001 \
     USER_NAME=search-operator
