@@ -5,13 +5,18 @@
 #
 # Managed by the operator — reset to this default on restart unless annotated with
 # search.open-cluster-management.io/manual-override. See docs/ARCHITECTURE.md.
+#
+# Deliberately has NO cluster.open-cluster-management.io/backup label: this config is
+# deterministically reseeded from this file on every operator restart, so backing it up is
+# redundant — and the label actively breaks hub restore, since the CollectorConfig admission
+# webhook rejects restore-time patches from Velero's service account for operator-owned
+# configs. Do not add it back.
 apiVersion: search.open-cluster-management.io/v1alpha1
 kind: CollectorConfig
 metadata:
   name: grc-integration
   labels:
     search.open-cluster-management.io/config-type: integration
-    cluster.open-cluster-management.io/backup: ""
 spec:
   collectionRules:
     - action: include

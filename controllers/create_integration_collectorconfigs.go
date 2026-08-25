@@ -147,8 +147,10 @@ func applyOneIntegrationCollectorConfig(
 
 	hasAllLabels := hasDesiredLabels(found, desired)
 	hasOwnerRef := hasControllerOwnerRef(found, owner)
-	if hasAllLabels && hasOwnerRef && equality.Semantic.DeepEqual(found.Spec, desired.Spec) {
-		// Already matches the currently shipped default, correctly labeled, and owned — skip.
+	_, hasStaleBackupLabel := found.Labels[backupLabel]
+	if hasAllLabels && hasOwnerRef && !hasStaleBackupLabel && equality.Semantic.DeepEqual(found.Spec, desired.Spec) {
+		// Already matches the currently shipped default, correctly labeled, owned, and free
+		// of the stale backup label — skip.
 		return nil
 	}
 	found.Spec = desired.Spec
@@ -157,12 +159,20 @@ func applyOneIntegrationCollectorConfig(
 	}
 	// Merge all labels from the shipped YAML, then enforce the integration label on top.
 	// This makes Create and Update symmetric: the shipped YAML's labels are always the
-	// source of truth — if someone removes the backup label from a live config, the seeder
+	// source of truth — if someone removes a desired label from a live config, the seeder
 	// restores it on the next restart.
 	for k, v := range desired.Labels {
 		found.Labels[k] = v
 	}
 	found.Labels[searchv1alpha1.IntegrationTeamLabel] = searchv1alpha1.IntegrationTeamLabelValue
+	// Integration configs must never carry the backup label: they are deterministically
+	// reseeded from this embedded YAML on every operator restart, so backing them up is
+	// redundant, and the label actively breaks hub restore — the CollectorConfig admission
+	// webhook rejects restore-time patches from Velero's service account for operator-owned
+	// configs. Strip it unconditionally (not just omit it from desired.Labels) so
+	// clusters upgrading from an operator version that shipped the label self-heal here,
+	// rather than carrying it forever since the merge above is otherwise additive-only.
+	delete(found.Labels, backupLabel)
 	// Ensure ownerReference is set for GC when Search is torn down.
 	if scheme != nil && owner != nil && owner.UID != "" && !hasOwnerRef {
 		if err := controllerutil.SetControllerReference(owner, found, scheme); err != nil {
