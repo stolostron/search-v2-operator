@@ -352,8 +352,16 @@ func TestApplyOneIntegrationCollectorConfig_CreateError(t *testing.T) {
 // admission webhook otherwise rejects backup/restore patches to these operator-owned configs
 // (ACM-42665). The additive label-merge alone would never remove it, since the shipped YAML
 // simply omits the key rather than requesting its removal.
+//
+// existing carries a real controller ownerReference and owner has a matching non-empty UID, so
+// hasControllerOwnerRef evaluates the actual "already owned" path instead of the empty-UID
+// shortcut that testSearchOwner()/hasControllerOwnerRef otherwise take in tests that don't care
+// about ownership.
 func TestApplyOneIntegrationCollectorConfig_StripsStaleBackupLabel(t *testing.T) {
-	existing := newIntegrationTeamConfig("real-config", searchv1alpha1.CollectorConfigSpec{
+	owner := newSearchInstance()
+	owner.UID = "test-owner-uid"
+
+	existing := newOwnedIntegrationTeamConfig("real-config", searchv1alpha1.CollectorConfigSpec{
 		CollectionRules: []searchv1alpha1.CollectionRule{
 			{
 				Action:           searchv1alpha1.ActionInclude,
@@ -367,7 +375,7 @@ func TestApplyOneIntegrationCollectorConfig_StripsStaleBackupLabel(t *testing.T)
 		"configs/real-config.yaml": &fstest.MapFile{Data: validCollectorConfigYAML("real-config")},
 	}
 
-	err := applyIntegrationCollectorConfigsFrom(context.TODO(), r.Client, testScheme(), testSearchOwner(), fsys, "configs")
+	err := applyIntegrationCollectorConfigsFrom(context.TODO(), r.Client, testScheme(), owner, fsys, "configs")
 	require.NoError(t, err)
 
 	after := &searchv1alpha1.CollectorConfig{}
