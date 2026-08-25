@@ -69,3 +69,25 @@ rules:
   - selfsubjectrulesreviews
   verbs:
   - create
+# Namespace list/watch — required by cacheValidation and sharedData to build the
+# cache of accessible namespaces used for per-user RBAC filtering of search results
+# (search-v2-api/pkg/cachevalidation, pkg/rbac/sharedData.go).
+- apiGroups:
+  - ""
+  resources:
+  - namespaces
+  verbs:
+  - get
+  - list
+  - watch
+# ManagedCluster list/watch — required by sharedData to build the fleet-wide cluster
+# inventory used for cross-cluster search result scoping
+# (search-v2-api/pkg/rbac/sharedData.go).
+- apiGroups:
+  - cluster.open-cluster-management.io
+  resources:
+  - managedclusters
+  verbs:
+  - get
+  - list
+  - watch
