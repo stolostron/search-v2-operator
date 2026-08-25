@@ -55,7 +55,7 @@ func newIntegrationTeamConfig(name string, spec searchv1alpha1.CollectorConfigSp
 // newOwnedIntegrationTeamConfig creates an integration team CollectorConfig with a controller
 // ownerReference — representing a canonical config created by IntegrationCollectorConfigSeeder.
 // These are deterministically reseeded on every operator restart and must never carry the
-// backup label (ACM-42665).
+// backup label.
 func newOwnedIntegrationTeamConfig(
 	name string, spec searchv1alpha1.CollectorConfigSpec,
 ) *searchv1alpha1.CollectorConfig {
@@ -588,7 +588,7 @@ func TestBackupLabel_IntegrationTeamConfig_GetsLabeled(t *testing.T) {
 // An operator-owned integration team CollectorConfig (the canonical, seeded kind — see
 // IntegrationCollectorConfigSeeder) must NOT get the backup label: it is deterministically
 // reseeded on every operator restart, and the label would break hub restore by conflicting
-// with the CollectorConfig admission webhook's ownership check (ACM-42665).
+// with the CollectorConfig admission webhook's ownership check.
 func TestBackupLabel_OwnedIntegrationTeamConfig_NotLabeled(t *testing.T) {
 	instance := newSearchInstance()
 	ownedCC := newOwnedIntegrationTeamConfig("cnv-integration", searchv1alpha1.CollectorConfigSpec{})

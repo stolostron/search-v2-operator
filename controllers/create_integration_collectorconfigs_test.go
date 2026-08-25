@@ -44,7 +44,7 @@ var expectedIntegrationConfigNames = []string{
 }
 
 // Every embedded integration CollectorConfig must be created with the integration-team label and
-// collection rules, and must NOT carry the backup label — see ACM-42665.
+// collection rules, and must NOT carry the backup label.
 func TestApplyIntegrationCollectorConfigs_CreatesAllEmbeddedConfigs(t *testing.T) {
 	r := setupReconciler()
 
@@ -60,7 +60,7 @@ func TestApplyIntegrationCollectorConfigs_CreatesAllEmbeddedConfigs(t *testing.T
 		_, hasBackupLabel := cc.Labels[backupLabel]
 		assert.False(t, hasBackupLabel,
 			"%s must NOT have the backup label — it is reseeded on every restart, and the "+
-				"label breaks hub restore via the admission webhook's ownership check (ACM-42665)", name)
+				"label breaks hub restore via the admission webhook's ownership check", name)
 	}
 }
 
@@ -349,9 +349,9 @@ func TestApplyOneIntegrationCollectorConfig_CreateError(t *testing.T) {
 // A canonical integration CollectorConfig created by a previous operator version that still
 // carries the (now-removed) backup label must have it stripped on the next seeder run — even
 // when the spec and every other label already matches the shipped default — since the
-// admission webhook otherwise rejects backup/restore patches to these operator-owned configs
-// (ACM-42665). The additive label-merge alone would never remove it, since the shipped YAML
-// simply omits the key rather than requesting its removal.
+// admission webhook otherwise rejects backup/restore patches to these operator-owned configs.
+// The additive label-merge alone would never remove it, since the shipped YAML simply omits
+// the key rather than requesting its removal.
 //
 // existing carries a real controller ownerReference and owner has a matching non-empty UID, so
 // hasControllerOwnerRef evaluates the actual "already owned" path instead of the empty-UID
