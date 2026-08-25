@@ -43,6 +43,8 @@ var expectedIntegrationConfigNames = []string{
 	"app-lifecycle-integration",
 }
 
+// Every embedded integration CollectorConfig must be created with the integration-team label and
+// collection rules, and must NOT carry the backup label.
 func TestApplyIntegrationCollectorConfigs_CreatesAllEmbeddedConfigs(t *testing.T) {
 	r := setupReconciler()
 
@@ -55,6 +57,10 @@ func TestApplyIntegrationCollectorConfigs_CreatesAllEmbeddedConfigs(t *testing.T
 		require.NoError(t, err, "expected %s to be created", name)
 		assert.Equal(t, searchv1alpha1.IntegrationTeamLabelValue, cc.Labels[searchv1alpha1.IntegrationTeamLabel])
 		assert.NotEmpty(t, cc.Spec.CollectionRules, "%s should have collection rules", name)
+		_, hasBackupLabel := cc.Labels[backupLabel]
+		assert.False(t, hasBackupLabel,
+			"%s must NOT have the backup label — it is reseeded on every restart, and the "+
+				"label breaks hub restore via the admission webhook's ownership check", name)
 	}
 }
 
@@ -326,6 +332,8 @@ func TestApplyOneIntegrationCollectorConfig_GetErrorOtherThanNotFound(t *testing
 	assert.Error(t, err)
 }
 
+// applyIntegrationCollectorConfigs must propagate an error from the client when creating a new
+// integration CollectorConfig fails.
 func TestApplyOneIntegrationCollectorConfig_CreateError(t *testing.T) {
 	base := setupReconciler().Client.(client.WithWatch)
 	failingClient := interceptor.NewClient(base, interceptor.Funcs{
@@ -338,6 +346,50 @@ func TestApplyOneIntegrationCollectorConfig_CreateError(t *testing.T) {
 	assert.Error(t, err)
 }
 
+// A canonical integration CollectorConfig created by a previous operator version that still
+// carries the (now-removed) backup label must have it stripped on the next seeder run — even
+// when the spec and every other label already matches the shipped default — since the
+// admission webhook otherwise rejects backup/restore patches to these operator-owned configs.
+// The additive label-merge alone would never remove it, since the shipped YAML simply omits
+// the key rather than requesting its removal.
+//
+// existing carries a real controller ownerReference and owner has a matching non-empty UID, so
+// hasControllerOwnerRef evaluates the actual "already owned" path instead of the empty-UID
+// shortcut that testSearchOwner()/hasControllerOwnerRef otherwise take in tests that don't care
+// about ownership.
+func TestApplyOneIntegrationCollectorConfig_StripsStaleBackupLabel(t *testing.T) {
+	owner := newSearchInstance()
+	owner.UID = "test-owner-uid"
+
+	existing := newOwnedIntegrationTeamConfig("real-config", searchv1alpha1.CollectorConfigSpec{
+		CollectionRules: []searchv1alpha1.CollectionRule{
+			{
+				Action:           searchv1alpha1.ActionInclude,
+				ResourceSelector: searchv1alpha1.ResourceSelector{APIGroups: []string{"example.io"}, Kinds: []string{"*"}},
+			},
+		},
+	})
+	existing.Labels[backupLabel] = "" // simulate a pre-fix operator version's stale label
+	r := setupReconciler(existing)
+	fsys := fstest.MapFS{
+		"configs/real-config.yaml": &fstest.MapFile{Data: validCollectorConfigYAML("real-config")},
+	}
+
+	err := applyIntegrationCollectorConfigsFrom(context.TODO(), r.Client, testScheme(), owner, fsys, "configs")
+	require.NoError(t, err)
+
+	after := &searchv1alpha1.CollectorConfig{}
+	require.NoError(t, r.Get(context.TODO(), types.NamespacedName{
+		Name: "real-config", Namespace: testNamespace,
+	}, after))
+	_, hasLabel := after.Labels[backupLabel]
+	assert.False(t, hasLabel, "stale backup label must be stripped from operator-owned integration configs")
+	assert.Equal(t, searchv1alpha1.IntegrationTeamLabelValue, after.Labels[searchv1alpha1.IntegrationTeamLabel],
+		"integration team label must be preserved while stripping the backup label")
+}
+
+// applyIntegrationCollectorConfigs must propagate an error from the client when updating an
+// out-of-date integration CollectorConfig fails.
 func TestApplyOneIntegrationCollectorConfig_UpdateError(t *testing.T) {
 	// Pre-create one config with a spec that differs from the shipped default, so the code
 	// takes the Update path rather than Create.
