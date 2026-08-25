@@ -39,12 +39,31 @@ func newCollectorConfig(name string, spec searchv1alpha1.CollectorConfigSpec) *s
 	}
 }
 
-// newIntegrationTeamConfig creates a CollectorConfig with the integration team label.
+// newIntegrationTeamConfig creates a CollectorConfig with the integration team label but no
+// ownerReference — representing a team's differently-named test config (the manual-override
+// escape hatch), which is user-authored and not reseeded by the operator.
 func newIntegrationTeamConfig(name string, spec searchv1alpha1.CollectorConfigSpec) *searchv1alpha1.CollectorConfig {
 	cc := newCollectorConfig(name, spec)
 	cc.Labels = map[string]string{
 		searchv1alpha1.IntegrationTeamLabel: searchv1alpha1.IntegrationTeamLabelValue,
 	}
+	return cc
+}
+
+// newOwnedIntegrationTeamConfig creates an integration team CollectorConfig with a controller
+// ownerReference — representing a canonical config created by IntegrationCollectorConfigSeeder.
+// These are deterministically reseeded on every operator restart and must never carry the
+// backup label (ACM-42665).
+func newOwnedIntegrationTeamConfig(name string, spec searchv1alpha1.CollectorConfigSpec) *searchv1alpha1.CollectorConfig {
+	cc := newIntegrationTeamConfig(name, spec)
+	isController := true
+	cc.OwnerReferences = []metav1.OwnerReference{{
+		APIVersion: searchv1alpha1.GroupVersion.String(),
+		Kind:       "Search",
+		Name:       OperatorName,
+		UID:        "test-owner-uid",
+		Controller: &isController,
+	}}
 	return cc
 }
 
@@ -560,6 +579,26 @@ func TestBackupLabel_IntegrationTeamConfig_GetsLabeled(t *testing.T) {
 	assert.Nil(t, r.Get(context.TODO(), nn, updated))
 	_, hasLabel := updated.Labels[backupLabel]
 	assert.True(t, hasLabel, "integration team config should have the backup label")
+}
+
+// An operator-owned integration team CollectorConfig (the canonical, seeded kind — see
+// IntegrationCollectorConfigSeeder) must NOT get the backup label: it is deterministically
+// reseeded on every operator restart, and the label would break hub restore by conflicting
+// with the CollectorConfig admission webhook's ownership check (ACM-42665).
+func TestBackupLabel_OwnedIntegrationTeamConfig_NotLabeled(t *testing.T) {
+	instance := newSearchInstance()
+	ownedCC := newOwnedIntegrationTeamConfig("cnv-integration", searchv1alpha1.CollectorConfigSpec{})
+	r := setupReconciler(instance, ownedCC)
+
+	result, err := r.createOrUpdateMergedCollectorConfig(context.TODO(), instance)
+	assert.Nil(t, err)
+	assert.Nil(t, result)
+
+	updated := &searchv1alpha1.CollectorConfig{}
+	nn := types.NamespacedName{Name: "cnv-integration", Namespace: testNamespace}
+	assert.Nil(t, r.Get(context.TODO(), nn, updated))
+	_, hasLabel := updated.Labels[backupLabel]
+	assert.False(t, hasLabel, "operator-owned integration config must NOT have the backup label")
 }
 
 // merged-collector-config is never passed to addBackupLabel — it is operator-managed and

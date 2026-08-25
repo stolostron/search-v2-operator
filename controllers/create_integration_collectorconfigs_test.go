@@ -55,6 +55,10 @@ func TestApplyIntegrationCollectorConfigs_CreatesAllEmbeddedConfigs(t *testing.T
 		require.NoError(t, err, "expected %s to be created", name)
 		assert.Equal(t, searchv1alpha1.IntegrationTeamLabelValue, cc.Labels[searchv1alpha1.IntegrationTeamLabel])
 		assert.NotEmpty(t, cc.Spec.CollectionRules, "%s should have collection rules", name)
+		_, hasBackupLabel := cc.Labels[backupLabel]
+		assert.False(t, hasBackupLabel,
+			"%s must NOT have the backup label — it is reseeded on every restart, and the "+
+				"label breaks hub restore via the admission webhook's ownership check (ACM-42665)", name)
 	}
 }
 
@@ -336,6 +340,40 @@ func TestApplyOneIntegrationCollectorConfig_CreateError(t *testing.T) {
 
 	err := applyIntegrationCollectorConfigs(context.TODO(), failingClient, testScheme(), testSearchOwner())
 	assert.Error(t, err)
+}
+
+// A canonical integration CollectorConfig created by a previous operator version that still
+// carries the (now-removed) backup label must have it stripped on the next seeder run — even
+// when the spec and every other label already matches the shipped default — since the
+// admission webhook otherwise rejects backup/restore patches to these operator-owned configs
+// (ACM-42665). The additive label-merge alone would never remove it, since the shipped YAML
+// simply omits the key rather than requesting its removal.
+func TestApplyOneIntegrationCollectorConfig_StripsStaleBackupLabel(t *testing.T) {
+	existing := newIntegrationTeamConfig("real-config", searchv1alpha1.CollectorConfigSpec{
+		CollectionRules: []searchv1alpha1.CollectionRule{
+			{
+				Action:           searchv1alpha1.ActionInclude,
+				ResourceSelector: searchv1alpha1.ResourceSelector{APIGroups: []string{"example.io"}, Kinds: []string{"*"}},
+			},
+		},
+	})
+	existing.Labels[backupLabel] = "" // simulate a pre-fix operator version's stale label
+	r := setupReconciler(existing)
+	fsys := fstest.MapFS{
+		"configs/real-config.yaml": &fstest.MapFile{Data: validCollectorConfigYAML("real-config")},
+	}
+
+	err := applyIntegrationCollectorConfigsFrom(context.TODO(), r.Client, testScheme(), testSearchOwner(), fsys, "configs")
+	require.NoError(t, err)
+
+	after := &searchv1alpha1.CollectorConfig{}
+	require.NoError(t, r.Get(context.TODO(), types.NamespacedName{
+		Name: "real-config", Namespace: testNamespace,
+	}, after))
+	_, hasLabel := after.Labels[backupLabel]
+	assert.False(t, hasLabel, "stale backup label must be stripped from operator-owned integration configs")
+	assert.Equal(t, searchv1alpha1.IntegrationTeamLabelValue, after.Labels[searchv1alpha1.IntegrationTeamLabel],
+		"integration team label must be preserved while stripping the backup label")
 }
 
 func TestApplyOneIntegrationCollectorConfig_UpdateError(t *testing.T) {
