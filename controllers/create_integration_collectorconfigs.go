@@ -169,7 +169,7 @@ func applyOneIntegrationCollectorConfig(
 	// reseeded from this embedded YAML on every operator restart, so backing them up is
 	// redundant, and the label actively breaks hub restore — the CollectorConfig admission
 	// webhook rejects restore-time patches from Velero's service account for operator-owned
-	// configs (ACM-42665). Strip it unconditionally (not just omit it from desired.Labels) so
+	// configs. Strip it unconditionally (not just omit it from desired.Labels) so
 	// clusters upgrading from an operator version that shipped the label self-heal here,
 	// rather than carrying it forever since the merge above is otherwise additive-only.
 	delete(found.Labels, backupLabel)

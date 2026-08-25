@@ -30,8 +30,7 @@ import (
 // Callers must NOT call this for operator-owned CollectorConfigs (see isOperatorOwnedCC): those
 // are deterministically reseeded by the operator on every restart, so backing them up is
 // redundant, and the label actively breaks hub restore — the CollectorConfig admission webhook
-// rejects restore-time patches from Velero's service account for operator-owned configs
-// (ACM-42665).
+// rejects restore-time patches from Velero's service account for operator-owned configs.
 func (r *SearchReconciler) addBackupLabel(ctx context.Context, cc *searchv1alpha1.CollectorConfig) error {
 	if _, hasLabel := cc.Labels[backupLabel]; hasLabel {
 		return nil
@@ -217,7 +216,7 @@ func (r *SearchReconciler) createOrUpdateMergedCollectorConfig(
 	// Also ensure each non-operator-owned source config carries the backup label so it
 	// survives hub backup/restore. Operator-owned integration configs (the canonical, seeded
 	// ones — see IntegrationCollectorConfigSeeder) are skipped: they are deterministically
-	// reseeded on every restart, and labeling them for backup breaks hub restore (ACM-42665).
+	// reseeded on every restart, and labeling them for backup breaks hub restore.
 	// A team's differently-named test config (the manual-override escape hatch) has no
 	// ownerReference, so it still gets backed up here like user-collector-config.
 	mergedSpec := searchv1alpha1.CollectorConfigSpec{}
