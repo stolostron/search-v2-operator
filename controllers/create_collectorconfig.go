@@ -23,9 +23,15 @@ import (
 // addBackupLabel patches the backup label onto a CollectorConfig if it is missing.
 // The search.open-cluster-management.io API group is excluded from the automatic resources
 // backup (backup.go excludedAPIGroups). Resources labeled with backupLabel are picked up by
-// the acm-resources-generic-schedule backup instead. All source CollectorConfigs — integration
-// team configs, user-collector-config, and any future per-cluster override configs — should
-// carry this label so they survive a hub backup/restore cycle.
+// the acm-resources-generic-schedule backup instead. User-authored source CollectorConfigs —
+// user-collector-config, and any future per-cluster override configs — should carry this label
+// so they survive a hub backup/restore cycle.
+//
+// Callers must NOT call this for operator-owned CollectorConfigs (see isOperatorOwnedCC): those
+// are deterministically reseeded by the operator on every restart, so backing them up is
+// redundant, and the label actively breaks hub restore — the CollectorConfig admission webhook
+// rejects restore-time patches from Velero's service account for operator-owned configs
+// (ACM-42665).
 func (r *SearchReconciler) addBackupLabel(ctx context.Context, cc *searchv1alpha1.CollectorConfig) error {
 	if _, hasLabel := cc.Labels[backupLabel]; hasLabel {
 		return nil
@@ -41,6 +47,21 @@ func (r *SearchReconciler) addBackupLabel(ctx context.Context, cc *searchv1alpha
 	}
 	log.V(2).Info("Added backup label to CollectorConfig", "name", cc.Name)
 	return nil
+}
+
+// isOperatorOwnedCC returns true if cc has a controller ownerReference, meaning it is
+// managed by the operator (created/reseeded by IntegrationCollectorConfigSeeder or
+// createOrUpdateMergedCollectorConfig) and therefore protected by the CollectorConfig admission
+// webhook's ownership check. Mirrors isOperatorOwned in api/v1alpha1/collectorconfig_webhook.go —
+// duplicated here (rather than imported) to avoid a dependency from controllers on that
+// package's internal helper.
+func isOperatorOwnedCC(cc *searchv1alpha1.CollectorConfig) bool {
+	for _, ref := range cc.GetOwnerReferences() {
+		if ref.Controller != nil && *ref.Controller {
+			return true
+		}
+	}
+	return false
 }
 
 const (
@@ -193,11 +214,19 @@ func (r *SearchReconciler) createOrUpdateMergedCollectorConfig(
 	// FUTURE: detect and handle rule collisions between integration team configs.
 
 	// Build merged spec: integration team rules first, then user rules.
-	// Also ensure each source config carries the backup label so it survives hub backup/restore.
+	// Also ensure each non-operator-owned source config carries the backup label so it
+	// survives hub backup/restore. Operator-owned integration configs (the canonical, seeded
+	// ones — see IntegrationCollectorConfigSeeder) are skipped: they are deterministically
+	// reseeded on every restart, and labeling them for backup breaks hub restore (ACM-42665).
+	// A team's differently-named test config (the manual-override escape hatch) has no
+	// ownerReference, so it still gets backed up here like user-collector-config.
 	mergedSpec := searchv1alpha1.CollectorConfigSpec{}
 	for i := range teamConfigs.Items {
 		tc := &teamConfigs.Items[i]
 		mergedSpec.CollectionRules = append(mergedSpec.CollectionRules, tc.Spec.CollectionRules...)
+		if isOperatorOwnedCC(tc) {
+			continue
+		}
 		if err := r.addBackupLabel(ctx, tc); err != nil {
 			return &reconcile.Result{}, err
 		}
