@@ -56,7 +56,9 @@ func newIntegrationTeamConfig(name string, spec searchv1alpha1.CollectorConfigSp
 // ownerReference — representing a canonical config created by IntegrationCollectorConfigSeeder.
 // These are deterministically reseeded on every operator restart and must never carry the
 // backup label (ACM-42665).
-func newOwnedIntegrationTeamConfig(name string, spec searchv1alpha1.CollectorConfigSpec) *searchv1alpha1.CollectorConfig {
+func newOwnedIntegrationTeamConfig(
+	name string, spec searchv1alpha1.CollectorConfigSpec,
+) *searchv1alpha1.CollectorConfig {
 	cc := newIntegrationTeamConfig(name, spec)
 	isController := true
 	cc.OwnerReferences = []metav1.OwnerReference{{
