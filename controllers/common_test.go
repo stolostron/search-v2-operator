@@ -206,6 +206,12 @@ func TestSearchAPIClusterRoleHasCachePermissions(t *testing.T) {
 		{"cluster.open-cluster-management.io", "managedclusters", "get"},
 		{"cluster.open-cluster-management.io", "managedclusters", "list"},
 		{"cluster.open-cluster-management.io", "managedclusters", "watch"},
+		// configmaps get — required by federated query path to read search-ca-crt
+		// for TLS CA bundle construction (ACM-43077)
+		{"", "configmaps", "get"},
+		// routes list — required by federated query path to discover hub routes
+		// (ACM-43077)
+		{"route.openshift.io", "routes", "list"},
 	}
 	for _, c := range checks {
 		if !hasVerb(apiCR, c.apiGroup, c.resource, c.verb) {
@@ -664,6 +670,7 @@ func TestIndexerCustomization(t *testing.T) {
 		t.Errorf("Env vars not set for %s", testFor)
 	}
 }
+
 // TestGetContainerArgsAllowsVerbosity verifies that -v= and --v= arguments pass through the allowlist.
 func TestGetContainerArgsAllowsVerbosity(t *testing.T) {
 	for _, arg := range []string{"-v=5", "--v=5"} {
