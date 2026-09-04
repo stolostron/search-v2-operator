@@ -34,12 +34,22 @@ func init() {
 }
 
 func newCluster(name string) *clusterv1.ManagedCluster {
-	cluster := &clusterv1.ManagedCluster{
+	return &clusterv1.ManagedCluster{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
 	}
-	return cluster
+}
+
+func newClusterWithImageRegistries(name, imageRegistriesJSON string) *clusterv1.ManagedCluster {
+	return &clusterv1.ManagedCluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+			Annotations: map[string]string{
+				clusterv1.ClusterImageRegistriesAnnotationKey: imageRegistriesJSON,
+			},
+		},
+	}
 }
 
 func newAddon(name, cluster, installNamespace string, annotationValues map[string]string) *addonapiv1alpha1.ManagedClusterAddOn {
@@ -58,22 +68,28 @@ func newAddon(name, cluster, installNamespace string, annotationValues map[strin
 
 func newAgentAddon(t *testing.T, objects []runtime.Object) agent.AgentAddon {
 	registrationOption := newRegistrationOption(nil, SearchAddonName)
-	getValuesFunc := getValue
 	fakeAddonClient := fakeaddon.NewSimpleClientset(objects...)
 	agentAddon, err := addonfactory.NewAgentAddonFactory(SearchAddonName, ChartFS, ChartDir).
 		WithScheme(scheme).
-		WithGetValuesFuncs(getValuesFunc, addonfactory.GetValuesFromAddonAnnotation,
+		WithGetValuesFuncs(
+			getValue,
+			addonfactory.GetValuesFromAddonAnnotation,
 			addonfactory.GetAddOnDeploymentConfigValues(
 				utils.NewAddOnDeploymentConfigGetter(fakeAddonClient),
 				addonfactory.ToAddOnNodePlacementValues,
 				addonfactory.ToAddOnResourceRequirementsValues,
 			),
-			validateImageOverride).
+			validateImageOverride,
+			addonfactory.GetAgentImageValues(
+				utils.NewAddOnDeploymentConfigGetter(fakeAddonClient),
+				"global.imageOverrides.search_collector",
+				SearchCollectorImage,
+			),
+		).
 		WithAgentRegistrationOption(registrationOption).
 		BuildHelmAgentAddon()
 	if err != nil {
 		t.Fatalf("failed to build agent %v", err)
-
 	}
 	return agentAddon
 }
@@ -625,26 +641,135 @@ func findSearchDeployment(objs []runtime.Object) *appsv1.Deployment {
 	return nil
 }
 
-// TestManifest_TrustedImageAllowed verifies that a trusted image supplied via
-// the values annotation is preserved (not replaced) by validateImageOverride.
-func TestManifest_TrustedImageAllowed(t *testing.T) {
-	trustedAnnotations := map[string]string{
-		"addon.open-cluster-management.io/values": `{"global":{"imageOverrides":{"search_collector":"quay.io/stolostron/search_collector:custom-tag"}}}`,
+// TestManifest_AddonAnnotationImageIgnored verifies that an image supplied via
+// the addon values annotation — even from a trusted registry — is always
+// replaced by validateImageOverride (CVE-2026-71471 / CVE-2026-71473 fix).
+// The addon annotation is not a trusted source for image overrides; customers
+// must use ManagedClusterImageRegistry instead (see TestManifest_MCIRMirroredImageHonoured).
+func TestManifest_AddonAnnotationImageIgnored(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		annotations map[string]string
+	}{
+		{
+			name: "untrusted registry",
+			annotations: map[string]string{
+				"addon.open-cluster-management.io/values": `{"global":{"imageOverrides":{"search_collector":"docker.io/attacker/search_collector:evil"}}}`,
+			},
+		},
+		{
+			name: "trusted registry via addon annotation",
+			annotations: map[string]string{
+				"addon.open-cluster-management.io/values": `{"global":{"imageOverrides":{"search_collector":"quay.io/stolostron/search_collector:custom-tag"}}}`,
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			SearchCollectorImage = "quay.io/stolostron/search_collector:2.7.0"
+			agentAddon := newAgentAddon(t, nil)
+			addon := newAddon(SearchAddonName, "cluster1", "", tc.annotations)
+			objects, err := agentAddon.Manifests(newCluster("cluster1"), addon)
+			if err != nil {
+				t.Fatalf("failed to get manifests: %v", err)
+			}
+			dep := findSearchDeployment(objects)
+			if dep == nil {
+				t.Fatal("no Deployment found in manifests")
+			}
+			got := dep.Spec.Template.Spec.Containers[0].Image
+			if got != "quay.io/stolostron/search_collector:2.7.0" {
+				t.Errorf("image set via addon annotation must be ignored; got %q, want operator image", got)
+			}
+		})
 	}
+}
+
+// TestManifest_MCIRMirroredImageHonoured verifies the primary MCIR use-case:
+// when ManagedClusterImageRegistry stamps the "open-cluster-management.io/image-registries"
+// annotation on the ManagedCluster with a source→mirror registry mapping,
+// GetAgentImageValues applies it to the operator-controlled SearchCollectorImage
+// and the mirrored image reaches the ManifestWork.
+//
+// Critically, the mirror registry can be any arbitrary private registry (e.g.
+// registry.customer-corp.internal/) — it is not restricted to Red Hat registries.
+// This supports customers in disconnected/air-gapped environments.
+//
+// This is the regression introduced by commit 7278188 ("validate image overrides #818")
+// and fixed by adding GetAgentImageValues as the final GetValuesFunc.
+func TestManifest_MCIRMirroredImageHonoured(t *testing.T) {
 	SearchCollectorImage = "quay.io/stolostron/search_collector:2.7.0"
 	agentAddon := newAgentAddon(t, nil)
-	addon := newAddon(SearchAddonName, "cluster1", "", trustedAnnotations)
-	objects, err := agentAddon.Manifests(newCluster("cluster1"), addon)
+
+	for _, tc := range []struct {
+		name           string
+		registriesJSON string
+		expectedImage  string
+	}{
+		{
+			name: "customer private registry (arbitrary mirror)",
+			// The customer mirrors quay.io/stolostron/ → registry.customer-corp.internal/acm-mirror/
+			registriesJSON: `{"registries":[{"source":"quay.io/stolostron","mirror":"registry.customer-corp.internal/acm-mirror"}]}`,
+			expectedImage:  "registry.customer-corp.internal/acm-mirror/search_collector:2.7.0",
+		},
+		{
+			name:           "acm-d mirror registry",
+			registriesJSON: `{"registries":[{"source":"quay.io/stolostron","mirror":"quay.io/acm-d"}]}`,
+			expectedImage:  "quay.io/acm-d/search_collector:2.7.0",
+		},
+		{
+			name:           "redhat official registry",
+			registriesJSON: `{"registries":[{"source":"quay.io/stolostron","mirror":"registry.redhat.io/rhacm2"}]}`,
+			expectedImage:  "registry.redhat.io/rhacm2/search_collector:2.7.0",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			cluster := newClusterWithImageRegistries("cluster1", tc.registriesJSON)
+			addon := newAddon(SearchAddonName, "cluster1", "", nil)
+			objects, err := agentAddon.Manifests(cluster, addon)
+			if err != nil {
+				t.Fatalf("failed to get manifests: %v", err)
+			}
+			dep := findSearchDeployment(objects)
+			if dep == nil {
+				t.Fatal("no Deployment found in manifests")
+			}
+			got := dep.Spec.Template.Spec.Containers[0].Image
+			if got != tc.expectedImage {
+				t.Errorf("MCIR-mirrored image must be used in ManifestWork;\n  got:  %q\n  want: %q", got, tc.expectedImage)
+			}
+		})
+	}
+}
+
+// TestManifest_MCIRAnnotationAndAddonAnnotationImageIsolation verifies that when
+// BOTH the ManagedCluster registry annotation (MCIR) AND an image override in the
+// addon annotation are present, only the MCIR-derived image is used — the addon
+// annotation image is discarded by validateImageOverride before GetAgentImageValues runs.
+func TestManifest_MCIRAnnotationAndAddonAnnotationImageIsolation(t *testing.T) {
+	SearchCollectorImage = "quay.io/stolostron/search_collector:2.7.0"
+	agentAddon := newAgentAddon(t, nil)
+
+	// Addon annotation tries to inject an attacker image.
+	addonAnnotations := map[string]string{
+		"addon.open-cluster-management.io/values": `{"global":{"imageOverrides":{"search_collector":"docker.io/attacker/evil:latest"}}}`,
+	}
+	// ManagedCluster has a legitimate MCIR mapping.
+	cluster := newClusterWithImageRegistries("cluster1",
+		`{"registries":[{"source":"quay.io/stolostron","mirror":"registry.customer-corp.internal/acm-mirror"}]}`)
+	addon := newAddon(SearchAddonName, "cluster1", "", addonAnnotations)
+
+	objects, err := agentAddon.Manifests(cluster, addon)
 	if err != nil {
 		t.Fatalf("failed to get manifests: %v", err)
 	}
-	for _, o := range objects {
-		if dep, ok := o.(*appsv1.Deployment); ok {
-			// validateImageOverride always re-pins to SearchCollectorImage regardless
-			// of what the annotation says — the operator-controlled image is authoritative.
-			if dep.Spec.Template.Spec.Containers[0].Image != "quay.io/stolostron/search_collector:2.7.0" {
-				t.Errorf("expected operator image, got %s", dep.Spec.Template.Spec.Containers[0].Image)
-			}
-		}
+	dep := findSearchDeployment(objects)
+	if dep == nil {
+		t.Fatal("no Deployment found in manifests")
+	}
+	got := dep.Spec.Template.Spec.Containers[0].Image
+	// The MCIR-mirrored image must win; the attacker image in the addon annotation must be dropped.
+	want := "registry.customer-corp.internal/acm-mirror/search_collector:2.7.0"
+	if got != want {
+		t.Errorf("MCIR image must win over addon annotation image;\n  got:  %q\n  want: %q", got, want)
 	}
 }

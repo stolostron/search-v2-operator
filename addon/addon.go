@@ -151,11 +151,18 @@ func getValue(cluster *clusterv1.ManagedCluster,
 	return values, nil
 }
 
-// validateImageOverride is registered as the last GetValuesFunc so that
-// image overrides injected via the per-cluster ManagedClusterAddOn values
-// annotation are validated against the trusted-registry allowlist. Any image
-// that does not originate from a trusted registry is replaced with the
-// operator-controlled SearchCollectorImage.
+// validateImageOverride closes the CVE-2026-71471 / CVE-2026-71473 attack vector:
+// any image injected via the "addon.open-cluster-management.io/values" annotation
+// on the ManagedClusterAddOn (func [1], GetValuesFromAddonAnnotation) is discarded
+// by unconditionally resetting the image to the operator-controlled SearchCollectorImage.
+//
+// This func runs as func [3] — after GetValuesFromAddonAnnotation but before
+// GetAgentImageValues. GetAgentImageValues (func [4], the last func) then applies
+// the ManagedCluster's "open-cluster-management.io/image-registries" registry
+// mapping rules to SearchCollectorImage to produce the MCIR-mirrored image.
+// Because GetAgentImageValues derives its output solely from the operator-controlled
+// base image via prefix replacement, the final image is always a deterministic
+// transform of a known-good image — never an arbitrary injection.
 func validateImageOverride(_ *clusterv1.ManagedCluster,
 	_ *addonapiv1alpha1.ManagedClusterAddOn) (addonfactory.Values, error) {
 	return addonfactory.Values{
@@ -256,13 +263,39 @@ func NewAddonManager(kubeConfig *rest.Config) (addonmanager.AddonManager, error)
 		WithConfigGVRs(
 			utils.AddOnDeploymentConfigGVR,
 		).WithGetValuesFuncs(
+		// [0] Base defaults: SearchCollectorImage, pull policy, proxy config, user args
+		// from the per-cluster addon annotations (memory limits, heartbeat, etc.).
 		getValue,
+		// [1] Merge non-image values from the addon annotation (e.g. memory limits,
+		// container args). May also set an image — deliberately ignored by [2].
 		addonfactory.GetValuesFromAddonAnnotation,
+		// [2] Node placement and resource requirements from AddOnDeploymentConfig.
 		addonfactory.GetAddOnDeploymentConfigValues(
 			utils.NewAddOnDeploymentConfigGetter(addonClient),
 			addonfactory.ToAddOnNodePlacementValues,
 			addonfactory.ToAddOnResourceRequirementsValues),
+		// [3] Security gate (CVE-2026-71471 / CVE-2026-71473): unconditionally reset
+		// the image to SearchCollectorImage, discarding any image set by [1] via the
+		// addon annotation. This closes the arbitrary-image-injection attack vector.
 		validateImageOverride,
+		// [4] MCIR support: apply the "open-cluster-management.io/image-registries"
+		// registry mapping rules from the ManagedCluster annotation to
+		// SearchCollectorImage. This transforms the known-good base image's registry
+		// prefix to the customer's mirror registry — supporting arbitrary private
+		// registries in disconnected/air-gapped environments. Runs last so it wins.
+		// AddOnDeploymentConfig.Spec.Registries takes precedence if both are set.
+		addonfactory.GetAgentImageValues(
+			utils.NewAddOnDeploymentConfigGetter(addonClient),
+			"global.imageOverrides.search_collector",
+			SearchCollectorImage,
+		),
+	).WithAgentDeployTriggerClusterFilter(
+		// Trigger redeployment when the MCIR annotation on the ManagedCluster changes
+		// so that newly applied or updated registry mirrors take effect immediately.
+		func(old, new *clusterv1.ManagedCluster) bool {
+			return old.GetAnnotations()[clusterv1.ClusterImageRegistriesAnnotationKey] !=
+				new.GetAnnotations()[clusterv1.ClusterImageRegistriesAnnotationKey]
+		},
 	).WithAgentRegistrationOption(newRegistrationOption(kubeClient, SearchAddonName)).
 		BuildHelmAgentAddon()
 	if err != nil {
