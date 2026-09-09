@@ -91,3 +91,21 @@ rules:
   - get
   - list
   - watch
+# ConfigMap get — required by the federated query path to read the search-ca-crt
+# ConfigMap in the ACM namespace for TLS CA bundle construction
+# (search-v2-api/pkg/federated/fedConfig.go).
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  verbs:
+  - get
+# Route list — required by the federated query path to discover the console route
+# and cluster-proxy-addon-user route for hub URL resolution
+# (search-v2-api/pkg/federated/fedConfig.go).
+- apiGroups:
+  - route.openshift.io
+  resources:
+  - routes
+  verbs:
+  - list
