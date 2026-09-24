@@ -28,7 +28,7 @@ Key pages and when to load them:
 
 Fetch a wiki page with:
 ```bash
-curl -s "https://github.com/stolostron/search-v2-operator/wiki/<Page-Name>" | python3 -c "
+curl -sL "https://github.com/stolostron/search-v2-operator/wiki/<Page-Name>" | python3 -c "
 import sys, re
 html = sys.stdin.read()
 body = re.search(r'<div[^>]+class=\"[^\"]*markdown-body[^\"]*\"[^>]*>(.*?)</div>', html, re.DOTALL)
