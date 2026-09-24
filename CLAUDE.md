@@ -4,6 +4,38 @@ Kubernetes operator (kubebuilder/controller-runtime) that deploys and manages al
 
 For system architecture, data flows, and module layout, see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
+## Wiki
+
+The project Wiki at <https://github.com/stolostron/search-v2-operator/wiki> is the canonical source for architecture, design decisions, and operational knowledge. **Load relevant wiki pages at the start of any task** — do not rely solely on source code.
+
+Key pages and when to load them:
+
+| Wiki page | Load when… |
+|---|---|
+| [Home](https://github.com/stolostron/search-v2-operator/wiki/Home) | Starting any task — overview and links |
+| [Feature-Spec](https://github.com/stolostron/search-v2-operator/wiki/Feature-Spec) | Implementing or reviewing a feature |
+| [Addon-Framework-Operator](https://github.com/stolostron/search-v2-operator/wiki/Addon-Framework-Operator) | Working on addon deployment, ManagedClusterAddOn, or collector rollout |
+| [Request-flow-and-timeouts](https://github.com/stolostron/search-v2-operator/wiki/Request-flow-and-timeouts) | Debugging latency, timeouts, or collector-to-indexer sync issues |
+| [Collector:-Configure-resources-collected](https://github.com/stolostron/search-v2-operator/wiki/Collector:-Configure-resources-collected) | Working on collection config, allowlists, or resource filtering |
+| [Search-Query-API](https://github.com/stolostron/search-v2-operator/wiki/Search-Query-API) / [GraphQL-API](https://github.com/stolostron/search-v2-operator/wiki/GraphQL-API) | Working on the search-v2-api or query patterns |
+| [Current-Limitations-of-User-Authorization](https://github.com/stolostron/search-v2-operator/wiki/Current-Limitations-of-User-Authorization) | Working on RBAC, authorization, or security issues |
+| [PostgreSQL-Key-Tuning-Parameters](https://github.com/stolostron/search-v2-operator/wiki/PostgreSQL-Key-Tuning-Parameters) | Investigating database performance or configuration |
+| [PostgreSQL-query-inventory](https://github.com/stolostron/search-v2-operator/wiki/PostgreSQL-query-inventory) | Reviewing or optimizing SQL queries in search-indexer |
+| [Scale-and-performance-metrics](https://github.com/stolostron/search-v2-operator/wiki/Scale-and-performance-metrics) | Working on scale, performance, or capacity planning |
+| [NodeSelectors-and-tolerations](https://github.com/stolostron/search-v2-operator/wiki/NodeSelectors-and-tolerations) | Working on scheduling, placement, or node affinity |
+| [Global-Search-User-Configuration](https://github.com/stolostron/search-v2-operator/wiki/Global-Search-User-Configuration) | Working on global search or multi-hub configuration |
+| [Integration-(E2E)-test-strategy](https://github.com/stolostron/search-v2-operator/wiki/Integration-(E2E)-test-strategy) | Writing or debugging E2E tests |
+
+Fetch a wiki page with:
+```bash
+curl -sL "https://github.com/stolostron/search-v2-operator/wiki/<Page-Name>" | python3 -c "
+import sys, re
+html = sys.stdin.read()
+body = re.search(r'<div[^>]+class=\"[^\"]*markdown-body[^\"]*\"[^>]*>(.*?)</div>', html, re.DOTALL)
+print(body.group(1) if body else html[:4000])
+"
+```
+
 ## Commands
 
 ```bash
