@@ -87,6 +87,30 @@ func TestPostgresConfigmapWithStatementTimeout(t *testing.T) {
 	}
 }
 
+func TestPostgresConfigmapGroupUsersIndex(t *testing.T) {
+	search := &searchv1alpha1.Search{
+		TypeMeta:   metav1.TypeMeta{Kind: "Search"},
+		ObjectMeta: metav1.ObjectMeta{Name: "search-v2-operator", Namespace: "test-namespace"},
+		Spec:       searchv1alpha1.SearchSpec{},
+	}
+
+	s := scheme.Scheme
+	err := searchv1alpha1.SchemeBuilder.AddToScheme(s)
+	assert.NoError(t, err)
+
+	cl := fake.NewClientBuilder().WithRuntimeObjects(search).Build()
+	r := &SearchReconciler{Client: cl, Scheme: s}
+
+	startScript := r.PostgresConfigmap(search, PostgresTLSConfig{}).Data["postgresql-start.sh"]
+	
+	// Use `?` to match the predicate shape emitted by search-v2-api.
+	assert.Contains(t, startScript,
+		`CREATE INDEX IF NOT EXISTS data_users_idx ON search.resources `+
+			`USING GIN ((data -> 'users')) WHERE (data -> 'kind') ? 'Group' `+
+			`AND (data -> 'apigroup') ? 'user.openshift.io'`,
+		"data_users_idx must match the definition in search-indexer")
+}
+
 func TestUpdatePostgresConfigmapNewInstallation(t *testing.T) {
 	// Test case: New installation - no existing custom config
 	existing := &corev1.ConfigMap{
