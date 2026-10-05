@@ -9,7 +9,7 @@ import (
 // Important: Run the "make manifests" command to regenerate the manifests after you modify this file.
 
 // DataType represents the data type of a collected field
-// +kubebuilder:validation:Enum=bytes;string;integer;float;boolean
+// +kubebuilder:validation:Enum=bytes;string;integer;float;boolean;array
 type DataType string
 
 const (
@@ -18,6 +18,7 @@ const (
 	DataTypeInteger DataType = "integer"
 	DataTypeFloat   DataType = "float"
 	DataTypeBoolean DataType = "boolean"
+	DataTypeArray   DataType = "array"
 )
 
 // ActionType represents the action to take for a collection rule
