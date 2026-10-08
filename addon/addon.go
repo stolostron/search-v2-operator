@@ -344,6 +344,13 @@ func newRoleBindingForClusterRole(name, clusterRoleName, clusterName, addonName 
 	}
 }
 
+// NewAddonManager builds the search-collector addon manager: it registers the Prometheus and
+// search v1alpha1 API types onto the shared Scheme, constructs the addon/kube/hub clients the
+// GetValuesFuncs below depend on, and wires the addon-framework factory (base defaults,
+// CollectorConfig distribution, annotation overrides, node placement, and probe-rollout values,
+// in that order) into a ready-to-run AddonManager. Returns an error — rather than continuing with
+// a partially-initialized Scheme or client — on any setup failure, since every downstream
+// GetValuesFunc assumes these succeeded.
 func NewAddonManager(kubeConfig *rest.Config) (addonmanager.AddonManager, error) {
 	if SearchCollectorImage == "" {
 		return nil, fmt.Errorf("the search-collector pod image is empty")
@@ -354,6 +361,7 @@ func NewAddonManager(kubeConfig *rest.Config) (addonmanager.AddonManager, error)
 	}
 	if err := searchv1alpha1.AddToScheme(Scheme); err != nil {
 		klog.Errorf("failed to add search v1alpha1 scheme to scheme: %v", err)
+		return nil, err
 	}
 	addonMgr, err := addonmanager.New(kubeConfig)
 	if err != nil {

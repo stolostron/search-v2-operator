@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"open-cluster-management.io/addon-framework/pkg/utils"
+	"slices"
 	"testing"
 
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
@@ -114,7 +115,9 @@ func newSearchCR(namespace string) *searchv1alpha1.Search {
 
 // newMergedCollectorConfig returns a CollectorConfig CR named mergedCollectorConfigName in the
 // given namespace, matching the shape of the hub's operator-computed merged-collector-config.
-func newMergedCollectorConfig(namespace string, spec searchv1alpha1.CollectorConfigSpec) *searchv1alpha1.CollectorConfig {
+func newMergedCollectorConfig(
+	namespace string, spec searchv1alpha1.CollectorConfigSpec,
+) *searchv1alpha1.CollectorConfig {
 	return &searchv1alpha1.CollectorConfig{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      mergedCollectorConfigName,
@@ -930,7 +933,8 @@ func TestGetCollectorConfigValue_ValuesShape(t *testing.T) {
 		}),
 	).Build()
 
-	values, err := getCollectorConfigValue(hubClient)(newCluster("cluster1"), newAddon(SearchAddonName, "cluster1", "", nil))
+	values, err := getCollectorConfigValue(hubClient)(
+		newCluster("cluster1"), newAddon(SearchAddonName, "cluster1", "", nil))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -965,12 +969,16 @@ func TestGetCollectorConfigValue_NotFound_ReturnsEmptyValues(t *testing.T) {
 		objects []client.Object
 	}{
 		{name: "no Search CR yet", objects: nil},
-		{name: "Search CR exists but merged-collector-config does not", objects: []client.Object{newSearchCR("open-cluster-management")}},
+		{
+			name:    "Search CR exists but merged-collector-config does not",
+			objects: []client.Object{newSearchCR("open-cluster-management")},
+		},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			hubClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(tc.objects...).Build()
-			values, err := getCollectorConfigValue(hubClient)(newCluster("cluster1"), newAddon(SearchAddonName, "cluster1", "", nil))
+			values, err := getCollectorConfigValue(hubClient)(
+				newCluster("cluster1"), newAddon(SearchAddonName, "cluster1", "", nil))
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
@@ -1004,7 +1012,7 @@ func TestGetCollectorConfigValue_AmbiguousSearchCR_ReturnsError(t *testing.T) {
 // cluster", turning a transient hub API hiccup into a fleet-wide config wipe.
 func TestGetCollectorConfigValue_TransientGetError_ReturnsError(t *testing.T) {
 	base := fake.NewClientBuilder().WithScheme(scheme).WithObjects(newSearchCR("open-cluster-management")).Build()
-	failingClient := interceptor.NewClient(base.(client.WithWatch), interceptor.Funcs{
+	failingClient := interceptor.NewClient(base, interceptor.Funcs{
 		Get: func(
 			ctx context.Context, c client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption,
 		) error {
@@ -1015,7 +1023,8 @@ func TestGetCollectorConfigValue_TransientGetError_ReturnsError(t *testing.T) {
 		},
 	})
 
-	_, err := getCollectorConfigValue(failingClient)(newCluster("cluster1"), newAddon(SearchAddonName, "cluster1", "", nil))
+	_, err := getCollectorConfigValue(failingClient)(
+		newCluster("cluster1"), newAddon(SearchAddonName, "cluster1", "", nil))
 	if err == nil {
 		t.Fatal("expected an error when the hub Get fails transiently, got nil — must not be swallowed")
 	}
@@ -1069,27 +1078,26 @@ func TestManifest_CollectorConfigEditorRoleAlwaysRendered(t *testing.T) {
 			cr.Labels["rbac.authorization.k8s.io/aggregate-to-admin"])
 	}
 	found := false
+	wantVerbs := []string{"create", "get", "list", "patch", "update", "watch", "delete"}
 	for _, r := range cr.Rules {
-		for _, g := range r.APIGroups {
-			if g == "search.open-cluster-management.io" {
-				found = true
-				for _, verb := range []string{"create", "get", "list", "patch", "update", "watch", "delete"} {
-					has := false
-					for _, v := range r.Verbs {
-						if v == verb {
-							has = true
-							break
-						}
-					}
-					if !has {
-						t.Errorf("expected verb %q on collectorconfigs rule, got %v", verb, r.Verbs)
-					}
-				}
-			}
+		if !slices.Contains(r.APIGroups, "search.open-cluster-management.io") {
+			continue
 		}
+		found = true
+		assertHasAllVerbs(t, r.Verbs, wantVerbs)
 	}
 	if !found {
 		t.Errorf("expected a rule for apiGroup search.open-cluster-management.io, got %+v", cr.Rules)
+	}
+}
+
+// assertHasAllVerbs fails the test for each entry of want that is missing from got.
+func assertHasAllVerbs(t *testing.T, got, want []string) {
+	t.Helper()
+	for _, verb := range want {
+		if !slices.Contains(got, verb) {
+			t.Errorf("expected verb %q on collectorconfigs rule, got %v", verb, got)
+		}
 	}
 }
 
@@ -1199,7 +1207,7 @@ func TestManifest_CollectorConfigDistribution_TransientErrorAbortsWholeRender(t 
 	SearchCollectorImage = "quay.io/stolostron/search_collector:2.7.0"
 
 	base := fake.NewClientBuilder().WithScheme(scheme).WithObjects(newSearchCR("open-cluster-management")).Build()
-	failingClient := interceptor.NewClient(base.(client.WithWatch), interceptor.Funcs{
+	failingClient := interceptor.NewClient(base, interceptor.Funcs{
 		Get: func(
 			ctx context.Context, c client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption,
 		) error {
