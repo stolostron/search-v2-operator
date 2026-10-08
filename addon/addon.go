@@ -18,6 +18,7 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
@@ -29,6 +30,7 @@ import (
 	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const (
@@ -39,6 +41,16 @@ const (
 	roleBindingName = "open-cluster-management:addons:search-collector"
 
 	GroupName = "rbac.authorization.k8s.io"
+
+	// mergedCollectorConfigName is the name of the operator-computed CollectorConfig CR on the
+	// hub (see controllers.createOrUpdateMergedCollectorConfig) whose Spec is distributed, as-is,
+	// to every managed cluster running the search-collector addon.
+	mergedCollectorConfigName = "merged-collector-config"
+
+	// searchInstanceName duplicates controllers.OperatorName. This package cannot import
+	// controllers — controllers already imports addon, so importing back would create a cycle.
+	// There is always supposed to be exactly one Search CR cluster-wide, named this.
+	searchInstanceName = "search-v2-operator"
 )
 
 //go:embed manifests
@@ -174,6 +186,133 @@ func validateImageOverride(_ *clusterv1.ManagedCluster,
 	}, nil
 }
 
+// resolveSearchNamespace returns the namespace of the live Search CR (there is always supposed
+// to be exactly one, named searchInstanceName) via the hub client. found is false (with err nil)
+// if no such CR exists yet — e.g. a fresh install racing with the operator's own first reconcile
+// — which callers should treat as "not ready yet", not as an error. Mirrors
+// controllers.IntegrationCollectorConfigSeeder.resolveSearch's lookup and its rationale for
+// refusing to guess when more than one match is found (duplicated rather than imported, for the
+// same import-cycle reason as searchInstanceName above).
+func resolveSearchNamespace(ctx context.Context, hubClient client.Client) (namespace string, found bool, err error) {
+	list := &searchv1alpha1.SearchList{}
+	if err := hubClient.List(ctx, list); err != nil {
+		return "", false, err
+	}
+	var match *searchv1alpha1.Search
+	for i := range list.Items {
+		if list.Items[i].Name == searchInstanceName {
+			if match != nil {
+				return "", false, fmt.Errorf(
+					"found multiple Search CRs named %q (namespaces %q and %q) — refusing to guess which one to use",
+					searchInstanceName, match.Namespace, list.Items[i].Namespace)
+			}
+			match = &list.Items[i]
+		}
+	}
+	if match == nil {
+		return "", false, nil
+	}
+	return match.Namespace, true, nil
+}
+
+// getCollectorConfigValue reads the hub's merged-collector-config CollectorConfig CR (computed by
+// controllers.createOrUpdateMergedCollectorConfig from user + integration-team rules) and injects
+// only its Spec into the Helm values, under the "collectorConfig.spec" key, so
+// collectorconfig_cr.yaml can render a matching CR into every managed cluster running the
+// search-collector addon. This is what lets search-collector pick up the hub's collection rules
+// on managed clusters without any ACM Policy.
+//
+// Correctness requirements:
+//
+//   - Only .Spec is ever read — never the full hub object. The hub's merged-collector-config
+//     carries a controller ownerReference pointing at the hub Search CR, which has no matching
+//     object on a managed cluster; extracting only Spec makes it structurally impossible to leak
+//     that ownerReference into the rendered CR.
+//
+//   - "Not found yet" (no Search CR, or no merged-collector-config CR yet — both legitimate
+//     during a fresh install race, or after the Search CR's deletion cascade has already removed
+//     merged-collector-config) is reported by omitting the "collectorConfig" key entirely
+//     (addonfactory.Values{}, nil), not as an error.
+//
+//   - Any other error is propagated (nil, err) — NOT swallowed into an empty Values{}. The
+//     addon-framework re-renders the full manifest list from scratch on every pass; silently
+//     returning empty Values{} here on a transient error would make the Helm template's
+//     `{{- if hasKey .Values "collectorConfig" }}` guard skip rendering the CR, and the
+//     work-agent — which treats each ManifestWork's manifest list as the complete desired state —
+//     would then DELETE a previously-delivered CollectorConfig CR from every managed cluster.
+//     Propagating the error instead makes addon-framework mark the ManagedClusterAddOn's Applied
+//     condition False and leave the previously-applied ManifestWork untouched.
+func getCollectorConfigValue(hubClient client.Client) addonfactory.GetValuesFunc {
+	return func(_ *clusterv1.ManagedCluster, _ *addonapiv1alpha1.ManagedClusterAddOn) (addonfactory.Values, error) {
+		if hubClient == nil {
+			// Defensive only — NewAddonManager always constructs a real client.
+			return addonfactory.Values{}, nil
+		}
+		ctx := context.TODO()
+
+		namespace, found, err := resolveSearchNamespace(ctx, hubClient)
+		if err != nil {
+			return nil, err
+		}
+		if !found {
+			return addonfactory.Values{}, nil
+		}
+
+		cc := &searchv1alpha1.CollectorConfig{}
+		err = hubClient.Get(ctx, types.NamespacedName{Name: mergedCollectorConfigName, Namespace: namespace}, cc)
+		if err != nil {
+			if errors.IsNotFound(err) {
+				return addonfactory.Values{}, nil
+			}
+			return nil, err
+		}
+
+		// Round-trip through JSON (matching the convention getValue() already uses via
+		// addonfactory.JsonStructToValues) rather than passing the typed struct straight through,
+		// so the value tree reaching the Helm template is plain map[string]interface{}/[]interface{}
+		// all the way down — the same shape every other GetValuesFunc in this file produces.
+		specValues, err := addonfactory.JsonStructToValues(cc.Spec)
+		if err != nil {
+			return nil, err
+		}
+		return addonfactory.Values{
+			"collectorConfig": map[string]interface{}{
+				"spec": specValues,
+			},
+		}, nil
+	}
+}
+
+// stripCollectorConfigFromAnnotation wraps addonfactory.GetValuesFromAddonAnnotation to drop any
+// "collectorConfig" key present in the addon.open-cluster-management.io/values annotation on a
+// ManagedClusterAddOn, before merging those values into the chain.
+//
+// collectorConfig must only ever come from the hub's merged-collector-config CR via
+// getCollectorConfigValue above — that provider runs earlier in the WithGetValuesFuncs chain, but
+// addon-framework's value merge lets a LATER provider's key override an EARLIER one, and
+// GetValuesFromAddonAnnotation accepts arbitrary top-level keys with no schema restriction.
+// Without this guard, anyone with permission to edit a ManagedClusterAddOn's annotations for
+// their own cluster (not necessarily a hub cluster-admin) could set
+// {"collectorConfig":{"spec":{...}}} on that annotation and override the fleet-wide collection
+// policy for that cluster — including when the hub has no merged-collector-config yet, since an
+// empty hub result does not remove an annotation-provided key from the merge.
+func stripCollectorConfigFromAnnotation(
+	cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn,
+) (addonfactory.Values, error) {
+	values, err := addonfactory.GetValuesFromAddonAnnotation(cluster, addon)
+	if err != nil {
+		return values, err
+	}
+	if _, ok := values["collectorConfig"]; ok {
+		klog.Warningf(
+			"ignoring collectorConfig set via the %s annotation on ManagedClusterAddOn %s/%s: "+
+				"this value may only be set by the hub's merged-collector-config CR",
+			addonfactory.AnnotationValuesName, addon.GetNamespace(), addon.GetName())
+		delete(values, "collectorConfig")
+	}
+	return values, nil
+}
+
 func newRegistrationOption(kubeClient kubernetes.Interface, addonName string) *agent.RegistrationOption {
 	return &agent.RegistrationOption{
 		CSRConfigurations: agent.KubeClientSignerConfigurations(addonName, addonName),
@@ -235,6 +374,13 @@ func newRoleBindingForClusterRole(name, clusterRoleName, clusterName, addonName 
 	}
 }
 
+// NewAddonManager builds the search-collector addon manager: it registers the Prometheus and
+// search v1alpha1 API types onto the shared Scheme, constructs the addon/kube/hub clients the
+// GetValuesFuncs below depend on, and wires the addon-framework factory (base defaults,
+// CollectorConfig distribution, annotation overrides, node placement, and probe-rollout values,
+// in that order) into a ready-to-run AddonManager. Returns an error — rather than continuing with
+// a partially-initialized Scheme or client — on any setup failure, since every downstream
+// GetValuesFunc assumes these succeeded.
 func NewAddonManager(kubeConfig *rest.Config) (addonmanager.AddonManager, error) {
 	if SearchCollectorImage == "" {
 		return nil, fmt.Errorf("the search-collector pod image is empty")
@@ -242,6 +388,10 @@ func NewAddonManager(kubeConfig *rest.Config) (addonmanager.AddonManager, error)
 	err := prometheusv1.AddToScheme(Scheme)
 	if err != nil {
 		klog.Errorf("failed to add Prometheus scheme to scheme: %v", err)
+	}
+	if err := searchv1alpha1.AddToScheme(Scheme); err != nil {
+		klog.Errorf("failed to add search v1alpha1 scheme to scheme: %v", err)
+		return nil, err
 	}
 	addonMgr, err := addonmanager.New(kubeConfig)
 	if err != nil {
@@ -258,6 +408,14 @@ func NewAddonManager(kubeConfig *rest.Config) (addonmanager.AddonManager, error)
 		klog.Errorf("unable to create kube client: %v", err)
 		return nil, err
 	}
+	// hubClient is used only by getCollectorConfigValue, to read the hub's
+	// merged-collector-config CollectorConfig CR. Scheme already has searchv1alpha1 registered
+	// above.
+	hubClient, err := client.New(kubeConfig, client.Options{Scheme: Scheme})
+	if err != nil {
+		klog.Errorf("unable to create hub client for CollectorConfig distribution: %v", err)
+		return nil, err
+	}
 	agentAddon, err := addonfactory.NewAgentAddonFactory(SearchAddonName, ChartFS, ChartDir).
 		WithScheme(Scheme).
 		WithConfigGVRs(
@@ -266,19 +424,25 @@ func NewAddonManager(kubeConfig *rest.Config) (addonmanager.AddonManager, error)
 		// [0] Base defaults: SearchCollectorImage, pull policy, proxy config, user args
 		// from the per-cluster addon annotations (memory limits, heartbeat, etc.).
 		getValue,
-		// [1] Merge non-image values from the addon annotation (e.g. memory limits,
-		// container args). May also set an image — deliberately ignored by [2].
-		addonfactory.GetValuesFromAddonAnnotation,
-		// [2] Node placement and resource requirements from AddOnDeploymentConfig.
+		// [1] Distribute the hub's merged-collector-config CollectorConfig Spec to every
+		// managed cluster. Independent top-level "collectorConfig" key; does not interact
+		// with [2]-[5].
+		getCollectorConfigValue(hubClient),
+		// [2] Merge non-image values from the addon annotation (e.g. memory limits,
+		// container args). May also set an image — deliberately ignored by [3]. Strips any
+		// "collectorConfig" key the annotation might carry — see
+		// stripCollectorConfigFromAnnotation's doc comment for why.
+		stripCollectorConfigFromAnnotation,
+		// [3] Node placement and resource requirements from AddOnDeploymentConfig.
 		addonfactory.GetAddOnDeploymentConfigValues(
 			utils.NewAddOnDeploymentConfigGetter(addonClient),
 			addonfactory.ToAddOnNodePlacementValues,
 			addonfactory.ToAddOnResourceRequirementsValues),
-		// [3] Security gate (CVE-2026-71471 / CVE-2026-71473): unconditionally reset
-		// the image to SearchCollectorImage, discarding any image set by [1] via the
+		// [4] Security gate (CVE-2026-71471 / CVE-2026-71473): unconditionally reset
+		// the image to SearchCollectorImage, discarding any image set by [2] via the
 		// addon annotation. This closes the arbitrary-image-injection attack vector.
 		validateImageOverride,
-		// [4] MCIR support: apply the "open-cluster-management.io/image-registries"
+		// [5] MCIR support: apply the "open-cluster-management.io/image-registries"
 		// registry mapping rules from the ManagedCluster annotation to
 		// SearchCollectorImage. This transforms the known-good base image's registry
 		// prefix to the customer's mirror registry — supporting arbitrary private

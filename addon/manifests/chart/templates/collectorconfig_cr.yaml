@@ -1,0 +1,28 @@
+{{- /*
+merged-collector-config: the hub's operator-computed CollectorConfig, distributed as-is to every
+managed cluster running the search-collector addon. See getCollectorConfigValue in addon/addon.go.
+
+Name and namespace deliberately match what search-collector already looks up locally on its own
+cluster (search-collector/pkg/transforms/configurableCollection.go: Get "merged-collector-config"
+in config.Cfg.PodNamespace, i.e. this addon's install namespace, {{ .Release.Namespace }} here) —
+no search-collector code change is required for it to pick this up.
+
+Guarded on key *existence*, not truthiness of .spec: an empty (but valid) CollectionRules list is
+a meaningful "no customizations" state and must still be rendered, not silently skipped.
+
+Deliberately carries no ownerReferences: getCollectorConfigValue only ever reads the hub CR's
+.Spec, never the full object, so there is nothing here to strip — the hub's own ownerReference
+(pointing at the hub Search CR) never reaches this template in the first place.
+*/}}
+{{- if hasKey .Values "collectorConfig" }}
+---
+apiVersion: search.open-cluster-management.io/v1alpha1
+kind: CollectorConfig
+metadata:
+  name: merged-collector-config
+  namespace: {{ .Release.Namespace }}
+  labels:
+    component: "search"
+spec:
+{{ toYaml .Values.collectorConfig.spec | indent 2 }}
+{{- end }}

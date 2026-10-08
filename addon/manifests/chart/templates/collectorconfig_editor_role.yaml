@@ -1,0 +1,37 @@
+{{- /*
+This aggregates into the built-in "admin" ClusterRole (via the well-known
+rbac.authorization.k8s.io/aggregate-to-admin label) so that the OCM work-agent's own identity
+(klusterlet-work-sa, bound to "admin" on every managed cluster — see
+open-cluster-management:klusterlet-work:execution-admin) can create/update the
+merged-collector-config CollectorConfig CR delivered by collectorconfig_cr.yaml.
+
+Without this, the work-agent has no RBAC at all for this custom resource type — Kubernetes'
+built-in "admin"/"edit"/"view" ClusterRoles only aggregate rules from ClusterRoles carrying this
+label; a CRD's own controller-generated RBAC (cluster_role.yaml in this chart) does not
+automatically grant anything to the cluster's built-in roles. Found live on a real ACM 5.0
+cluster during end-to-end testing: the work-agent's ManifestWork apply failed with
+"cannot get resource \"collectorconfigs\" ... is forbidden" until this aggregation was added.
+
+Deliberately +listType handling not needed here; this is RBAC, not the CollectorConfig API.
+*/}}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: collectorconfig-editor-role
+  labels:
+    component: "search"
+    rbac.authorization.k8s.io/aggregate-to-admin: "true"
+rules:
+- apiGroups:
+  - search.open-cluster-management.io
+  resources:
+  - collectorconfigs
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
