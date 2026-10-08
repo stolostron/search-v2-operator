@@ -283,6 +283,36 @@ func getCollectorConfigValue(hubClient client.Client) addonfactory.GetValuesFunc
 	}
 }
 
+// stripCollectorConfigFromAnnotation wraps addonfactory.GetValuesFromAddonAnnotation to drop any
+// "collectorConfig" key present in the addon.open-cluster-management.io/values annotation on a
+// ManagedClusterAddOn, before merging those values into the chain.
+//
+// collectorConfig must only ever come from the hub's merged-collector-config CR via
+// getCollectorConfigValue above — that provider runs earlier in the WithGetValuesFuncs chain, but
+// addon-framework's value merge lets a LATER provider's key override an EARLIER one, and
+// GetValuesFromAddonAnnotation accepts arbitrary top-level keys with no schema restriction.
+// Without this guard, anyone with permission to edit a ManagedClusterAddOn's annotations for
+// their own cluster (not necessarily a hub cluster-admin) could set
+// {"collectorConfig":{"spec":{...}}} on that annotation and override the fleet-wide collection
+// policy for that cluster — including when the hub has no merged-collector-config yet, since an
+// empty hub result does not remove an annotation-provided key from the merge.
+func stripCollectorConfigFromAnnotation(
+	cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn,
+) (addonfactory.Values, error) {
+	values, err := addonfactory.GetValuesFromAddonAnnotation(cluster, addon)
+	if err != nil {
+		return values, err
+	}
+	if _, ok := values["collectorConfig"]; ok {
+		klog.Warningf(
+			"ignoring collectorConfig set via the %s annotation on ManagedClusterAddOn %s/%s: "+
+				"this value may only be set by the hub's merged-collector-config CR",
+			addonfactory.AnnotationValuesName, addon.GetNamespace(), addon.GetName())
+		delete(values, "collectorConfig")
+	}
+	return values, nil
+}
+
 func newRegistrationOption(kubeClient kubernetes.Interface, addonName string) *agent.RegistrationOption {
 	return &agent.RegistrationOption{
 		CSRConfigurations: agent.KubeClientSignerConfigurations(addonName, addonName),
@@ -399,8 +429,10 @@ func NewAddonManager(kubeConfig *rest.Config) (addonmanager.AddonManager, error)
 		// with [2]-[5].
 		getCollectorConfigValue(hubClient),
 		// [2] Merge non-image values from the addon annotation (e.g. memory limits,
-		// container args). May also set an image — deliberately ignored by [3].
-		addonfactory.GetValuesFromAddonAnnotation,
+		// container args). May also set an image — deliberately ignored by [3]. Strips any
+		// "collectorConfig" key the annotation might carry — see
+		// stripCollectorConfigFromAnnotation's doc comment for why.
+		stripCollectorConfigFromAnnotation,
 		// [3] Node placement and resource requirements from AddOnDeploymentConfig.
 		addonfactory.GetAddOnDeploymentConfigValues(
 			utils.NewAddOnDeploymentConfigGetter(addonClient),

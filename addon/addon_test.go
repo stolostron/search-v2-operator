@@ -138,7 +138,7 @@ func newAgentAddonWithHubClient(t *testing.T, objects []runtime.Object, hubClien
 		WithGetValuesFuncs(
 			getValue,
 			getCollectorConfigValue(hubClient),
-			addonfactory.GetValuesFromAddonAnnotation,
+			stripCollectorConfigFromAnnotation,
 			addonfactory.GetAddOnDeploymentConfigValues(
 				utils.NewAddOnDeploymentConfigGetter(fakeAddonClient),
 				addonfactory.ToAddOnNodePlacementValues,
@@ -1192,6 +1192,80 @@ func TestManifest_CollectorConfigDistribution(t *testing.T) {
 				t.Errorf("rendered CollectorConfig must not carry ownerReferences (would leak the hub's "+
 					"Search CR ownerReference to a managed cluster with no matching object), got %+v",
 					cc.GetOwnerReferences())
+			}
+		})
+	}
+}
+
+// TestManifest_CollectorConfigDistribution_AnnotationCannotOverrideHubConfig is a security
+// regression test: a ManagedClusterAddOn's addon.open-cluster-management.io/values annotation
+// (settable by anyone with edit access to that object for their own cluster — not necessarily a
+// hub cluster-admin) must never be able to set or override the rendered collectorConfig. That key
+// may only ever come from the hub's merged-collector-config CR via getCollectorConfigValue.
+// Without stripCollectorConfigFromAnnotation, addon-framework's value merge would let this
+// later-running provider's "collectorConfig" key silently win over the earlier hub-sourced one.
+func TestManifest_CollectorConfigDistribution_AnnotationCannotOverrideHubConfig(t *testing.T) {
+	SearchCollectorImage = "quay.io/stolostron/search_collector:2.7.0"
+
+	hubSpec := searchv1alpha1.CollectorConfigSpec{
+		CollectionRules: []searchv1alpha1.CollectionRule{
+			{
+				Action:           searchv1alpha1.ActionInclude,
+				ResourceSelector: searchv1alpha1.ResourceSelector{APIGroups: []string{"example.io"}, Kinds: []string{"Foo"}},
+			},
+		},
+	}
+	maliciousAnnotation := `{"collectorConfig":{"spec":{"collectionRules":` +
+		`[{"action":"include","resourceSelector":{"apiGroups":["*"],"kinds":["Secret"]}}]}}}`
+
+	tests := []struct {
+		name       string
+		hubObjects []client.Object
+		expectCC   bool
+		expectSpec searchv1alpha1.CollectorConfigSpec
+	}{
+		{
+			name: "hub has a populated config — annotation attack is ignored, hub value wins",
+			hubObjects: []client.Object{
+				newSearchCR("open-cluster-management"),
+				newMergedCollectorConfig("open-cluster-management", hubSpec),
+			},
+			expectCC:   true,
+			expectSpec: hubSpec,
+		},
+		{
+			name:       "hub has no config at all — annotation attack still cannot inject one",
+			hubObjects: nil,
+			expectCC:   false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			hubClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(tc.hubObjects...).Build()
+			agentAddon := newAgentAddonWithHubClient(t, nil, hubClient)
+
+			addon := newAddon(SearchAddonName, "cluster1", "",
+				map[string]string{addonfactory.AnnotationValuesName: maliciousAnnotation})
+			objects, err := agentAddon.Manifests(newCluster("cluster1"), addon)
+			if err != nil {
+				t.Fatalf("failed to get manifests: %v", err)
+			}
+
+			cc := findCollectorConfig(objects)
+			if !tc.expectCC {
+				if cc != nil {
+					t.Fatalf("expected no CollectorConfig to be rendered, but the annotation-injected "+
+						"one was: %+v", cc)
+				}
+				return
+			}
+			if cc == nil {
+				t.Fatal("expected the hub-sourced CollectorConfig to be rendered, but it was not")
+			}
+			if !equality.Semantic.DeepEqual(cc.Spec, tc.expectSpec) {
+				t.Errorf("the annotation-injected spec leaked through:\n got:  %+v\n want: %+v",
+					cc.Spec, tc.expectSpec)
 			}
 		})
 	}
