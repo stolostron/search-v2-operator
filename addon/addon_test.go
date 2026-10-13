@@ -641,6 +641,34 @@ func findSearchDeployment(objs []runtime.Object) *appsv1.Deployment {
 	return nil
 }
 
+func TestManifest_ConfigurableCollectionEnvVar(t *testing.T) {
+	SearchCollectorImage = "quay.io/stolostron/search_collector:2.7.0"
+	agentAddon := newAgentAddon(t, nil)
+
+	addon := newAddon(SearchAddonName, "cluster1", "", map[string]string{
+		"addon.open-cluster-management.io/search_configurable_collection": "true",
+	})
+	objects, err := agentAddon.Manifests(newCluster("cluster1"), addon)
+	if err != nil {
+		t.Fatalf("failed to get manifests: %v", err)
+	}
+	dep := findSearchDeployment(objects)
+	if dep == nil {
+		t.Fatal("no Deployment found in manifests")
+	}
+
+	var found bool
+	for _, env := range dep.Spec.Template.Spec.Containers[0].Env {
+		if env.Name == "FEATURE_CONFIGURABLE_COLLECTION" && env.Value == "true" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("expected FEATURE_CONFIGURABLE_COLLECTION=true env var, but not found")
+	}
+}
+
 // TestManifest_AddonAnnotationImageIgnored verifies that an image supplied via
 // the addon values annotation — even from a trusted registry — is always
 // replaced by validateImageOverride (CVE-2026-71471 / CVE-2026-71473 fix).
