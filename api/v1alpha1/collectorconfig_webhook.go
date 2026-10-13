@@ -430,6 +430,7 @@ func (r *CollectorConfig) validateField(customField *Field, path *field.Path) fi
 			string(DataTypeFloat),
 			string(DataTypeBytes),
 			string(DataTypeBoolean),
+			string(DataTypeArray),
 		}
 		if !contains(validTypes, string(customField.Type)) {
 			allErrs = append(allErrs, field.NotSupported(

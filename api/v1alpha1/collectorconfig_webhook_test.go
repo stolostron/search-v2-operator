@@ -209,6 +209,29 @@ func TestAcceptValidConfigWithFieldsAndSuffix(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+// Verify that all currently supported field data types pass webhook validation.
+func TestAcceptAllFieldTypes(t *testing.T) {
+	dataTypes := []DataType{
+		DataTypeBytes,
+		DataTypeString,
+		DataTypeInteger,
+		DataTypeFloat,
+		DataTypeBoolean,
+		DataTypeArray,
+	}
+
+	for _, dataType := range dataTypes {
+		t.Run(string(dataType), func(t *testing.T) {
+			c := validConfig()
+			c.Spec.CollectionRules[0].Fields = []Field{
+				{Name: "field", JSONPath: "{.spec.field}", Type: dataType},
+			}
+			_, err := c.ValidateCreate(context.Background(), c)
+			assert.NoError(t, err)
+		})
+	}
+}
+
 // Accept a rule using the Exclude action.
 func TestAcceptExcludeAction(t *testing.T) {
 	c := validConfig()
