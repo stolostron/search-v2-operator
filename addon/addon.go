@@ -287,15 +287,16 @@ func getCollectorConfigValue(hubClient client.Client) addonfactory.GetValuesFunc
 // "collectorConfig" key present in the addon.open-cluster-management.io/values annotation on a
 // ManagedClusterAddOn, before merging those values into the chain.
 //
-// collectorConfig must only ever come from the hub's merged-collector-config CR via
-// getCollectorConfigValue above — that provider runs earlier in the WithGetValuesFuncs chain, but
-// addon-framework's value merge lets a LATER provider's key override an EARLIER one, and
-// GetValuesFromAddonAnnotation accepts arbitrary top-level keys with no schema restriction.
-// Without this guard, anyone with permission to edit a ManagedClusterAddOn's annotations for
-// their own cluster (not necessarily a hub cluster-admin) could set
-// {"collectorConfig":{"spec":{...}}} on that annotation and override the fleet-wide collection
-// policy for that cluster — including when the hub has no merged-collector-config yet, since an
-// empty hub result does not remove an annotation-provided key from the merge.
+// The rendered "collectorConfig" value must only ever come from reading the hub's
+// merged-collector-config CR, via getCollectorConfigValue above — that provider runs earlier in
+// the WithGetValuesFuncs chain, but addon-framework's value merge lets a LATER provider's key
+// override an EARLIER one, and GetValuesFromAddonAnnotation accepts arbitrary top-level keys from
+// the annotation JSON with no schema restriction. Without this guard, anyone with permission to
+// edit a ManagedClusterAddOn's annotations for their own cluster (not necessarily a hub
+// cluster-admin) could set {"collectorConfig":{"spec":{...}}} on that annotation and override the
+// fleet-wide collection policy for that cluster — including when the hub has no
+// merged-collector-config yet, since an empty hub result does not remove an annotation-provided
+// key from the merge.
 func stripCollectorConfigFromAnnotation(
 	cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn,
 ) (addonfactory.Values, error) {
@@ -306,7 +307,9 @@ func stripCollectorConfigFromAnnotation(
 	if _, ok := values["collectorConfig"]; ok {
 		klog.Warningf(
 			"ignoring collectorConfig set via the %s annotation on ManagedClusterAddOn %s/%s: "+
-				"this value may only be set by the hub's merged-collector-config CR",
+				"to change search collection rules, create or update a CollectorConfig CR on the "+
+				"hub (e.g. user-collector-config) instead — this annotation key is reserved for "+
+				"the hub's own computed merged-collector-config CR and is never read from here",
 			addonfactory.AnnotationValuesName, addon.GetNamespace(), addon.GetName())
 		delete(values, "collectorConfig")
 	}
