@@ -63,12 +63,13 @@ type GlobalValues struct {
 }
 
 type UserArgs struct {
-	ContainerArgs  string `json:"containerArgs,"`
-	LimitMemory    string `json:"limitMemory,"`
-	RequestMemory  string `json:"requestMemory,"`
-	RediscoverRate int    `json:"rediscoverRate,"`
-	HeartBeat      int    `json:"heartBeat,"`
-	ReportRate     int    `json:"reportRate,"`
+	ContainerArgs            string `json:"containerArgs,"`
+	LimitMemory              string `json:"limitMemory,"`
+	RequestMemory            string `json:"requestMemory,"`
+	RediscoverRate           int    `json:"rediscoverRate,"`
+	HeartBeat                int    `json:"heartBeat,"`
+	ReportRate               int    `json:"reportRate,"`
+	ConfigurableCollection   bool   `json:"configurableCollection,"`
 }
 
 type Values struct {
@@ -142,6 +143,9 @@ func getValue(cluster *clusterv1.ManagedCluster,
 		if err == nil {
 			addonValues.UserArgs.ReportRate = intVal
 		}
+	}
+	if val, ok := addon.GetAnnotations()["addon.open-cluster-management.io/search_configurable_collection"]; ok {
+		addonValues.UserArgs.ConfigurableCollection = val == "true"
 	}
 
 	values, err := addonfactory.JsonStructToValues(addonValues)
