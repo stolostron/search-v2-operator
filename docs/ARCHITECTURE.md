@@ -103,6 +103,36 @@ As each apiGroup gets covered by a real integration config, it's removed from th
 `validateExcludeAgainstIntegrationConfigs` check already protects anything with a real `include`
 rule in an integration-labeled CollectorConfig, regardless of how that CR was created.
 
+### Distributing merged-collector-config to managed clusters
+
+`merged-collector-config` only ever lived on the hub until the `search-collector` OCM addon
+(`addon/addon.go`) started shipping it to every managed cluster too. This required no
+`search-collector` code changes: the collector already `Get`s and watches a CR named
+`merged-collector-config` from its own local cluster/namespace and hot-reloads on it — the gap was
+purely on the delivery side.
+
+- `getCollectorConfigValue` (a `GetValuesFunc` in the addon's `WithGetValuesFuncs` chain) reads the
+  hub's `merged-collector-config` via its own hub client and injects only its `.Spec` into the Helm
+  values, under a `collectorConfig.spec` key. Only `.Spec` is ever read — never the full object —
+  so the hub CR's `ownerReference` (pointing at the hub `Search` CR, meaningless on a managed
+  cluster) can never leak into the rendered copy.
+  - "Not found yet" (no `Search` CR yet, or `merged-collector-config` not computed yet — both
+    legitimate during a fresh-install race) is reported as an empty `Values{}`, not an error.
+  - Any other error is propagated, not swallowed — the addon-framework leaves the
+    previously-applied `ManifestWork` untouched on a `GetValuesFunc` error rather than rendering a
+    manifest list that omits (and thus deletes) a previously-delivered CR from every managed
+    cluster.
+- `addon/manifests/chart/templates/collectorconfig_cr.yaml` renders the CR from that value, guarded
+  on key *existence* (not truthiness of `.spec`), so an empty-but-valid `CollectionRules` list still
+  renders as a meaningful "no customizations" state.
+- `addon/manifests/chart/templates/collectorconfig_editor_role.yaml` ships a `ClusterRole` labeled
+  `rbac.authorization.k8s.io/aggregate-to-admin: "true"`, granting the OCM work-agent (which applies
+  the addon's `ManifestWork` under its own identity, bound to the built-in `admin` `ClusterRole` via
+  aggregation) permission on the `collectorconfigs` resource. Without this, the work-agent has no
+  RBAC at all on this custom resource type — a CRD's own controller-generated RBAC never
+  automatically grants anything to a cluster's built-in `admin`/`edit`/`view` roles. This template
+  renders unconditionally, not gated on hub state, since it's what makes the CR appliable at all.
+
 ## Reconcile flow
 
 Each reconcile call processes the `Search` CR in a fixed sequence. Note: seeding the built-in

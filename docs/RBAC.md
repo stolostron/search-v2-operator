@@ -193,3 +193,23 @@ The `search-collector` ClusterRole is applied as a static install-time manifest 
 | `coordination.k8s.io` | `leases` | `get`, `create`, `update` | Manage the addon heartbeat lease. |
 
 The collector does **not** hold `impersonate`, write access to `secrets`/`services`/`deployments`, `tokenreviews`, or `selfsubjectaccessreviews`.
+
+---
+
+## collectorconfig-editor-role (shipped to every managed cluster via the search-collector addon)
+
+This is a different RBAC concern from the two ClusterRoles above: it's not about the hub's own
+`search-collector`/`search-api` service accounts, but about the **OCM work-agent** on every managed
+cluster — the component that applies the addon's `ManifestWork` (which now includes a
+`merged-collector-config` CollectorConfig CR, computed on the hub and distributed as-is).
+
+`addon/manifests/chart/templates/collectorconfig_editor_role.yaml` ships a `ClusterRole` labeled
+`rbac.authorization.k8s.io/aggregate-to-admin: "true"`, granting `create`/`get`/`list`/`patch`/
+`update`/`watch`/`delete` on `collectorconfigs`. The work-agent applies manifests under an identity
+bound to the built-in `admin` `ClusterRole` via Kubernetes' own role-aggregation mechanism — and
+that built-in role only picks up rules from ClusterRoles carrying this specific label. Without it,
+the work-agent has no RBAC at all on this custom resource type (a CRD's own controller-generated
+RBAC never automatically grants anything to a cluster's built-in `admin`/`edit`/`view` roles), and
+every attempt to apply the distributed CollectorConfig CR fails with `... is forbidden`. This
+template renders unconditionally on every managed cluster running the addon, not gated on hub
+state, since it's a prerequisite for the CR to be appliable at all.
