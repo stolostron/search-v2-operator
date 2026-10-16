@@ -134,8 +134,9 @@ spec:
                       minimum: -1
                       type: integer
                     collectAnnotations:
-                      description: '[NOT IMPLEMENTED] Specifies to collect annotations
-                        for the resource.'
+                      description: |-
+                        Specifies to collect annotations for the resource.
+                        Annotations with values over 64 characters aren't included in collection.
                       type: boolean
                     collectConditions:
                       description: Enable collection of status conditions for the
@@ -169,10 +170,11 @@ spec:
                               by Search Collectors. Default is a string.
                             enum:
                             - bytes
-                            - slice
                             - string
-                            - number
-                            - mapString
+                            - integer
+                            - float
+                            - boolean
+                            - array
                             type: string
                         required:
                         - jsonPath
