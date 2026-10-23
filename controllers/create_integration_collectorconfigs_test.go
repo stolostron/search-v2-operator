@@ -41,7 +41,7 @@ var expectedIntegrationConfigNames = []string{
 	"gatekeeper-integration",
 	"argo-integration",
 	"app-lifecycle-integration",
-	"openshift-users-integration",
+	"console-integration",
 }
 
 // Every embedded integration CollectorConfig must be created with the integration-team label and
@@ -65,13 +65,13 @@ func TestApplyIntegrationCollectorConfigs_CreatesAllEmbeddedConfigs(t *testing.T
 	}
 }
 
-func TestApplyIntegrationCollectorConfigs_OpenshiftUsersIntegration(t *testing.T) {
+func TestApplyIntegrationCollectorConfigs_ConsoleIntegration(t *testing.T) {
 	r := setupReconciler()
 
 	err := applyIntegrationCollectorConfigs(context.TODO(), r.Client, testScheme(), testSearchOwner())
 	require.NoError(t, err)
 
-	name := "openshift-users-integration"
+	name := "console-integration"
 	cc := &searchv1alpha1.CollectorConfig{}
 	err = r.Get(context.TODO(), types.NamespacedName{Name: name, Namespace: testNamespace}, cc)
 	require.NoError(t, err, "expected %s to be created", name)

@@ -1,8 +1,9 @@
 # Copyright Contributors to the Open Cluster Management project
-# Integration CollectorConfig for OpenShift user.openshift.io Groups. Indexes Group.users as
-# the searchable array field groupUsers so console User Management can filter Groups by
-# membership (ACM-39832 / ACM-47305). Group resources are already collected by default; this
-# config adds the membership field via configurable collection.
+# Integration CollectorConfig for the ACM console team. Currently indexes
+# user.openshift.io Group.users as the searchable array field groupUsers so console
+# User Management can filter Groups by membership (ACM-39832 / ACM-47305). Group
+# resources are already collected by default; this config adds the membership field
+# via configurable collection. Further console Search customizations should land here.
 #
 # Managed by the operator — reset to this default on restart unless annotated with
 # search.open-cluster-management.io/manual-override. See docs/ARCHITECTURE.md.
@@ -15,7 +16,7 @@
 apiVersion: search.open-cluster-management.io/v1alpha1
 kind: CollectorConfig
 metadata:
-  name: openshift-users-integration
+  name: console-integration
   labels:
     search.open-cluster-management.io/config-type: integration
 spec:

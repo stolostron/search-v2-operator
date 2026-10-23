@@ -3,7 +3,7 @@
 // Package integrationconfigs embeds the initial integration team CollectorConfig manifests
 // shipped in integration_collector_configs/.
 //
-// Integration teams (CNV, OLM, GRC, Kyverno, Gatekeeper, Argo, ACM app lifecycle, OpenShift users)
+// Integration teams (CNV, OLM, GRC, Kyverno, Gatekeeper, Argo, ACM app lifecycle, console)
 // contribute a plain CollectorConfig YAML file to that directory instead of writing Go code.
 // The operator embeds these files at build time and creates/updates the corresponding CRs on
 // the cluster — see controllers/create_integration_collectorconfigs.go for the reconcile logic.
