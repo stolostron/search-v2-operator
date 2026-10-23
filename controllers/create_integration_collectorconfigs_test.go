@@ -41,6 +41,7 @@ var expectedIntegrationConfigNames = []string{
 	"gatekeeper-integration",
 	"argo-integration",
 	"app-lifecycle-integration",
+	"openshift-users-integration",
 }
 
 // Every embedded integration CollectorConfig must be created with the integration-team label and
