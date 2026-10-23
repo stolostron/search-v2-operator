@@ -62,19 +62,28 @@ func TestApplyIntegrationCollectorConfigs_CreatesAllEmbeddedConfigs(t *testing.T
 		assert.False(t, hasBackupLabel,
 			"%s must NOT have the backup label — it is reseeded on every restart, and the "+
 				"label breaks hub restore via the admission webhook's ownership check", name)
-
-		if name == "openshift-users-integration" {
-			require.Len(t, cc.Spec.CollectionRules, 1)
-			rule := cc.Spec.CollectionRules[0]
-			assert.Equal(t, searchv1alpha1.ActionInclude, rule.Action)
-			assert.Equal(t, []string{"user.openshift.io"}, rule.ResourceSelector.APIGroups)
-			assert.Equal(t, []string{"Group"}, rule.ResourceSelector.Kinds)
-			require.Len(t, rule.Fields, 1)
-			assert.Equal(t, "groupUsers", rule.Fields[0].Name)
-			assert.Equal(t, ".users[*]", rule.Fields[0].JSONPath)
-			assert.Equal(t, searchv1alpha1.DataTypeArray, rule.Fields[0].Type)
-		}
 	}
+}
+
+func TestApplyIntegrationCollectorConfigs_OpenshiftUsersIntegration(t *testing.T) {
+	r := setupReconciler()
+
+	err := applyIntegrationCollectorConfigs(context.TODO(), r.Client, testScheme(), testSearchOwner())
+	require.NoError(t, err)
+
+	name := "openshift-users-integration"
+	cc := &searchv1alpha1.CollectorConfig{}
+	err = r.Get(context.TODO(), types.NamespacedName{Name: name, Namespace: testNamespace}, cc)
+	require.NoError(t, err, "expected %s to be created", name)
+	require.Len(t, cc.Spec.CollectionRules, 1)
+	rule := cc.Spec.CollectionRules[0]
+	assert.Equal(t, searchv1alpha1.ActionInclude, rule.Action)
+	assert.Equal(t, []string{"user.openshift.io"}, rule.ResourceSelector.APIGroups)
+	assert.Equal(t, []string{"Group"}, rule.ResourceSelector.Kinds)
+	require.Len(t, rule.Fields, 1)
+	assert.Equal(t, "groupUsers", rule.Fields[0].Name)
+	assert.Equal(t, ".users[*]", rule.Fields[0].JSONPath)
+	assert.Equal(t, searchv1alpha1.DataTypeArray, rule.Fields[0].Type)
 }
 
 func TestApplyIntegrationCollectorConfigs_NoOpWhenAlreadyUpToDate(t *testing.T) {
