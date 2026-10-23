@@ -21,8 +21,8 @@ import (
 )
 
 // applyIntegrationCollectorConfigs creates or overwrites the initial integration team
-// CollectorConfig CRs (CNV, OLM, GRC, Kyverno, Gatekeeper, Argo, ACM app lifecycle, etc.) from
-// the manifests embedded in config/integration_collector_configs/.
+// CollectorConfig CRs (CNV, OLM, GRC, Kyverno, Gatekeeper, Argo, ACM app lifecycle,
+// console, etc.) from the manifests embedded in config/integration_collector_configs/.
 //
 // Integration teams contribute a plain CollectorConfig YAML file to that directory instead of
 // writing Go code. This runs exactly once per operator process, at startup (see
