@@ -8,6 +8,7 @@ import (
 	"reflect"
 	"regexp"
 	"strconv"
+	"sync"
 
 	"k8s.io/apimachinery/pkg/runtime"
 
@@ -480,6 +481,82 @@ func NewAddonManager(kubeConfig *rest.Config) (addonmanager.AddonManager, error)
 	return addonMgr, err
 }
 
+// Triggerable is the minimal addon-framework capability TriggerSearchCollectorReconcile depends
+// on: asking for a prompt re-reconcile of one managed cluster's addon, instead of waiting for
+// addon-framework's periodic resync. Satisfied by addonmanager.AddonManager's Trigger method —
+// kept as a small, separately-named interface here (rather than depending on the full
+// AddonManager interface) so it's trivially fakeable in tests.
+type Triggerable interface {
+	Trigger(clusterName, addonName string)
+}
+
+var (
+	addonManagerMu sync.Mutex
+	addonMgrRef    Triggerable
+	// pendingTriggerClusters holds cluster names TriggerSearchCollectorReconcile couldn't
+	// deliver yet because addonMgrRef is still nil (addon manager starting, or never started).
+	// A set, not a slice: naturally de-duplicates and bounds memory to the number of distinct
+	// clusters ever named here before the manager becomes available, rather than growing once
+	// per call. Drained by setAddonManager once a manager is published.
+	pendingTriggerClusters = map[string]struct{}{}
+)
+
+// setAddonManager stores mgr so TriggerSearchCollectorReconcile can use it later, then replays
+// any cluster names that arrived earlier while no manager was available (see
+// pendingTriggerClusters). Callers MUST only call this after mgr.Start(ctx) has already returned
+// successfully.
+//
+// Why that ordering matters: addon-framework's BaseAddonManagerImpl.Trigger iterates an internal
+// syncContexts slice with no locking at all around it, and that slice is only populated partway
+// through Start() (specifically inside StartWithInformers, before Start spawns the deploy/
+// registration controllers' goroutines and returns). Storing the reference before Start()
+// finishes would let a concurrent Trigger() call race with that slice being appended to.
+// Start() itself is NOT a long-running/blocking call — it wires up clients and informers and
+// returns quickly, handing off the real work to goroutines it spawns — so waiting for it to
+// return before calling setAddonManager costs nothing.
+func setAddonManager(mgr Triggerable) {
+	addonManagerMu.Lock()
+	addonMgrRef = mgr
+	pending := pendingTriggerClusters
+	pendingTriggerClusters = map[string]struct{}{}
+	addonManagerMu.Unlock()
+
+	for name := range pending {
+		mgr.Trigger(name, SearchAddonName)
+	}
+}
+
+// TriggerSearchCollectorReconcile asks addon-framework to promptly re-reconcile the
+// search-collector addon for every cluster name given, instead of waiting for its periodic
+// resync (worst case ~10-20 minutes). Safe to call at any time, including before the addon
+// manager has finished starting.
+//
+// If called before a manager is available, the cluster names are buffered (see
+// pendingTriggerClusters) rather than dropped: addon-framework's own startup informer sync does
+// reconcile every existing ManagedClusterAddOn once, but its timing relative to the
+// merged-collector-config change that triggered this call isn't guaranteed — that initial
+// reconcile could already have run (and read the old config) before the change landed, which
+// would otherwise leave that cluster waiting for the next periodic resync instead of picking up
+// the change promptly. Buffering and replaying once setAddonManager runs closes that gap. If the
+// manager never starts successfully at all, the buffered names are simply never drained — bounded
+// by the number of distinct clusters involved, not an unbounded leak.
+func TriggerSearchCollectorReconcile(clusterNames []string) {
+	addonManagerMu.Lock()
+	mgr := addonMgrRef
+	if mgr == nil {
+		for _, name := range clusterNames {
+			pendingTriggerClusters[name] = struct{}{}
+		}
+		addonManagerMu.Unlock()
+		return
+	}
+	addonManagerMu.Unlock()
+
+	for _, name := range clusterNames {
+		mgr.Trigger(name, SearchAddonName)
+	}
+}
+
 func startAddon(ctx context.Context) {
 	controller := "controller: "
 	kubeConfig, err := ctrl.GetConfig()
@@ -490,13 +567,16 @@ func startAddon(ctx context.Context) {
 	addonMgr, err := NewAddonManager(kubeConfig)
 	if err != nil {
 		klog.Error(err, " unable to create a new  addon manager ", controller, "SearchOperator")
-	} else {
-		klog.Info("starting search addon manager")
-		err = addonMgr.Start(ctx)
-		if err != nil {
-			klog.Error(err, "unable to start a new  addon manager ", controller, "SearchOperator")
-		}
+		return
 	}
+	klog.Info("starting search addon manager")
+	if err := addonMgr.Start(ctx); err != nil {
+		klog.Error(err, "unable to start a new  addon manager ", controller, "SearchOperator")
+		return
+	}
+	// Only now that Start() has returned successfully is it safe to publish the reference for
+	// TriggerSearchCollectorReconcile to use — see setAddonManager's doc comment for why.
+	setAddonManager(addonMgr)
 }
 
 /*

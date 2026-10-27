@@ -3,6 +3,7 @@ package controllers
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	searchv1alpha1 "github.com/stolostron/search-v2-operator/api/v1alpha1"
@@ -11,8 +12,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/kubernetes/scheme"
+	clusterv1 "open-cluster-management.io/api/cluster/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 )
 
 const testNamespace = "open-cluster-management"
@@ -71,10 +74,27 @@ func newOwnedIntegrationTeamConfig(
 	return cc
 }
 
-func setupReconciler(objs ...runtime.Object) *SearchReconciler {
-	s := scheme.Scheme
+// newCollectorConfigTestScheme builds a scheme deliberately independent of the shared
+// k8s.io/client-go/kubernetes/scheme.Scheme singleton that most of this package's other test
+// files use (and mutate — e.g. global_search_setup_test.go's fakeDynClient registers
+// ManagedClusterList against it as an *unstructured.UnstructuredList*). Reusing that singleton
+// here would panic with a "double registration of different types" error the moment any test in
+// this file runs after one of those, since triggerDistributionToAllClusters needs the *typed*
+// clusterv1.ManagedClusterList registered instead. A dedicated scheme sidesteps that order
+// dependency entirely, in both directions.
+func newCollectorConfigTestScheme() *runtime.Scheme {
+	s := runtime.NewScheme()
 	_ = searchv1alpha1.SchemeBuilder.AddToScheme(s)
+	// Registered so triggerDistributionToAllClusters's r.List(ctx, &clusterv1.ManagedClusterList{})
+	// works against the fake client, even in tests that don't use any ManagedCluster fixtures.
+	_ = clusterv1.AddToScheme(s)
+	return s
+}
+
+func setupReconciler(objs ...runtime.Object) *SearchReconciler {
+	s := newCollectorConfigTestScheme()
 	cl := fake.NewClientBuilder().
+		WithScheme(s).
 		WithRuntimeObjects(objs...).
 		WithStatusSubresource(&searchv1alpha1.CollectorConfig{}).
 		Build()
@@ -868,4 +888,192 @@ func TestMerge_UserIncludeNotAffectedByExcludeProtection(t *testing.T) {
 	merged, err := getMergedConfig(r)
 	assert.Nil(t, err)
 	assert.Len(t, merged.Spec.CollectionRules, 2, "Both include rules should be in merged — include is never filtered")
+}
+
+// --- Prompt-reconcile trigger tests ---
+//
+// createOrUpdateMergedCollectorConfig calls triggerDistributionToAllClusters whenever
+// merged-collector-config's spec actually changes, so addon-framework re-reconciles every
+// cluster's search-collector addon promptly instead of waiting for its periodic resync. These
+// tests substitute the package-level triggerCollectorConfigDistribution var (normally
+// addon.TriggerSearchCollectorReconcile) with a spy, so they don't need a real addon manager.
+
+// newManagedCluster builds a bare ManagedCluster fixture with the given name.
+func newManagedCluster(name string) *clusterv1.ManagedCluster {
+	return &clusterv1.ManagedCluster{
+		ObjectMeta: metav1.ObjectMeta{Name: name},
+	}
+}
+
+// stubTrigger substitutes the package-level triggerCollectorConfigDistribution var with a spy
+// that records the cluster-name slice passed on every call, restoring the original value
+// (addon.TriggerSearchCollectorReconcile) once the test completes so other tests are unaffected.
+func stubTrigger(t *testing.T) *[][]string {
+	t.Helper()
+	original := triggerCollectorConfigDistribution
+	calls := &[][]string{}
+	triggerCollectorConfigDistribution = func(clusterNames []string) {
+		*calls = append(*calls, append([]string{}, clusterNames...))
+	}
+	t.Cleanup(func() { triggerCollectorConfigDistribution = original })
+	return calls
+}
+
+// On the very first call, merged-collector-config does not exist yet, so
+// createOrUpdateMergedCollectorConfig takes the Create path. The trigger must fire exactly once,
+// covering every existing ManagedCluster.
+func TestTrigger_FiresOnCreate(t *testing.T) {
+	instance := newSearchInstance()
+	cluster1 := newManagedCluster("cluster1")
+	cluster2 := newManagedCluster("cluster2")
+	r := setupReconciler(instance, cluster1, cluster2)
+	calls := stubTrigger(t)
+
+	result, err := r.createOrUpdateMergedCollectorConfig(context.TODO(), instance)
+	assert.Nil(t, err)
+	assert.Nil(t, result)
+
+	require.Len(t, *calls, 1, "expected exactly one trigger call on initial create")
+	assert.ElementsMatch(t, []string{"cluster1", "cluster2"}, (*calls)[0])
+}
+
+// Once merged-collector-config exists, a real spec change (e.g. a new integration team config
+// appearing) takes the Update path. The trigger must fire again, with the current cluster list.
+func TestTrigger_FiresOnSpecChangeUpdate(t *testing.T) {
+	instance := newSearchInstance()
+	teamA := newIntegrationTeamConfig("team-a-config", searchv1alpha1.CollectorConfigSpec{
+		CollectionRules: []searchv1alpha1.CollectionRule{
+			{
+				Action:      searchv1alpha1.ActionInclude,
+				FieldSuffix: "FOO",
+				ResourceSelector: searchv1alpha1.ResourceSelector{
+					APIGroups: []string{"policy.open-cluster-management.io"}, Kinds: []string{"Policy"},
+				},
+			},
+		},
+	})
+	cluster1 := newManagedCluster("cluster1")
+	r := setupReconciler(instance, teamA, cluster1)
+	calls := stubTrigger(t)
+
+	// First call creates merged-collector-config, which fires one trigger.
+	result, err := r.createOrUpdateMergedCollectorConfig(context.TODO(), instance)
+	assert.Nil(t, err)
+	assert.Nil(t, result)
+	require.Len(t, *calls, 1, "expected trigger on create")
+
+	// Add a second team config so the next merge actually changes the spec.
+	teamB := newIntegrationTeamConfig("team-b-config", searchv1alpha1.CollectorConfigSpec{
+		CollectionRules: []searchv1alpha1.CollectionRule{
+			{
+				Action:      searchv1alpha1.ActionInclude,
+				FieldSuffix: "BAR",
+				ResourceSelector: searchv1alpha1.ResourceSelector{
+					APIGroups: []string{"kubevirt.io"}, Kinds: []string{"VirtualMachine"},
+				},
+			},
+		},
+	})
+	require.Nil(t, r.Create(context.TODO(), teamB))
+
+	result, err = r.createOrUpdateMergedCollectorConfig(context.TODO(), instance)
+	assert.Nil(t, err)
+	assert.Nil(t, result)
+
+	require.Len(t, *calls, 2, "expected a second trigger call after a real spec change")
+	assert.Equal(t, []string{"cluster1"}, (*calls)[1])
+}
+
+// Mirrors TestMerge_Idempotency: a second call with no actual spec change must not fire a
+// redundant trigger.
+func TestTrigger_DoesNotFireOnNoOpUpdate(t *testing.T) {
+	instance := newSearchInstance()
+	teamA := newIntegrationTeamConfig("team-a-config", searchv1alpha1.CollectorConfigSpec{
+		CollectionRules: []searchv1alpha1.CollectionRule{
+			{
+				Action:      searchv1alpha1.ActionInclude,
+				FieldSuffix: "FOO",
+				ResourceSelector: searchv1alpha1.ResourceSelector{
+					APIGroups: []string{"policy.open-cluster-management.io"}, Kinds: []string{"Policy"},
+				},
+			},
+		},
+	})
+	r := setupReconciler(instance, teamA)
+	calls := stubTrigger(t)
+
+	// First call creates merged-collector-config, which fires one trigger.
+	_, err := r.createOrUpdateMergedCollectorConfig(context.TODO(), instance)
+	assert.Nil(t, err)
+	require.Len(t, *calls, 1)
+
+	// Second call with no changes must not fire again.
+	_, err = r.createOrUpdateMergedCollectorConfig(context.TODO(), instance)
+	assert.Nil(t, err)
+	assert.Len(t, *calls, 1, "no-op update must not trigger a redundant reconcile")
+}
+
+// When no ManagedClusters exist yet (e.g. a brand-new hub), the trigger is still called once —
+// just with an empty slice — rather than being skipped entirely.
+func TestTrigger_NoManagedClusters_CalledWithEmptySlice(t *testing.T) {
+	instance := newSearchInstance()
+	r := setupReconciler(instance)
+	calls := stubTrigger(t)
+
+	_, err := r.createOrUpdateMergedCollectorConfig(context.TODO(), instance)
+	assert.Nil(t, err)
+
+	require.Len(t, *calls, 1)
+	assert.Empty(t, (*calls)[0], "trigger should still be called, just with an empty cluster list")
+}
+
+// A failure listing ManagedClusters must not fail the reconcile, and must not call the trigger
+// (there's nothing valid to pass it) — this is a best-effort optimization layered on top of the
+// primary job of writing merged-collector-config, which must still succeed.
+func TestTrigger_ListFailure_DoesNotFailReconcileOrTrigger(t *testing.T) {
+	instance := newSearchInstance()
+	s := newCollectorConfigTestScheme()
+	base := fake.NewClientBuilder().
+		WithScheme(s).
+		WithRuntimeObjects(instance).
+		WithStatusSubresource(&searchv1alpha1.CollectorConfig{}).
+		Build()
+	listErr := errors.New("simulated API server error")
+	failingClient := interceptor.NewClient(base, interceptor.Funcs{
+		List: func(
+			ctx context.Context, c client.WithWatch, obj client.ObjectList, opts ...client.ListOption,
+		) error {
+			if _, ok := obj.(*clusterv1.ManagedClusterList); ok {
+				return listErr
+			}
+			return c.List(ctx, obj, opts...)
+		},
+	})
+	r := &SearchReconciler{Client: failingClient, Scheme: s}
+	calls := stubTrigger(t)
+
+	result, err := r.createOrUpdateMergedCollectorConfig(context.TODO(), instance)
+
+	assert.Nil(t, err, "a ManagedCluster list failure must not fail the overall reconcile")
+	assert.Nil(t, result)
+	assert.Empty(t, *calls, "trigger must not be called when listing ManagedClusters fails")
+
+	merged, err := getMergedConfig(r)
+	assert.Nil(t, err)
+	assert.NotNil(t, merged, "merged-collector-config must still be written despite the trigger's list failure")
+}
+
+// Multiple existing ManagedClusters are all passed through to the trigger together, in a single
+// call (not once per cluster) — asserting triggerDistributionToAllClusters's batching contract.
+func TestTrigger_MultipleManagedClusters_AllPassedInOneCall(t *testing.T) {
+	instance := newSearchInstance()
+	r := setupReconciler(instance,
+		newManagedCluster("cluster1"), newManagedCluster("cluster2"), newManagedCluster("cluster3"))
+	calls := stubTrigger(t)
+
+	_, err := r.createOrUpdateMergedCollectorConfig(context.TODO(), instance)
+	assert.Nil(t, err)
+
+	require.Len(t, *calls, 1, "all clusters should be delivered via a single trigger call")
+	assert.ElementsMatch(t, []string{"cluster1", "cluster2", "cluster3"}, (*calls)[0])
 }

@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/stolostron/search-v2-operator/addon"
 	searchv1alpha1 "github.com/stolostron/search-v2-operator/api/v1alpha1"
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
@@ -15,6 +16,7 @@ import (
 	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -70,6 +72,31 @@ const (
 	webhookConfigName     = "search-v2-operator-validating-webhook-configuration"
 	caInjectionAnnotation = "service.beta.openshift.io/inject-cabundle"
 )
+
+// triggerCollectorConfigDistribution asks addon-framework to promptly re-reconcile the given
+// clusters' search-collector addon, instead of waiting for its periodic resync, after
+// merged-collector-config actually changes. A package-level var — same pattern as the `once`/
+// `cleanOnce` package vars in search_controller.go — so tests can substitute a spy without
+// needing a real addon manager running.
+var triggerCollectorConfigDistribution = addon.TriggerSearchCollectorReconcile
+
+// triggerDistributionToAllClusters lists every ManagedCluster and asks their search-collector
+// addon to promptly pick up the just-changed merged-collector-config, instead of waiting for
+// addon-framework's periodic resync (worst case ~10-20 minutes). Best-effort: a list failure is
+// logged, not returned, since this is purely a "do it sooner" optimization — the periodic resync
+// is the existing fallback safety net regardless of whether this succeeds.
+func (r *SearchReconciler) triggerDistributionToAllClusters(ctx context.Context) {
+	clusters := &clusterv1.ManagedClusterList{}
+	if err := r.List(ctx, clusters); err != nil {
+		log.Error(err, "Could not list ManagedClusters to trigger prompt CollectorConfig distribution")
+		return
+	}
+	names := make([]string, 0, len(clusters.Items))
+	for i := range clusters.Items {
+		names = append(names, clusters.Items[i].GetName())
+	}
+	triggerCollectorConfigDistribution(names)
+}
 
 // ensureWebhookCAInjection ensures the ValidatingWebhookConfiguration has the
 // OpenShift service-ca CA injection annotation. OLM creates the VWC from the
@@ -304,6 +331,7 @@ func (r *SearchReconciler) createOrUpdateMergedCollectorConfig(
 			return &reconcile.Result{}, err
 		}
 		log.V(2).Info("Created merged-collector-config", "ruleCount", len(mergedSpec.CollectionRules))
+		r.triggerDistributionToAllClusters(ctx)
 		return nil, nil
 	} else if err != nil {
 		return &reconcile.Result{}, err
@@ -317,6 +345,7 @@ func (r *SearchReconciler) createOrUpdateMergedCollectorConfig(
 			return &reconcile.Result{}, err
 		}
 		log.V(2).Info("Updated merged-collector-config", "ruleCount", len(mergedSpec.CollectionRules))
+		r.triggerDistributionToAllClusters(ctx)
 	}
 
 	return nil, nil
