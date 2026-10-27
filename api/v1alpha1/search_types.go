@@ -52,11 +52,11 @@ type SearchSpec struct {
 	Deployments SearchDeployments `json:"deployments,omitempty"`
 
 	// +optional
-	// [PLACEHOLDER, NOT IMPLEMENTED] Specifies deployment replication for improved availability. Options are: Basic and High (default)
+	// Not currently supported. Reserved for future use.
 	AvailabilityConfig AvailabilityType `json:"availabilityConfig,omitempty"`
 
 	// +optional
-	// [PLACEHOLDER, NOT IMPLEMENTED] Kubernetes secret name containing user provided db secret
+	// Not currently supported. Reserved for future use.
 	// Secret should contain connection parameters [db_host, db_port, db_user, db_password, db_name, ca_cert]
 	// Not supported for development preview.
 	ExternalDBInstance string `json:"externalDBInstance,omitempty"`

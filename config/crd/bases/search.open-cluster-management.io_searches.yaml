@@ -45,9 +45,7 @@ spec:
               Most fields have production-ready defaults and do not need to be set.
             properties:
               availabilityConfig:
-                description: '[PLACEHOLDER, NOT IMPLEMENTED] Specifies deployment
-                  replication for improved availability. Options are: Basic and High
-                  (default)'
+                description: Not currently supported. Reserved for future use.
                 type: string
               dbConfig:
                 description: |-
@@ -1027,7 +1025,7 @@ spec:
                 type: object
               externalDBInstance:
                 description: |-
-                  [PLACEHOLDER, NOT IMPLEMENTED] Kubernetes secret name containing user provided db secret
+                  Not currently supported. Reserved for future use.
                   Secret should contain connection parameters [db_host, db_port, db_user, db_password, db_name, ca_cert]
                   Not supported for development preview.
                 type: string
