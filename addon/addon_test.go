@@ -731,19 +731,19 @@ func TestManifest_ConfigurableCollectionEnvVar(t *testing.T) {
 		expectedValue string
 	}{
 		{
-			name:          "annotation unset defaults to enabled",
+			name:          "annotation unset ships a blank slate",
 			annotations:   map[string]string{},
-			expectedValue: "true",
+			expectedValue: "",
 		},
 		{
-			name: "annotation true enables",
+			name: "annotation true ships a blank slate",
 			annotations: map[string]string{
 				"addon.open-cluster-management.io/search_configurable_collection": "true",
 			},
-			expectedValue: "true",
+			expectedValue: "",
 		},
 		{
-			name: "annotation false disables",
+			name: "annotation false disables explicitly",
 			annotations: map[string]string{
 				"addon.open-cluster-management.io/search_configurable_collection": "false",
 			},
@@ -768,7 +768,9 @@ func TestManifest_ConfigurableCollectionEnvVar(t *testing.T) {
 
 			for _, env := range dep.Spec.Template.Spec.Containers[0].Env {
 				if env.Name == "FEATURE_CONFIGURABLE_COLLECTION" {
-					if env.Value != tt.expectedValue {
+					if tt.expectedValue == "" {
+						t.Errorf("expected no FEATURE_CONFIGURABLE_COLLECTION env var, got %s", env.Value)
+					} else if env.Value != tt.expectedValue {
 						t.Errorf("expected FEATURE_CONFIGURABLE_COLLECTION=%s, got %s",
 							tt.expectedValue, env.Value)
 					}
@@ -776,7 +778,9 @@ func TestManifest_ConfigurableCollectionEnvVar(t *testing.T) {
 				}
 			}
 
-			t.Error("FEATURE_CONFIGURABLE_COLLECTION env var not found")
+			if tt.expectedValue != "" {
+				t.Errorf("expected FEATURE_CONFIGURABLE_COLLECTION=%s, env var not found", tt.expectedValue)
+			}
 		})
 	}
 }

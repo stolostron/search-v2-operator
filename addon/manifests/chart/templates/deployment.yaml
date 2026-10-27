@@ -57,8 +57,10 @@ spec:
         - name: REPORT_RATE_MS
           value: "{{ .Values.userargs.reportRate }}"
         {{- end }}
+        {{- if not .Values.userargs.configurableCollection }}
         - name: FEATURE_CONFIGURABLE_COLLECTION
-          value: "{{ .Values.userargs.configurableCollection }}"
+          value: "false"
+        {{- end }}
         {{- if .Values.global.proxyConfig.HTTP_PROXY }}
         - name: HTTP_PROXY
           value: {{ .Values.global.proxyConfig.HTTP_PROXY }}
