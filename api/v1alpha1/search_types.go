@@ -24,7 +24,9 @@ const (
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
 
-// Search is the schema for the searches API.
+// Search configures the ACM Search service, including database storage,
+// replica counts, and resource limits for the collector, indexer, query API,
+// and database deployments.
 type Search struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -33,14 +35,16 @@ type Search struct {
 	Status SearchStatus `json:"status,omitempty"`
 }
 
-// SearchSpec defines the desired state of Search.
+// SearchSpec defines the configuration for the Search service components.
+// Most fields have production-ready defaults and do not need to be set.
 type SearchSpec struct {
 	// +optional
 	// Storage configuration for the database.
 	DBStorage StorageSpec `json:"dbStorage,omitempty"`
 
 	// +optional
-	// The config map name contains parameters to override default database parameters.
+	// Name of a ConfigMap that overrides default PostgreSQL parameters for the
+	// Search database, such as connection limits and memory-related settings.
 	DBConfig string `json:"dbConfig,omitempty"`
 
 	// +optional
@@ -58,11 +62,13 @@ type SearchSpec struct {
 	ExternalDBInstance string `json:"externalDBInstance,omitempty"`
 
 	// +optional
-	// ImagePullSecret
+	// Name of an existing Secret of type kubernetes.io/dockerconfigjson used
+	// to pull Search component images from private registries.
 	ImagePullSecret string `json:"imagePullSecret,omitempty"`
 
 	// +optional
-	// ImagePullPolicy
+	// Kubernetes image pull policy for Search component images.
+	// One of: Always, Never, IfNotPresent.
 	ImagePullPolicy corev1.PullPolicy `json:"imagePullPolicy,omitempty"`
 
 	// +optional
@@ -76,7 +82,8 @@ type SearchSpec struct {
 
 type SearchDeployments struct {
 	// +optional
-	// Configuration for the database.
+	// Configuration for the PostgreSQL database deployment (replicas, resources,
+	// image override, arguments, and environment variables).
 	Database DeploymentConfig `json:"database,omitempty"`
 
 	// +optional
@@ -88,7 +95,8 @@ type SearchDeployments struct {
 	Collector DeploymentConfig `json:"collector,omitempty"`
 
 	// +optional
-	// Configuration for Query API.
+	// Configuration for the Search query API deployment (replicas, resources,
+	// image override, arguments, and environment variables).
 	QueryAPI DeploymentConfig `json:"queryapi,omitempty"`
 }
 
@@ -103,7 +111,8 @@ type DeploymentConfig struct {
 	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
 
 	// +optional
-	// Image_override
+	// Full image reference (registry/repository:tag) to override the default
+	// image for this Search component deployment.
 	ImageOverride string `json:"imageOverride,omitempty"`
 
 	// +optional
@@ -116,9 +125,12 @@ type DeploymentConfig struct {
 }
 
 type StorageSpec struct {
-	// name of the storage class
+	// Name of the StorageClass used to provision the database PVC.
+	// If not set, the cluster default StorageClass is used.
 	StorageClassName string `json:"storageClassName,omitempty"`
 	// +optional
+	// Size of the PersistentVolumeClaim for the Search database.
+	// Example: "10Gi". Defaults to "10Gi".
 	// +kubebuilder:default:="10Gi"
 	Size *resource.Quantity `json:"size,omitempty"`
 }
@@ -133,7 +145,8 @@ type SearchStatus struct {
 	Storage string `json:"storage"`
 
 	// +optional
-	// Conditions
+	// Conditions describing the current state of the Search deployment.
+	// Condition types include Ready and Degraded.
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }
 
