@@ -4,11 +4,12 @@ import (
 	"context"
 	"embed"
 	"fmt"
-	"k8s.io/apimachinery/pkg/runtime"
 	"os"
 	"reflect"
 	"regexp"
 	"strconv"
+
+	"k8s.io/apimachinery/pkg/runtime"
 
 	"github.com/cloudflare/cfssl/log"
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
@@ -75,13 +76,13 @@ type GlobalValues struct {
 }
 
 type UserArgs struct {
-	ContainerArgs            string `json:"containerArgs,"`
-	LimitMemory              string `json:"limitMemory,"`
-	RequestMemory            string `json:"requestMemory,"`
-	RediscoverRate           int    `json:"rediscoverRate,"`
-	HeartBeat                int    `json:"heartBeat,"`
-	ReportRate               int    `json:"reportRate,"`
-	ConfigurableCollection   bool   `json:"configurableCollection,"`
+	ContainerArgs          string `json:"containerArgs,"`
+	LimitMemory            string `json:"limitMemory,"`
+	RequestMemory          string `json:"requestMemory,"`
+	RediscoverRate         int    `json:"rediscoverRate,"`
+	HeartBeat              int    `json:"heartBeat,"`
+	ReportRate             int    `json:"reportRate,"`
+	ConfigurableCollection bool   `json:"configurableCollection,"`
 }
 
 type Values struct {
@@ -108,6 +109,8 @@ func getValue(cluster *clusterv1.ManagedCluster,
 			},
 		},
 		Prometheus: map[string]interface{}{},
+		// Enable configurable collection by default while allowing MCA annotation to disable it.
+		UserArgs: UserArgs{ConfigurableCollection: true},
 	}
 	for _, cc := range cluster.Status.ClusterClaims {
 		if cc.Name == "product.open-cluster-management.io" {

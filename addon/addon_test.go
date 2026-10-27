@@ -3,9 +3,10 @@ package addon
 import (
 	"context"
 	"errors"
-	"open-cluster-management.io/addon-framework/pkg/utils"
 	"slices"
 	"testing"
+
+	"open-cluster-management.io/addon-framework/pkg/utils"
 
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	searchv1alpha1 "github.com/stolostron/search-v2-operator/api/v1alpha1"
@@ -719,31 +720,68 @@ func findSearchDeployment(objs []runtime.Object) *appsv1.Deployment {
 	return nil
 }
 
+// TestManifest_ConfigurableCollectionEnvVar verifies that configurable collection
+// is enabled by default and can be explicitly disabled via the MCA annotation.
 func TestManifest_ConfigurableCollectionEnvVar(t *testing.T) {
 	SearchCollectorImage = "quay.io/stolostron/search_collector:2.7.0"
-	agentAddon := newAgentAddon(t, nil)
 
-	addon := newAddon(SearchAddonName, "cluster1", "", map[string]string{
-		"addon.open-cluster-management.io/search_configurable_collection": "true",
-	})
-	objects, err := agentAddon.Manifests(newCluster("cluster1"), addon)
-	if err != nil {
-		t.Fatalf("failed to get manifests: %v", err)
-	}
-	dep := findSearchDeployment(objects)
-	if dep == nil {
-		t.Fatal("no Deployment found in manifests")
+	tests := []struct {
+		name          string
+		annotations   map[string]string
+		expectedValue string
+	}{
+		{
+			name:          "annotation unset ships a blank slate",
+			annotations:   map[string]string{},
+			expectedValue: "",
+		},
+		{
+			name: "annotation true ships a blank slate",
+			annotations: map[string]string{
+				"addon.open-cluster-management.io/search_configurable_collection": "true",
+			},
+			expectedValue: "",
+		},
+		{
+			name: "annotation false disables explicitly",
+			annotations: map[string]string{
+				"addon.open-cluster-management.io/search_configurable_collection": "false",
+			},
+			expectedValue: "false",
+		},
 	}
 
-	var found bool
-	for _, env := range dep.Spec.Template.Spec.Containers[0].Env {
-		if env.Name == "FEATURE_CONFIGURABLE_COLLECTION" && env.Value == "true" {
-			found = true
-			break
-		}
-	}
-	if !found {
-		t.Error("expected FEATURE_CONFIGURABLE_COLLECTION=true env var, but not found")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			agentAddon := newAgentAddon(t, nil)
+			addon := newAddon(SearchAddonName, "cluster1", "", tt.annotations)
+
+			objects, err := agentAddon.Manifests(newCluster("cluster1"), addon)
+			if err != nil {
+				t.Fatalf("failed to get manifests: %v", err)
+			}
+
+			dep := findSearchDeployment(objects)
+			if dep == nil {
+				t.Fatal("no Deployment found in manifests")
+			}
+
+			for _, env := range dep.Spec.Template.Spec.Containers[0].Env {
+				if env.Name == "FEATURE_CONFIGURABLE_COLLECTION" {
+					if tt.expectedValue == "" {
+						t.Errorf("expected no FEATURE_CONFIGURABLE_COLLECTION env var, got %s", env.Value)
+					} else if env.Value != tt.expectedValue {
+						t.Errorf("expected FEATURE_CONFIGURABLE_COLLECTION=%s, got %s",
+							tt.expectedValue, env.Value)
+					}
+					return
+				}
+			}
+
+			if tt.expectedValue != "" {
+				t.Errorf("expected FEATURE_CONFIGURABLE_COLLECTION=%s, env var not found", tt.expectedValue)
+			}
+		})
 	}
 }
 
