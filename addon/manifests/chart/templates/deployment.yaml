@@ -49,13 +49,13 @@ spec:
         - name: REDISCOVER_RATE_MS
           value: "{{ .Values.userargs.rediscoverRate }}"
         {{- end }}
-        {{- if .Values.userargs.heartBeat }}
-        - name: HEARTBEAT_MS
-          value: "{{ .Values.userargs.heartBeat }}"
-        {{- end }}
         {{- if .Values.userargs.reportRate }}
         - name: REPORT_RATE_MS
           value: "{{ .Values.userargs.reportRate }}"
+        {{- end }}
+        {{- if .Values.userargs.resourceCountInterval }}
+        - name: RESOURCE_COUNT_INTERVAL_MS
+          value: "{{ .Values.userargs.resourceCountInterval }}"
         {{- end }}
         {{- if not .Values.userargs.configurableCollection }}
         - name: FEATURE_CONFIGURABLE_COLLECTION

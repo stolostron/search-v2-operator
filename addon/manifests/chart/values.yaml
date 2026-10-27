@@ -16,8 +16,8 @@ userargs:
   limitMemory: 1024Mi
   requestMemory: 128Mi
   rediscoverRate: null
-  heartBeat: null
   reportRate: null
+  resourceCountInterval: null
 
 logLevel: null
 

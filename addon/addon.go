@@ -61,8 +61,10 @@ var ChartFS embed.FS
 
 var Scheme = runtime.NewScheme()
 
-const ChartDir = "manifests/chart"
-const resourceRegex = "^(\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))))?$"
+const (
+	ChartDir      = "manifests/chart"
+	resourceRegex = "^(\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))))?$"
+)
 
 var addonLog = ctrl.Log.WithName("addon")
 
@@ -76,13 +78,13 @@ type GlobalValues struct {
 }
 
 type UserArgs struct {
+	ConfigurableCollection bool   `json:"configurableCollection,"`
 	ContainerArgs          string `json:"containerArgs,"`
 	LimitMemory            string `json:"limitMemory,"`
-	RequestMemory          string `json:"requestMemory,"`
 	RediscoverRate         int    `json:"rediscoverRate,"`
-	HeartBeat              int    `json:"heartBeat,"`
 	ReportRate             int    `json:"reportRate,"`
-	ConfigurableCollection bool   `json:"configurableCollection,"`
+	RequestMemory          string `json:"requestMemory,"`
+	ResourceCountInterval  int    `json:"resourceCountInterval,"`
 }
 
 type Values struct {
@@ -93,7 +95,8 @@ type Values struct {
 }
 
 func getValue(cluster *clusterv1.ManagedCluster,
-	addon *addonapiv1alpha1.ManagedClusterAddOn) (addonfactory.Values, error) {
+	addon *addonapiv1alpha1.ManagedClusterAddOn,
+) (addonfactory.Values, error) {
 	addonValues := Values{
 		GlobalValues: GlobalValues{
 			ImagePullPolicy: corev1.PullIfNotPresent,
@@ -147,16 +150,16 @@ func getValue(cluster *clusterv1.ManagedCluster,
 		}
 
 	}
-	if val, ok := addon.GetAnnotations()["addon.open-cluster-management.io/search_heartbeat"]; ok {
-		intVal, err := strconv.Atoi(val)
-		if err == nil {
-			addonValues.UserArgs.HeartBeat = intVal
-		}
-	}
 	if val, ok := addon.GetAnnotations()["addon.open-cluster-management.io/search_report_rate"]; ok {
 		intVal, err := strconv.Atoi(val)
 		if err == nil {
 			addonValues.UserArgs.ReportRate = intVal
+		}
+	}
+	if val, ok := addon.GetAnnotations()["addon.open-cluster-management.io/search_resource_count_interval"]; ok {
+		intVal, err := strconv.Atoi(val)
+		if err == nil {
+			addonValues.UserArgs.ResourceCountInterval = intVal
 		}
 	}
 	if val, ok := addon.GetAnnotations()["addon.open-cluster-management.io/search_configurable_collection"]; ok {
@@ -183,7 +186,8 @@ func getValue(cluster *clusterv1.ManagedCluster,
 // base image via prefix replacement, the final image is always a deterministic
 // transform of a known-good image — never an arbitrary injection.
 func validateImageOverride(_ *clusterv1.ManagedCluster,
-	_ *addonapiv1alpha1.ManagedClusterAddOn) (addonfactory.Values, error) {
+	_ *addonapiv1alpha1.ManagedClusterAddOn,
+) (addonfactory.Values, error) {
 	return addonfactory.Values{
 		"global": map[string]interface{}{
 			"imageOverrides": map[string]interface{}{
