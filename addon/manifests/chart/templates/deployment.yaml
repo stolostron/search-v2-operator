@@ -53,9 +53,9 @@ spec:
         - name: REPORT_RATE_MS
           value: "{{ .Values.userargs.reportRate }}"
         {{- end }}
-        {{- if .Values.userargs.resourceCountInterval }}
-        - name: RESOURCE_COUNT_INTERVAL_MS
-          value: "{{ .Values.userargs.resourceCountInterval }}"
+        {{- if .Values.userargs.dataValidationInterval }}
+        - name: DATA_VALIDATION_INTERVAL_MS
+          value: "{{ .Values.userargs.dataValidationInterval }}"
         {{- end }}
         {{- if not .Values.userargs.configurableCollection }}
         - name: FEATURE_CONFIGURABLE_COLLECTION
