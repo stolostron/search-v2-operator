@@ -14,7 +14,7 @@ metadata:
         }
       ]
     capabilities: Basic Install
-    createdAt: "2026-08-20T19:06:56Z"
+    createdAt: "2026-10-27T19:28:28Z"
     operators.operatorframework.io/builder: operator-sdk-v1.37.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
   name: search-v2-operator.v0.0.1
@@ -28,7 +28,10 @@ spec:
       kind: CollectorConfig
       name: collectorconfigs.search.open-cluster-management.io
       version: v1alpha1
-    - description: Search is the schema for the searches API.
+    - description: |-
+        Search configures the ACM Search service, including database storage,
+        replica counts, and resource limits for the collector, indexer, query API,
+        and database deployments.
       displayName: Search
       kind: Search
       name: searches.search.open-cluster-management.io

@@ -15,7 +15,10 @@ spec:
       kind: CollectorConfig
       name: collectorconfigs.search.open-cluster-management.io
       version: v1alpha1
-    - description: Search is the schema for the searches API.
+    - description: |-
+        Search configures the ACM Search service, including database storage,
+        replica counts, and resource limits for the collector, indexer, query API,
+        and database deployments.
       displayName: Search
       kind: Search
       name: searches.search.open-cluster-management.io
