@@ -68,7 +68,7 @@ spec:
                   storageClassName:
                     description: |-
                       Name of the StorageClass used to provision the database PVC.
-                      If not set, the cluster default StorageClass is used.
+                      If not set, Search uses ephemeral emptyDir storage for the database.
                     type: string
                 type: object
               deployments:

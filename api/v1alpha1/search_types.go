@@ -126,7 +126,7 @@ type DeploymentConfig struct {
 
 type StorageSpec struct {
 	// Name of the StorageClass used to provision the database PVC.
-	// If not set, the cluster default StorageClass is used.
+	// If not set, Search uses ephemeral emptyDir storage for the database.
 	StorageClassName string `json:"storageClassName,omitempty"`
 	// +optional
 	// Size of the PersistentVolumeClaim for the Search database.
