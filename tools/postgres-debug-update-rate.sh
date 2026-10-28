@@ -39,7 +39,7 @@ EDGES_TABLE="edges"
 INTERVAL_SECONDS=60
 SAMPLES=1
 KINDS_LIMIT=15
-EDGE_COMBOS_LIMIT=15
+EDGES_LIMIT=15
 
 usage() {
   cat <<'EOF'
@@ -60,8 +60,7 @@ Options:
   -i, --interval <secs>    Seconds between samples (default: 60)
   -c, --samples <count>    Number of sample windows (default: 1)
   -k, --kinds-limit <n>    Max kinds to print per sample (default: 15)
-      --edge-combos-limit <n>
-                            Max edge combos to print per sample (default: 15)
+      --edges-limit <n>    Max edge combos to print per sample (default: 15)
   -h, --help               Show this help
 
 Examples:
@@ -106,8 +105,8 @@ parse_args() {
         SAMPLES="$2"; shift 2;;
       -k|--kinds-limit)
         KINDS_LIMIT="$2"; shift 2;;
-      --edge-combos-limit)
-        EDGE_COMBOS_LIMIT="$2"; shift 2;;
+      --edges-limit)
+        EDGES_LIMIT="$2"; shift 2;;
       -h|--help)
         usage; exit 0;;
       *)
@@ -123,11 +122,11 @@ validate_args() {
   [[ "$INTERVAL_SECONDS" =~ ^[0-9]+$ ]] || { echo "ERROR: --interval must be an integer" >&2; exit 1; }
   [[ "$SAMPLES" =~ ^[0-9]+$ ]] || { echo "ERROR: --samples must be an integer" >&2; exit 1; }
   [[ "$KINDS_LIMIT" =~ ^[0-9]+$ ]] || { echo "ERROR: --kinds-limit must be an integer" >&2; exit 1; }
-  [[ "$EDGE_COMBOS_LIMIT" =~ ^[0-9]+$ ]] || { echo "ERROR: --edge-combos-limit must be an integer" >&2; exit 1; }
+  [[ "$EDGES_LIMIT" =~ ^[0-9]+$ ]] || { echo "ERROR: --edge-limit must be an integer" >&2; exit 1; }
   (( INTERVAL_SECONDS > 0 )) || { echo "ERROR: --interval must be > 0" >&2; exit 1; }
   (( SAMPLES > 0 )) || { echo "ERROR: --samples must be > 0" >&2; exit 1; }
   (( KINDS_LIMIT > 0 )) || { echo "ERROR: --kinds-limit must be > 0" >&2; exit 1; }
-  (( EDGE_COMBOS_LIMIT > 0 )) || { echo "ERROR: --edge-combos-limit must be > 0" >&2; exit 1; }
+  (( EDGES_LIMIT > 0 )) || { echo "ERROR: --edge-limit must be > 0" >&2; exit 1; }
 }
 
 detect_pod() {
@@ -212,7 +211,7 @@ coalesce(destkind,'<null>') as dest_kind, \
 count(*) as cnt \
 from ${SCHEMA}.${EDGES_TABLE} \
 where (xmin::text::bigint) > ${start_xid} and (xmin::text::bigint) <= ${end_xid} \
-group by 1,2,3 order by 4 desc,1,2,3 limit ${EDGE_COMBOS_LIMIT};"
+group by 1,2,3 order by 4 desc,1,2,3 limit ${EDGES_LIMIT};"
 
   oc -n "$NAMESPACE" exec "$POD" -- \
     psql -U "$PGUSER" -d "$DATABASE" -AtF '|' -qc "$query"
@@ -240,11 +239,10 @@ main() {
   echo "  Interval  : ${INTERVAL_SECONDS}s"
   echo "  Samples   : $SAMPLES"
   echo "  Kinds top : $KINDS_LIMIT"
-  echo "  Edge top  : $EDGE_COMBOS_LIMIT"
+  echo "  Edge top  : $EDGES_LIMIT"
   echo
 
-  printf "%-8s %-8s %-10s %-10s %-10s %-10s %-14s %-14s\n" \
-    "sample" "elapsed" "section" "ins/min" "upd/min" "del/min" "total/min" "delta(upd)"
+  printf "Running... waiting ${INTERVAL_SECONDS}s between samples.\n"
 
   local i
   local total_ins_rate=0
@@ -293,6 +291,10 @@ main() {
 
     elapsed=$(( ts2 - ts1 ))
     (( elapsed > 0 )) || elapsed="$INTERVAL_SECONDS"
+
+      printf "\n-----------------------------------------------------------------------------------\n"
+      printf "%-8s %-8s %-10s %-10s %-10s %-10s %-14s %-14s\n" \
+        "sample" "elapsed" "section" "ins/min" "upd/min" "del/min" "total/min" "delta(upd)"    
 
     dins=$(( ins2 - ins1 ))
     dupd=$(( upd2 - upd1 ))
@@ -388,6 +390,8 @@ main() {
     avg_edel=$(awk -v s="$total_edges_del_rate" -v n="$SAMPLES" 'BEGIN{printf "%.2f", s/n}')
     avg_etotal=$(awk -v s="$total_edges_total_rate" -v n="$SAMPLES" 'BEGIN{printf "%.2f", s/n}')
     echo
+    printf "\nSUMMARY"
+    printf "\n-----------------------------------------------------------------------------------\n"
     printf "%-8s %-8s %-10s %-10s %-10s %-10s %-14s\n" "average" "-" "resources" "$avg_ins" "$avg_upd" "$avg_del" "$avg_total"
     printf "%-8s %-8s %-10s %-10s %-10s %-10s %-14s\n" "" "" "edges" "$avg_eins" "$avg_eupd" "$avg_edel" "$avg_etotal"
   fi
