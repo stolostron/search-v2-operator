@@ -66,13 +66,13 @@ Options:
 
 Examples:
   # One 60s sample on search.resources
-  ./ocp-postgres-update-rate-report.sh
+  ./postgres-debug-update-rate.sh
 
   # Five 30s samples and averaged output
-  ./ocp-postgres-update-rate-report.sh -i 30 -c 5
+  ./postgres-debug-update-rate.sh -i 30 -c 5
 
   # Explicit pod
-  ./ocp-postgres-update-rate-report.sh -p search-postgres-bffd4cd6b-kz9qh
+  ./postgres-debug-update-rate.sh -p search-postgres-bffd4cd6b-kz9qh
 EOF
 }
 
