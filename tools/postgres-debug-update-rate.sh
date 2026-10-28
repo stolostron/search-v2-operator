@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/bash
 
 # HOW TO RUN THIS SCRIPT:
 #   1. oc login ... <RHACM Hub>
