@@ -390,6 +390,8 @@ main() {
     avg_edel=$(awk -v s="$total_edges_del_rate" -v n="$SAMPLES" 'BEGIN{printf "%.2f", s/n}')
     avg_etotal=$(awk -v s="$total_edges_total_rate" -v n="$SAMPLES" 'BEGIN{printf "%.2f", s/n}')
     echo
+    printf "\nSUMMARY"
+    printf "\n-----------------------------------------------------------------------------------\n"
     printf "%-8s %-8s %-10s %-10s %-10s %-10s %-14s\n" "average" "-" "resources" "$avg_ins" "$avg_upd" "$avg_del" "$avg_total"
     printf "%-8s %-8s %-10s %-10s %-10s %-10s %-14s\n" "" "" "edges" "$avg_eins" "$avg_eupd" "$avg_edel" "$avg_etotal"
   fi
