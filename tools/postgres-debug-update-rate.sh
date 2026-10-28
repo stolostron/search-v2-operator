@@ -122,11 +122,11 @@ validate_args() {
   [[ "$INTERVAL_SECONDS" =~ ^[0-9]+$ ]] || { echo "ERROR: --interval must be an integer" >&2; exit 1; }
   [[ "$SAMPLES" =~ ^[0-9]+$ ]] || { echo "ERROR: --samples must be an integer" >&2; exit 1; }
   [[ "$KINDS_LIMIT" =~ ^[0-9]+$ ]] || { echo "ERROR: --kinds-limit must be an integer" >&2; exit 1; }
-  [[ "$EDGES_LIMIT" =~ ^[0-9]+$ ]] || { echo "ERROR: --edge-combos-limit must be an integer" >&2; exit 1; }
+  [[ "$EDGES_LIMIT" =~ ^[0-9]+$ ]] || { echo "ERROR: --edge-limit must be an integer" >&2; exit 1; }
   (( INTERVAL_SECONDS > 0 )) || { echo "ERROR: --interval must be > 0" >&2; exit 1; }
   (( SAMPLES > 0 )) || { echo "ERROR: --samples must be > 0" >&2; exit 1; }
   (( KINDS_LIMIT > 0 )) || { echo "ERROR: --kinds-limit must be > 0" >&2; exit 1; }
-  (( EDGES_LIMIT > 0 )) || { echo "ERROR: --edge-combos-limit must be > 0" >&2; exit 1; }
+  (( EDGES_LIMIT > 0 )) || { echo "ERROR: --edge-limit must be > 0" >&2; exit 1; }
 }
 
 detect_pod() {
