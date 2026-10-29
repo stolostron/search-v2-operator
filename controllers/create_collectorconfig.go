@@ -75,16 +75,13 @@ const (
 
 // triggerCollectorConfigDistribution asks addon-framework to promptly re-reconcile the given
 // clusters' search-collector addon, instead of waiting for its periodic resync, after
-// merged-collector-config actually changes. A package-level var — same pattern as the `once`/
-// `cleanOnce` package vars in search_controller.go — so tests can substitute a spy without
-// needing a real addon manager running.
+// merged-collector-config changes.
 var triggerCollectorConfigDistribution = addon.TriggerSearchCollectorReconcile
 
 // triggerDistributionToAllClusters lists every ManagedCluster and asks their search-collector
-// addon to promptly pick up the just-changed merged-collector-config, instead of waiting for
-// addon-framework's periodic resync (worst case ~10-20 minutes). Best-effort: a list failure is
-// logged, not returned, since this is purely a "do it sooner" optimization — the periodic resync
-// is the existing fallback safety net regardless of whether this succeeds.
+// addon to pick up the just-changed merged-collector-config, as opposed to waiting for the
+// periodic resync. In the event of error, we log, and the periodic resync will eventually
+// distribute the update.
 func (r *SearchReconciler) triggerDistributionToAllClusters(ctx context.Context) {
 	clusters := &clusterv1.ManagedClusterList{}
 	if err := r.List(ctx, clusters); err != nil {
