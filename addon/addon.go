@@ -8,6 +8,7 @@ import (
 	"reflect"
 	"regexp"
 	"strconv"
+	"sync"
 
 	"k8s.io/apimachinery/pkg/runtime"
 
@@ -480,6 +481,53 @@ func NewAddonManager(kubeConfig *rest.Config) (addonmanager.AddonManager, error)
 	return addonMgr, err
 }
 
+// Triggerable is the minimal addon-framework capability TriggerSearchCollectorReconcile depends
+// on. Satisfied by addonmanager.AddonManager's Trigger method.
+type Triggerable interface {
+	Trigger(clusterName, addonName string)
+}
+
+var (
+	addonManagerMu         sync.Mutex
+	addonMgrRef            Triggerable
+	pendingTriggerClusters = map[string]struct{}{}
+)
+
+// setAddonManager publishes a fully started manager and replays triggers buffered during
+// startup. Callers MUST only call this after mgr.Start(ctx) has already returned successfully —
+// addon-framework's BaseAddonManagerImpl.Trigger iterates an internal syncContexts slice with no
+// locking around it, and that slice is only populated partway through Start().
+func setAddonManager(mgr Triggerable) {
+	addonManagerMu.Lock()
+	addonMgrRef = mgr
+	pending := pendingTriggerClusters
+	pendingTriggerClusters = map[string]struct{}{}
+	addonManagerMu.Unlock()
+
+	for name := range pending {
+		mgr.Trigger(name, SearchAddonName)
+	}
+}
+
+// TriggerSearchCollectorReconcile promptly re-reconciles the search-collector addons.
+// Buffers calls in pendingTriggerClusters if the manager isn't yet fully ready.
+func TriggerSearchCollectorReconcile(clusterNames []string) {
+	addonManagerMu.Lock()
+	mgr := addonMgrRef
+	if mgr == nil {
+		for _, name := range clusterNames {
+			pendingTriggerClusters[name] = struct{}{}
+		}
+		addonManagerMu.Unlock()
+		return
+	}
+	addonManagerMu.Unlock()
+
+	for _, name := range clusterNames {
+		mgr.Trigger(name, SearchAddonName)
+	}
+}
+
 func startAddon(ctx context.Context) {
 	controller := "controller: "
 	kubeConfig, err := ctrl.GetConfig()
@@ -490,13 +538,16 @@ func startAddon(ctx context.Context) {
 	addonMgr, err := NewAddonManager(kubeConfig)
 	if err != nil {
 		klog.Error(err, " unable to create a new  addon manager ", controller, "SearchOperator")
-	} else {
-		klog.Info("starting search addon manager")
-		err = addonMgr.Start(ctx)
-		if err != nil {
-			klog.Error(err, "unable to start a new  addon manager ", controller, "SearchOperator")
-		}
+		return
 	}
+	klog.Info("starting search addon manager")
+	if err := addonMgr.Start(ctx); err != nil {
+		klog.Error(err, "unable to start a new  addon manager ", controller, "SearchOperator")
+		return
+	}
+	// Only now that Start() has returned successfully is it safe to publish the reference for
+	// TriggerSearchCollectorReconcile to use — see setAddonManager's doc comment for why.
+	setAddonManager(addonMgr)
 }
 
 /*

@@ -3,7 +3,9 @@ package addon
 import (
 	"context"
 	"errors"
+	"fmt"
 	"slices"
+	"sync"
 	"testing"
 
 	"open-cluster-management.io/addon-framework/pkg/utils"
@@ -1366,4 +1368,290 @@ func TestManifest_CollectorConfigDistribution_TransientErrorAbortsWholeRender(t 
 	if objects != nil {
 		t.Errorf("expected no objects on error, got %v", objects)
 	}
+}
+
+// --- Trigger mechanism tests ---
+//
+// TriggerSearchCollectorReconcile lets controllers/create_collectorconfig.go ask addon-framework
+// to promptly re-reconcile the search-collector addon on every managed cluster right after the
+// hub's merged-collector-config changes, instead of waiting for addon-framework's periodic
+// resync. These tests cover the storage/no-op semantics around the package-level addon manager
+// reference (addonMgrRef) in isolation from the real addon-framework manager, via the minimal
+// Triggerable interface and a fake implementing it.
+
+// fakeTriggerable is a test double for Triggerable, recording every Trigger call it receives.
+// Safe for concurrent use (TestSetAddonManager_ConcurrentAccess_NoRace exercises it from
+// multiple goroutines).
+type fakeTriggerable struct {
+	mu    sync.Mutex
+	calls []triggerCall
+}
+
+type triggerCall struct {
+	clusterName string
+	addonName   string
+}
+
+func (f *fakeTriggerable) Trigger(clusterName, addonName string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.calls = append(f.calls, triggerCall{clusterName: clusterName, addonName: addonName})
+}
+
+func (f *fakeTriggerable) recordedCalls() []triggerCall {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return slices.Clone(f.calls)
+}
+
+// resetAddonManagerForTest clears the package-level addon manager reference before the test
+// runs, and schedules it to be cleared again afterward, so tests don't leak state into each
+// other through this shared package var (addonMgrRef is global by necessity — it's populated by
+// startAddon's goroutine in production, outside of any single reconcile call).
+func resetAddonManagerForTest(t *testing.T) {
+	t.Helper()
+	reset := func() {
+		addonManagerMu.Lock()
+		addonMgrRef = nil
+		pendingTriggerClusters = map[string]struct{}{}
+		addonManagerMu.Unlock()
+	}
+	reset()
+	t.Cleanup(reset)
+}
+
+// TestTriggerSearchCollectorReconcile_NoManagerSet_NoOp confirms calling the trigger before any
+// addon manager has been stored (e.g. during the startup window before startAddon's goroutine
+// finishes calling setAddonManager, or if the addon manager never starts successfully at all) is
+// a safe no-op — no panic, nothing observable to go wrong.
+func TestTriggerSearchCollectorReconcile_NoManagerSet_NoOp(t *testing.T) {
+	resetAddonManagerForTest(t)
+	TriggerSearchCollectorReconcile([]string{"cluster1", "cluster2"})
+	TriggerSearchCollectorReconcile(nil)
+	TriggerSearchCollectorReconcile([]string{})
+}
+
+// TestTriggerSearchCollectorReconcile_EmptyClusterList_NoCalls confirms an empty/nil cluster
+// list results in zero Trigger calls, even with a manager set — e.g. the "no ManagedClusters
+// exist yet" case.
+func TestTriggerSearchCollectorReconcile_EmptyClusterList_NoCalls(t *testing.T) {
+	resetAddonManagerForTest(t)
+	fake := &fakeTriggerable{}
+	setAddonManager(fake)
+
+	TriggerSearchCollectorReconcile(nil)
+	TriggerSearchCollectorReconcile([]string{})
+
+	if got := fake.recordedCalls(); len(got) != 0 {
+		t.Errorf("expected 0 Trigger calls, got %d: %v", len(got), got)
+	}
+}
+
+// TestTriggerSearchCollectorReconcile_CallsTriggerPerCluster confirms one Trigger call per
+// cluster name, each with SearchAddonName as the addon name, in the order given — this is the
+// core behavior controllers/create_collectorconfig.go depends on after listing ManagedClusters.
+func TestTriggerSearchCollectorReconcile_CallsTriggerPerCluster(t *testing.T) {
+	resetAddonManagerForTest(t)
+	fake := &fakeTriggerable{}
+	setAddonManager(fake)
+
+	TriggerSearchCollectorReconcile([]string{"cluster1", "cluster2", "cluster3"})
+
+	got := fake.recordedCalls()
+	want := []triggerCall{
+		{clusterName: "cluster1", addonName: SearchAddonName},
+		{clusterName: "cluster2", addonName: SearchAddonName},
+		{clusterName: "cluster3", addonName: SearchAddonName},
+	}
+	if !slices.Equal(got, want) {
+		t.Errorf("Trigger calls = %v, want %v", got, want)
+	}
+}
+
+// TestTriggerSearchCollectorReconcile_SingleCluster covers the degenerate single-cluster case
+// explicitly (as opposed to only ever exercising the multi-cluster loop).
+func TestTriggerSearchCollectorReconcile_SingleCluster(t *testing.T) {
+	resetAddonManagerForTest(t)
+	fake := &fakeTriggerable{}
+	setAddonManager(fake)
+
+	TriggerSearchCollectorReconcile([]string{"only-cluster"})
+
+	want := []triggerCall{{clusterName: "only-cluster", addonName: SearchAddonName}}
+	if got := fake.recordedCalls(); !slices.Equal(got, want) {
+		t.Errorf("Trigger calls = %v, want %v", got, want)
+	}
+}
+
+// TestTriggerSearchCollectorReconcile_AfterManagerCleared_NoOpAgain confirms that once the
+// stored manager reference is cleared back to nil, the trigger reverts to a safe no-op rather
+// than panicking or operating on a stale reference.
+func TestTriggerSearchCollectorReconcile_AfterManagerCleared_NoOpAgain(t *testing.T) {
+	resetAddonManagerForTest(t)
+	fake := &fakeTriggerable{}
+	setAddonManager(fake)
+	TriggerSearchCollectorReconcile([]string{"cluster1"})
+	if got := fake.recordedCalls(); len(got) != 1 {
+		t.Fatalf("expected 1 call before clearing, got %d", len(got))
+	}
+
+	setAddonManager(nil)
+	TriggerSearchCollectorReconcile([]string{"cluster2"})
+
+	if got := fake.recordedCalls(); len(got) != 1 {
+		t.Errorf("expected call count to stay at 1 after manager cleared, got %d: %v", len(got), got)
+	}
+}
+
+// TestTriggerSearchCollectorReconcile_ManagerReplaced confirms that storing a second manager
+// reference (e.g. a hypothetical future restart path) replaces the first one, rather than both
+// being used.
+func TestTriggerSearchCollectorReconcile_ManagerReplaced(t *testing.T) {
+	resetAddonManagerForTest(t)
+	first := &fakeTriggerable{}
+	second := &fakeTriggerable{}
+
+	setAddonManager(first)
+	TriggerSearchCollectorReconcile([]string{"cluster1"})
+	setAddonManager(second)
+	TriggerSearchCollectorReconcile([]string{"cluster2"})
+
+	if got := first.recordedCalls(); len(got) != 1 {
+		t.Errorf("expected first manager to see exactly 1 call, got %d: %v", len(got), got)
+	}
+	if got := second.recordedCalls(); len(got) != 1 {
+		t.Errorf("expected second manager to see exactly 1 call, got %d: %v", len(got), got)
+	}
+}
+
+// TestTriggerSearchCollectorReconcile_BufferedBeforeManagerSet_ReplayedOnSet confirms that
+// cluster names given before a manager is available aren't dropped: they're buffered, then
+// replayed the moment setAddonManager runs. This is the fix for the narrow startup race where a
+// merged-collector-config change lands after addon-framework's own initial informer sync has
+// already reconciled a cluster (with the old config) but before setAddonManager has run --
+// without replay, that cluster would otherwise wait for the next periodic resync instead of
+// picking up the change promptly.
+func TestTriggerSearchCollectorReconcile_BufferedBeforeManagerSet_ReplayedOnSet(t *testing.T) {
+	resetAddonManagerForTest(t)
+
+	// No manager yet -- these must be buffered, not dropped.
+	TriggerSearchCollectorReconcile([]string{"cluster1", "cluster2"})
+
+	fake := &fakeTriggerable{}
+	setAddonManager(fake)
+
+	got := fake.recordedCalls()
+	want := []triggerCall{
+		{clusterName: "cluster1", addonName: SearchAddonName},
+		{clusterName: "cluster2", addonName: SearchAddonName},
+	}
+	assertSameTriggerCalls(t, got, want)
+}
+
+// TestTriggerSearchCollectorReconcile_BufferDeduplicatesRepeatedNames confirms that naming the
+// same cluster across multiple pre-manager calls only replays one Trigger call for it, not one
+// per call -- the buffer is a set, not an append-only log.
+func TestTriggerSearchCollectorReconcile_BufferDeduplicatesRepeatedNames(t *testing.T) {
+	resetAddonManagerForTest(t)
+
+	TriggerSearchCollectorReconcile([]string{"cluster1"})
+	TriggerSearchCollectorReconcile([]string{"cluster1", "cluster2"})
+	TriggerSearchCollectorReconcile([]string{"cluster1"})
+
+	fake := &fakeTriggerable{}
+	setAddonManager(fake)
+
+	got := fake.recordedCalls()
+	if len(got) != 2 {
+		t.Fatalf("expected exactly 2 replayed calls (cluster1 deduplicated), got %d: %v", len(got), got)
+	}
+	assertSameTriggerCalls(t, got, []triggerCall{
+		{clusterName: "cluster1", addonName: SearchAddonName},
+		{clusterName: "cluster2", addonName: SearchAddonName},
+	})
+}
+
+// TestTriggerSearchCollectorReconcile_NothingBufferedWhenManagerAlreadySet confirms the normal,
+// already-covered-elsewhere path doesn't regress: when a manager is already available, calls go
+// straight through and nothing is left sitting in the buffer for a later, unrelated
+// setAddonManager call to incorrectly replay.
+func TestTriggerSearchCollectorReconcile_NothingBufferedWhenManagerAlreadySet(t *testing.T) {
+	resetAddonManagerForTest(t)
+	first := &fakeTriggerable{}
+	setAddonManager(first)
+
+	TriggerSearchCollectorReconcile([]string{"cluster1"})
+	assertSameTriggerCalls(t, first.recordedCalls(), []triggerCall{
+		{clusterName: "cluster1", addonName: SearchAddonName},
+	})
+
+	// Replacing the manager must not replay "cluster1" again -- it was already delivered, never
+	// buffered.
+	second := &fakeTriggerable{}
+	setAddonManager(second)
+	if got := second.recordedCalls(); len(got) != 0 {
+		t.Errorf("expected no replayed calls on the new manager, got %d: %v", len(got), got)
+	}
+}
+
+// TestTriggerSearchCollectorReconcile_BufferSurvivesManagerNeverStarting confirms that if the
+// addon manager never starts successfully at all (setAddonManager never called), buffered names
+// simply sit there harmlessly -- no panic, no unbounded growth beyond the distinct cluster names
+// given.
+func TestTriggerSearchCollectorReconcile_BufferSurvivesManagerNeverStarting(t *testing.T) {
+	resetAddonManagerForTest(t)
+
+	for i := 0; i < 5; i++ {
+		TriggerSearchCollectorReconcile([]string{"cluster1", "cluster2", "cluster3"})
+	}
+
+	addonManagerMu.Lock()
+	pendingCount := len(pendingTriggerClusters)
+	addonManagerMu.Unlock()
+	if pendingCount != 3 {
+		t.Errorf("expected exactly 3 distinct buffered cluster names, got %d", pendingCount)
+	}
+}
+
+// assertSameTriggerCalls compares two []triggerCall slices as unordered sets -- replay order
+// from a map isn't guaranteed, and callers of this helper don't depend on it.
+func assertSameTriggerCalls(t *testing.T, got, want []triggerCall) {
+	t.Helper()
+	if len(got) != len(want) {
+		t.Fatalf("call count mismatch: got %v, want %v", got, want)
+	}
+	gotSet := map[triggerCall]int{}
+	for _, c := range got {
+		gotSet[c]++
+	}
+	for _, c := range want {
+		if gotSet[c] == 0 {
+			t.Errorf("expected call %v not found in %v", c, got)
+			continue
+		}
+		gotSet[c]--
+	}
+}
+
+// TestSetAddonManager_ConcurrentAccess_NoRace exercises setAddonManager and
+// TriggerSearchCollectorReconcile concurrently from many goroutines, to confirm addonManagerMu
+// actually serializes every access to addonMgrRef. Meaningful primarily under `go test -race`.
+func TestSetAddonManager_ConcurrentAccess_NoRace(t *testing.T) {
+	resetAddonManagerForTest(t)
+	fake := &fakeTriggerable{}
+
+	var wg sync.WaitGroup
+	for i := 0; i < 50; i++ {
+		wg.Add(2)
+		go func() {
+			defer wg.Done()
+			setAddonManager(fake)
+		}()
+		go func(n int) {
+			defer wg.Done()
+			TriggerSearchCollectorReconcile([]string{fmt.Sprintf("cluster%d", n)})
+		}(i)
+	}
+	wg.Wait()
+	// The real assertion is the absence of a data race, reported by `go test -race`.
 }
