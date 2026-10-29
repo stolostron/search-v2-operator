@@ -9,12 +9,10 @@ import (
 	"regexp"
 	"strings"
 
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
@@ -34,8 +32,7 @@ var (
 
 func (r *CollectorConfig) SetupWebhookWithManager(mgr ctrl.Manager) error {
 	webhookClient = mgr.GetClient()
-	return ctrl.NewWebhookManagedBy(mgr).
-		For(r).
+	return ctrl.NewWebhookManagedBy(mgr, r).
 		WithValidator(r).
 		Complete()
 }
@@ -43,7 +40,7 @@ func (r *CollectorConfig) SetupWebhookWithManager(mgr ctrl.Manager) error {
 //+kubebuilder:webhookconfiguration:mutating=false,name=search-v2-operator-validating-webhook-configuration
 //+kubebuilder:webhook:path=/validate-search-open-cluster-management-io-v1alpha1-collectorconfig,mutating=false,failurePolicy=fail,sideEffects=None,groups=search.open-cluster-management.io,resources=collectorconfigs,verbs=create;update;delete,versions=v1alpha1,name=vcollectorconfig.kb.io,admissionReviewVersions=v1,serviceName=search-v2-operator-webhook-service
 
-var _ webhook.CustomValidator = &CollectorConfig{}
+var _ admission.Validator[*CollectorConfig] = &CollectorConfig{}
 
 type WebhookOperation string
 
@@ -54,11 +51,7 @@ const (
 )
 
 // ValidateCreate implements webhook.CustomValidator so a webhook will be registered for the type
-func (r *CollectorConfig) ValidateCreate(ctx context.Context, obj runtime.Object) (admission.Warnings, error) {
-	cc, ok := obj.(*CollectorConfig)
-	if !ok {
-		return nil, fmt.Errorf("expected a CollectorConfig object but got %T", obj)
-	}
+func (r *CollectorConfig) ValidateCreate(ctx context.Context, cc *CollectorConfig) (admission.Warnings, error) {
 	collectorconfiglog.Info("validate create", "name", cc.Name)
 
 	if err := rejectIfProtected(ctx, cc, WebhookOperationCreate); err != nil {
@@ -73,15 +66,7 @@ func (r *CollectorConfig) ValidateCreate(ctx context.Context, obj runtime.Object
 }
 
 // ValidateUpdate implements webhook.CustomValidator so a webhook will be registered for the type
-func (r *CollectorConfig) ValidateUpdate(ctx context.Context, oldObj, newObj runtime.Object) (admission.Warnings, error) {
-	cc, ok := newObj.(*CollectorConfig)
-	if !ok {
-		return nil, fmt.Errorf("expected a CollectorConfig object but got %T", newObj)
-	}
-	oldCC, ok := oldObj.(*CollectorConfig)
-	if !ok {
-		return nil, fmt.Errorf("expected a CollectorConfig object but got %T", oldObj)
-	}
+func (r *CollectorConfig) ValidateUpdate(ctx context.Context, oldCC, cc *CollectorConfig) (admission.Warnings, error) {
 	collectorconfiglog.Info("validate update", "name", cc.Name)
 
 	// Check both old and new objects — prevents stripping the owner reference to bypass protection.
@@ -100,11 +85,7 @@ func (r *CollectorConfig) ValidateUpdate(ctx context.Context, oldObj, newObj run
 }
 
 // ValidateDelete implements webhook.CustomValidator so a webhook will be registered for the type
-func (r *CollectorConfig) ValidateDelete(ctx context.Context, obj runtime.Object) (admission.Warnings, error) {
-	cc, ok := obj.(*CollectorConfig)
-	if !ok {
-		return nil, fmt.Errorf("expected a CollectorConfig object but got %T", obj)
-	}
+func (r *CollectorConfig) ValidateDelete(ctx context.Context, cc *CollectorConfig) (admission.Warnings, error) {
 	collectorconfiglog.Info("validate delete", "name", cc.Name)
 
 	if err := rejectIfProtected(ctx, cc, WebhookOperationDelete); err != nil {
