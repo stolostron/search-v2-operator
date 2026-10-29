@@ -4,7 +4,7 @@ go 1.26.0
 
 require (
 	github.com/cloudflare/cfssl v1.6.5
-	github.com/openshift/api v0.0.0-20260213155647-8fe9fe363807
+	github.com/openshift/api v0.0.0-20261028163820-1f109e9eefc7
 	github.com/openshift/controller-runtime-common v0.0.0-20260213175913-767fef058eca
 	github.com/stretchr/testify v1.12.1
 	k8s.io/api v0.37.1
