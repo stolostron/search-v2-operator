@@ -182,6 +182,7 @@ func TestManifest(t *testing.T) {
 		"addon.open-cluster-management.io/search_report_rate":     "2000",
 		"addon.open-cluster-management.io/search_validation_rate": "6000",
 		"addon.open-cluster-management.io/search_args":            "--v=2"}
+	annotationsTest["addon.open-cluster-management.io/search_validation_max_pending"] = "120000"
 	annotations250 := map[string]string{"addon.open-cluster-management.io/values": "",
 		"addon.open-cluster-management.io/search_memory_limit":    "2000Mi",
 		"addon.open-cluster-management.io/search_memory_request":  "1000Mi",
@@ -189,6 +190,7 @@ func TestManifest(t *testing.T) {
 		"addon.open-cluster-management.io/search_args":            "--v=2",
 		"addon.open-cluster-management.io/search_report_rate":     "2000"}
 	annotations250["addon.open-cluster-management.io/search_validation_rate"] = "6000"
+	annotations250["addon.open-cluster-management.io/search_validation_max_pending"] = "120000"
 	tests := []struct {
 		name                   string
 		cluster                *clusterv1.ManagedCluster
@@ -285,10 +287,48 @@ func TestManifest(t *testing.T) {
 					if object.Spec.Template.Spec.Containers[0].Env[5].Value != test.expectedValidationRate {
 						t.Errorf("expected value is %s, but got %s", test.expectedValidationRate, object.Spec.Template.Spec.Containers[0].Env[5].Value)
 					}
+					if object.Spec.Template.Spec.Containers[0].Env[6].Name != "VALIDATION_MAX_PENDING_MS" {
+						t.Errorf("expected env is VALIDATION_MAX_PENDING_MS, but got %s", object.Spec.Template.Spec.Containers[0].Env[6].Name)
+					}
+					if object.Spec.Template.Spec.Containers[0].Env[6].Value != "120000" {
+						t.Errorf("expected value is 120000, but got %s", object.Spec.Template.Spec.Containers[0].Env[6].Value)
+					}
 
 				}
 			}
 
+		})
+	}
+}
+
+func TestManifestValidationMaxPendingDefaults(t *testing.T) {
+	oldImage := SearchCollectorImage
+	SearchCollectorImage = "quay.io/stolostron/search_collector:2.7.0"
+	defer func() { SearchCollectorImage = oldImage }()
+	agentAddon := newAgentAddon(t, nil)
+	for _, value := range []string{"", "0", "-1", "invalid"} {
+		t.Run("value="+value, func(t *testing.T) {
+			annotations := map[string]string{
+				"addon.open-cluster-management.io/search_validation_max_pending": value,
+			}
+			objects, err := agentAddon.Manifests(newCluster("cluster1"), newAddon(SearchAddonName, "cluster1", "", annotations))
+			if err != nil {
+				t.Fatal(err)
+			}
+			foundDeployment := false
+			for _, object := range objects {
+				if deployment, ok := object.(*appsv1.Deployment); ok {
+					foundDeployment = true
+					for _, env := range deployment.Spec.Template.Spec.Containers[0].Env {
+						if env.Name == "VALIDATION_MAX_PENDING_MS" {
+							t.Errorf("invalid or unset value %q must leave the collector's default in effect", value)
+						}
+					}
+				}
+			}
+			if !foundDeployment {
+				t.Fatal("collector deployment was not rendered")
+			}
 		})
 	}
 }

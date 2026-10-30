@@ -84,6 +84,7 @@ type UserArgs struct {
 	RediscoverRate         int    `json:"rediscoverRate,"`
 	ReportRate             int    `json:"reportRate,"`
 	RequestMemory          string `json:"requestMemory,"`
+	ValidationMaxPending   int    `json:"validationMaxPending,"`
 	ValidationRate         int    `json:"validationRate,"`
 }
 
@@ -154,6 +155,12 @@ func getValue(cluster *clusterv1.ManagedCluster,
 		intVal, err := strconv.Atoi(val)
 		if err == nil {
 			addonValues.UserArgs.ReportRate = intVal
+		}
+	}
+	if val, ok := addon.GetAnnotations()["addon.open-cluster-management.io/search_validation_max_pending"]; ok {
+		intVal, err := strconv.Atoi(val)
+		if err == nil && intVal > 0 {
+			addonValues.UserArgs.ValidationMaxPending = intVal
 		}
 	}
 	if val, ok := addon.GetAnnotations()["addon.open-cluster-management.io/search_validation_rate"]; ok {

@@ -17,6 +17,7 @@ userargs:
   rediscoverRate: null
   reportRate: null
   requestMemory: 128Mi
+  validationMaxPending: null
   validationRate: null
 
 logLevel: null

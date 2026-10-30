@@ -57,6 +57,10 @@ spec:
         - name: VALIDATION_RATE_MS
           value: "{{ .Values.userargs.validationRate }}"
         {{- end }}
+        {{- if .Values.userargs.validationMaxPending }}
+        - name: VALIDATION_MAX_PENDING_MS
+          value: "{{ .Values.userargs.validationMaxPending }}"
+        {{- end }}
         {{- if not .Values.userargs.configurableCollection }}
         - name: FEATURE_CONFIGURABLE_COLLECTION
           value: "false"
