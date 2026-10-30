@@ -162,6 +162,18 @@ func TestSearch_controller(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to get configmap %s: %v", "search-indexer", err)
 	}
+	verifyConfigmapDataContent(t, configmap2, "sub-resource", "/sync")
+
+	validationConfigmap := &corev1.ConfigMap{}
+	err = cl.Get(context.TODO(), types.NamespacedName{
+		Name:      "search-indexer-validation",
+		Namespace: namespace,
+	}, validationConfigmap)
+	if err != nil {
+		t.Fatalf("Failed to get configmap %s: %v", "search-indexer-validation", err)
+	}
+	verifyConfigmapDataContent(t, validationConfigmap, "sub-resource", "/validation")
+	verifyConfigmapDataContent(t, validationConfigmap, "path", "/aggregator/clusters/")
 
 	//check for configmap
 	configmap3 := &corev1.ConfigMap{}

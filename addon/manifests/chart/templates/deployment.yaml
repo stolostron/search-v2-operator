@@ -49,13 +49,17 @@ spec:
         - name: REDISCOVER_RATE_MS
           value: "{{ .Values.userargs.rediscoverRate }}"
         {{- end }}
-        {{- if .Values.userargs.heartBeat }}
-        - name: HEARTBEAT_MS
-          value: "{{ .Values.userargs.heartBeat }}"
-        {{- end }}
         {{- if .Values.userargs.reportRate }}
         - name: REPORT_RATE_MS
           value: "{{ .Values.userargs.reportRate }}"
+        {{- end }}
+        {{- if .Values.userargs.validationRate }}
+        - name: VALIDATION_RATE_MS
+          value: "{{ .Values.userargs.validationRate }}"
+        {{- end }}
+        {{- if .Values.userargs.validationMaxPending }}
+        - name: VALIDATION_MAX_PENDING_MS
+          value: "{{ .Values.userargs.validationMaxPending }}"
         {{- end }}
         {{- if not .Values.userargs.configurableCollection }}
         - name: FEATURE_CONFIGURABLE_COLLECTION
