@@ -56,12 +56,16 @@ type SearchReconciler struct {
 	DynamicClient dynamic.Interface
 }
 
-const searchFinalizer = "search.open-cluster-management.io/finalizer"
-const OperatorName = "search-v2-operator"
+const (
+	searchFinalizer = "search.open-cluster-management.io/finalizer"
+	OperatorName    = "search-v2-operator"
+)
 
-var log = logf.Log.WithName("searchoperator")
-var once sync.Once
-var cleanOnce sync.Once
+var (
+	log       = logf.Log.WithName("searchoperator")
+	once      sync.Once
+	cleanOnce sync.Once
+)
 
 //+kubebuilder:rbac:groups=*,resources=*,verbs=list;get;watch
 //+kubebuilder:rbac:groups="",resources=secrets;serviceaccounts;services,verbs=create;get;list;watch;patch;update;delete
@@ -91,7 +95,7 @@ var cleanOnce sync.Once
 //+kubebuilder:rbac:groups=authentication.open-cluster-management.io,resources=managedserviceaccounts,verbs=create;get;delete
 //+kubebuilder:rbac:groups=cluster.open-cluster-management.io,resources=managedclusters,verbs=get;list;watch
 //+kubebuilder:rbac:groups=operator.open-cluster-management.io,resources=multiclusterglobalhubs;multiclusterhubs,verbs=get;list
-//+kubebuilder:rbac:groups=proxy.open-cluster-management.io,resources=clusterstatuses/aggregator,verbs=create
+//+kubebuilder:rbac:groups=proxy.open-cluster-management.io,resources=clusterstatuses/aggregator,verbs=create;get
 //+kubebuilder:rbac:groups=rbac.open-cluster-management.io,resources=clusterpermissions,verbs=create;get;delete
 //+kubebuilder:rbac:groups=search.open-cluster-management.io,resources=searches,verbs=get;list;watch;update;patch
 //+kubebuilder:rbac:groups=search.open-cluster-management.io,resources=searches/status,verbs=get;update;patch
@@ -382,7 +386,6 @@ func (r *SearchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		if err != nil {
 			log.Error(err, "Failed to remove Search ownerRef from ClusterManagementAddon")
 		}
-
 	})
 
 	// Remove legacy shared RBAC objects left on clusters upgraded from pre-ACM-34432 releases.
@@ -500,7 +503,6 @@ func (r *SearchReconciler) SetupWithManager(mgr ctrl.Manager) error {
 				} else {
 					return nil
 				}
-
 			}),
 		).
 		Watches(&clusterv1.ManagedCluster{}, handler.EnqueueRequestsFromMapFunc(
@@ -594,8 +596,12 @@ func (r *SearchReconciler) updateStatus(ctx context.Context, instance *searchv1a
 			Status: corev1.PodStatus{
 				Phase: corev1.PodRunning,
 				Conditions: []corev1.PodCondition{
-					{Type: corev1.PodReady, Status: corev1.ConditionFalse, LastTransitionTime: metav1.Now(),
-						Reason: "NoPodsFound", Message: "Check status of deployment: " + deploymentName}}},
+					{
+						Type: corev1.PodReady, Status: corev1.ConditionFalse, LastTransitionTime: metav1.Now(),
+						Reason: "NoPodsFound", Message: "Check status of deployment: " + deploymentName,
+					},
+				},
+			},
 		})
 		log.Info("No pods found for deployment ", deploymentName, "listing pods failed")
 	}
