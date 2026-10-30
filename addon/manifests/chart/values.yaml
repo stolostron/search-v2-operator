@@ -13,11 +13,11 @@ affinity: {}
 
 userargs:
   containerArgs: null
-  dataValidationInterval: null
   limitMemory: 1024Mi
   rediscoverRate: null
   reportRate: null
   requestMemory: 128Mi
+  validationRate: null
 
 logLevel: null
 

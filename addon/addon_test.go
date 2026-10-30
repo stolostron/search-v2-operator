@@ -176,32 +176,32 @@ func findCollectorConfig(objs []runtime.Object) *searchv1alpha1.CollectorConfig 
 func TestManifest(t *testing.T) {
 	annotationsTest := map[string]string{"addon.open-cluster-management.io/values": `{"global":{"nodeSelector":{"node-role.kubernetes.io/infra":""},"imageOverrides":
 	{"search_collector":"quay.io/test/search_collector:test"}}}`,
-		"addon.open-cluster-management.io/search_memory_limit":             "2000Mi",
-		"addon.open-cluster-management.io/search_memory_request":           "1000Mi",
-		"addon.open-cluster-management.io/search_rediscover_rate":          "4000",
-		"addon.open-cluster-management.io/search_report_rate":              "2000",
-		"addon.open-cluster-management.io/search_data_validation_interval": "6000",
-		"addon.open-cluster-management.io/search_args":                     "--v=2"}
+		"addon.open-cluster-management.io/search_memory_limit":    "2000Mi",
+		"addon.open-cluster-management.io/search_memory_request":  "1000Mi",
+		"addon.open-cluster-management.io/search_rediscover_rate": "4000",
+		"addon.open-cluster-management.io/search_report_rate":     "2000",
+		"addon.open-cluster-management.io/search_validation_rate": "6000",
+		"addon.open-cluster-management.io/search_args":            "--v=2"}
 	annotations250 := map[string]string{"addon.open-cluster-management.io/values": "",
 		"addon.open-cluster-management.io/search_memory_limit":    "2000Mi",
 		"addon.open-cluster-management.io/search_memory_request":  "1000Mi",
 		"addon.open-cluster-management.io/search_rediscover_rate": "4000",
 		"addon.open-cluster-management.io/search_args":            "--v=2",
 		"addon.open-cluster-management.io/search_report_rate":     "2000"}
-	annotations250["addon.open-cluster-management.io/search_data_validation_interval"] = "6000"
+	annotations250["addon.open-cluster-management.io/search_validation_rate"] = "6000"
 	tests := []struct {
-		name                           string
-		cluster                        *clusterv1.ManagedCluster
-		addon                          *addonapiv1alpha1.ManagedClusterAddOn
-		expectedNamespace              string
-		expectedImage                  string
-		expectedCount                  int
-		expectedLimit                  string
-		expectedRequest                string
-		expectedArgs                   string
-		expectedRediscoverRate         string
-		expectedReportRate             string
-		expectedDataValidationInterval string
+		name                   string
+		cluster                *clusterv1.ManagedCluster
+		addon                  *addonapiv1alpha1.ManagedClusterAddOn
+		expectedNamespace      string
+		expectedImage          string
+		expectedCount          int
+		expectedLimit          string
+		expectedRequest        string
+		expectedArgs           string
+		expectedRediscoverRate string
+		expectedReportRate     string
+		expectedValidationRate string
 	}{
 		{
 			name:    "case_1",
@@ -210,29 +210,29 @@ func TestManifest(t *testing.T) {
 			// The annotation supplies quay.io/test/search_collector:test which is
 			// not from a trusted registry; validateImageOverride must reject it and
 			// keep the operator-controlled image.
-			expectedNamespace:              "open-cluster-management-agent-addon",
-			expectedImage:                  "quay.io/stolostron/search_collector:2.7.0",
-			expectedCount:                  7,
-			expectedLimit:                  "2000Mi",
-			expectedRequest:                "1000Mi",
-			expectedArgs:                   "--v=2",
-			expectedRediscoverRate:         "4000",
-			expectedReportRate:             "2000",
-			expectedDataValidationInterval: "6000",
+			expectedNamespace:      "open-cluster-management-agent-addon",
+			expectedImage:          "quay.io/stolostron/search_collector:2.7.0",
+			expectedCount:          7,
+			expectedLimit:          "2000Mi",
+			expectedRequest:        "1000Mi",
+			expectedArgs:           "--v=2",
+			expectedRediscoverRate: "4000",
+			expectedReportRate:     "2000",
+			expectedValidationRate: "6000",
 		},
 		{
-			name:                           "case_2",
-			cluster:                        newCluster("cluster1"),
-			addon:                          newAddon(SearchAddonName, "cluster1", "test", annotations250),
-			expectedNamespace:              "test",
-			expectedImage:                  "quay.io/stolostron/search_collector:2.7.0",
-			expectedCount:                  7,
-			expectedLimit:                  "2000Mi",
-			expectedRequest:                "1000Mi",
-			expectedArgs:                   "--v=2",
-			expectedRediscoverRate:         "4000",
-			expectedReportRate:             "2000",
-			expectedDataValidationInterval: "6000",
+			name:                   "case_2",
+			cluster:                newCluster("cluster1"),
+			addon:                  newAddon(SearchAddonName, "cluster1", "test", annotations250),
+			expectedNamespace:      "test",
+			expectedImage:          "quay.io/stolostron/search_collector:2.7.0",
+			expectedCount:          7,
+			expectedLimit:          "2000Mi",
+			expectedRequest:        "1000Mi",
+			expectedArgs:           "--v=2",
+			expectedRediscoverRate: "4000",
+			expectedReportRate:     "2000",
+			expectedValidationRate: "6000",
 		},
 	}
 
@@ -273,8 +273,8 @@ func TestManifest(t *testing.T) {
 					if object.Spec.Template.Spec.Containers[0].Env[4].Name != "REPORT_RATE_MS" {
 						t.Errorf("expected env is REPORT_RATE_MS, but got %s", object.Spec.Template.Spec.Containers[0].Env[4].Name)
 					}
-					if object.Spec.Template.Spec.Containers[0].Env[5].Name != "DATA_VALIDATION_INTERVAL_MS" {
-						t.Errorf("expected env is DATA_VALIDATION_INTERVAL_MS, but got %s", object.Spec.Template.Spec.Containers[0].Env[5].Name)
+					if object.Spec.Template.Spec.Containers[0].Env[5].Name != "VALIDATION_RATE_MS" {
+						t.Errorf("expected env is VALIDATION_RATE_MS, but got %s", object.Spec.Template.Spec.Containers[0].Env[5].Name)
 					}
 					if object.Spec.Template.Spec.Containers[0].Env[3].Value != "4000" {
 						t.Errorf("expected value is 4000, but got %s", object.Spec.Template.Spec.Containers[0].Env[4].Value)
@@ -282,8 +282,8 @@ func TestManifest(t *testing.T) {
 					if object.Spec.Template.Spec.Containers[0].Env[4].Value != "2000" {
 						t.Errorf("expected value is 2000, but got %s", object.Spec.Template.Spec.Containers[0].Env[4].Value)
 					}
-					if object.Spec.Template.Spec.Containers[0].Env[5].Value != test.expectedDataValidationInterval {
-						t.Errorf("expected value is %s, but got %s", test.expectedDataValidationInterval, object.Spec.Template.Spec.Containers[0].Env[5].Value)
+					if object.Spec.Template.Spec.Containers[0].Env[5].Value != test.expectedValidationRate {
+						t.Errorf("expected value is %s, but got %s", test.expectedValidationRate, object.Spec.Template.Spec.Containers[0].Env[5].Value)
 					}
 
 				}

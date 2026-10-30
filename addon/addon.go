@@ -80,11 +80,11 @@ type GlobalValues struct {
 type UserArgs struct {
 	ConfigurableCollection bool   `json:"configurableCollection,"`
 	ContainerArgs          string `json:"containerArgs,"`
-	DataValidationInterval int    `json:"dataValidationInterval,"`
 	LimitMemory            string `json:"limitMemory,"`
 	RediscoverRate         int    `json:"rediscoverRate,"`
 	ReportRate             int    `json:"reportRate,"`
 	RequestMemory          string `json:"requestMemory,"`
+	ValidationRate         int    `json:"validationRate,"`
 }
 
 type Values struct {
@@ -156,10 +156,10 @@ func getValue(cluster *clusterv1.ManagedCluster,
 			addonValues.UserArgs.ReportRate = intVal
 		}
 	}
-	if val, ok := addon.GetAnnotations()["addon.open-cluster-management.io/search_data_validation_interval"]; ok {
+	if val, ok := addon.GetAnnotations()["addon.open-cluster-management.io/search_validation_rate"]; ok {
 		intVal, err := strconv.Atoi(val)
 		if err == nil {
-			addonValues.UserArgs.DataValidationInterval = intVal
+			addonValues.UserArgs.ValidationRate = intVal
 		}
 	}
 	if val, ok := addon.GetAnnotations()["addon.open-cluster-management.io/search_configurable_collection"]; ok {
