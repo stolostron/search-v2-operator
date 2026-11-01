@@ -7,9 +7,9 @@ require (
 	github.com/openshift/api v0.0.0-20261028163820-1f109e9eefc7
 	github.com/openshift/controller-runtime-common v0.0.0-20260213175913-767fef058eca
 	github.com/stretchr/testify v1.12.1
-	k8s.io/api v0.37.1
-	k8s.io/apimachinery v0.37.1
-	k8s.io/client-go v0.37.1
+	k8s.io/api v0.37.2
+	k8s.io/apimachinery v0.37.2
+	k8s.io/client-go v0.37.2
 	k8s.io/klog/v2 v2.140.0
 	open-cluster-management.io/addon-framework v0.12.0
 	open-cluster-management.io/api v0.16.2
