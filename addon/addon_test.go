@@ -181,16 +181,18 @@ func TestManifest(t *testing.T) {
 		"addon.open-cluster-management.io/search_memory_limit":    "2000Mi",
 		"addon.open-cluster-management.io/search_memory_request":  "1000Mi",
 		"addon.open-cluster-management.io/search_rediscover_rate": "4000",
-		"addon.open-cluster-management.io/search_heartbeat":       "3000",
 		"addon.open-cluster-management.io/search_report_rate":     "2000",
+		"addon.open-cluster-management.io/search_validation_rate": "6000",
 		"addon.open-cluster-management.io/search_args":            "--v=2"}
+	annotationsTest["addon.open-cluster-management.io/search_validation_max_pending"] = "120000"
 	annotations250 := map[string]string{"addon.open-cluster-management.io/values": "",
 		"addon.open-cluster-management.io/search_memory_limit":    "2000Mi",
 		"addon.open-cluster-management.io/search_memory_request":  "1000Mi",
 		"addon.open-cluster-management.io/search_rediscover_rate": "4000",
 		"addon.open-cluster-management.io/search_args":            "--v=2",
-		"addon.open-cluster-management.io/search_heartbeat":       "3000",
 		"addon.open-cluster-management.io/search_report_rate":     "2000"}
+	annotations250["addon.open-cluster-management.io/search_validation_rate"] = "6000"
+	annotations250["addon.open-cluster-management.io/search_validation_max_pending"] = "120000"
 	tests := []struct {
 		name                   string
 		cluster                *clusterv1.ManagedCluster
@@ -201,9 +203,9 @@ func TestManifest(t *testing.T) {
 		expectedLimit          string
 		expectedRequest        string
 		expectedArgs           string
-		expectedHeartBeat      string
 		expectedRediscoverRate string
 		expectedReportRate     string
+		expectedValidationRate string
 	}{
 		{
 			name:    "case_1",
@@ -218,9 +220,9 @@ func TestManifest(t *testing.T) {
 			expectedLimit:          "2000Mi",
 			expectedRequest:        "1000Mi",
 			expectedArgs:           "--v=2",
-			expectedHeartBeat:      "3000",
 			expectedRediscoverRate: "4000",
 			expectedReportRate:     "2000",
+			expectedValidationRate: "6000",
 		},
 		{
 			name:                   "case_2",
@@ -232,9 +234,9 @@ func TestManifest(t *testing.T) {
 			expectedLimit:          "2000Mi",
 			expectedRequest:        "1000Mi",
 			expectedArgs:           "--v=2",
-			expectedHeartBeat:      "3000",
 			expectedRediscoverRate: "4000",
 			expectedReportRate:     "2000",
+			expectedValidationRate: "6000",
 		},
 	}
 
@@ -272,25 +274,63 @@ func TestManifest(t *testing.T) {
 					if object.Spec.Template.Spec.Containers[0].Env[3].Name != "REDISCOVER_RATE_MS" {
 						t.Errorf("expected env is REDISCOVER_RATE_MS, but got %s", object.Spec.Template.Spec.Containers[0].Env[4].Name)
 					}
-					if object.Spec.Template.Spec.Containers[0].Env[4].Name != "HEARTBEAT_MS" {
-						t.Errorf("expected env is HEARTBEAT_MS, but got %s", object.Spec.Template.Spec.Containers[0].Env[5].Name)
+					if object.Spec.Template.Spec.Containers[0].Env[4].Name != "REPORT_RATE_MS" {
+						t.Errorf("expected env is REPORT_RATE_MS, but got %s", object.Spec.Template.Spec.Containers[0].Env[4].Name)
 					}
-					if object.Spec.Template.Spec.Containers[0].Env[5].Name != "REPORT_RATE_MS" {
-						t.Errorf("expected env is REPORT_RATE_MS, but got %s", object.Spec.Template.Spec.Containers[0].Env[6].Name)
+					if object.Spec.Template.Spec.Containers[0].Env[5].Name != "VALIDATION_RATE_MS" {
+						t.Errorf("expected env is VALIDATION_RATE_MS, but got %s", object.Spec.Template.Spec.Containers[0].Env[5].Name)
 					}
 					if object.Spec.Template.Spec.Containers[0].Env[3].Value != "4000" {
 						t.Errorf("expected value is 4000, but got %s", object.Spec.Template.Spec.Containers[0].Env[4].Value)
 					}
-					if object.Spec.Template.Spec.Containers[0].Env[4].Value != "3000" {
-						t.Errorf("expected value is 3000, but got %s", object.Spec.Template.Spec.Containers[0].Env[5].Value)
+					if object.Spec.Template.Spec.Containers[0].Env[4].Value != "2000" {
+						t.Errorf("expected value is 2000, but got %s", object.Spec.Template.Spec.Containers[0].Env[4].Value)
 					}
-					if object.Spec.Template.Spec.Containers[0].Env[5].Value != "2000" {
-						t.Errorf("expected value is 2000, but got %s", object.Spec.Template.Spec.Containers[0].Env[6].Value)
+					if object.Spec.Template.Spec.Containers[0].Env[5].Value != test.expectedValidationRate {
+						t.Errorf("expected value is %s, but got %s", test.expectedValidationRate, object.Spec.Template.Spec.Containers[0].Env[5].Value)
+					}
+					if object.Spec.Template.Spec.Containers[0].Env[6].Name != "VALIDATION_MAX_PENDING_MS" {
+						t.Errorf("expected env is VALIDATION_MAX_PENDING_MS, but got %s", object.Spec.Template.Spec.Containers[0].Env[6].Name)
+					}
+					if object.Spec.Template.Spec.Containers[0].Env[6].Value != "120000" {
+						t.Errorf("expected value is 120000, but got %s", object.Spec.Template.Spec.Containers[0].Env[6].Value)
 					}
 
 				}
 			}
 
+		})
+	}
+}
+
+func TestManifestValidationMaxPendingDefaults(t *testing.T) {
+	oldImage := SearchCollectorImage
+	SearchCollectorImage = "quay.io/stolostron/search_collector:2.7.0"
+	defer func() { SearchCollectorImage = oldImage }()
+	agentAddon := newAgentAddon(t, nil)
+	for _, value := range []string{"", "0", "-1", "invalid"} {
+		t.Run("value="+value, func(t *testing.T) {
+			annotations := map[string]string{
+				"addon.open-cluster-management.io/search_validation_max_pending": value,
+			}
+			objects, err := agentAddon.Manifests(newCluster("cluster1"), newAddon(SearchAddonName, "cluster1", "", annotations))
+			if err != nil {
+				t.Fatal(err)
+			}
+			foundDeployment := false
+			for _, object := range objects {
+				if deployment, ok := object.(*appsv1.Deployment); ok {
+					foundDeployment = true
+					for _, env := range deployment.Spec.Template.Spec.Containers[0].Env {
+						if env.Name == "VALIDATION_MAX_PENDING_MS" {
+							t.Errorf("invalid or unset value %q must leave the collector's default in effect", value)
+						}
+					}
+				}
+			}
+			if !foundDeployment {
+				t.Fatal("collector deployment was not rendered")
+			}
 		})
 	}
 }

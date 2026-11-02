@@ -9,12 +9,20 @@ import (
 )
 
 func (r *SearchReconciler) IndexerConfigmap(instance *searchv1alpha1.Search) *corev1.ConfigMap {
+	return r.indexerProxyConfigmap(instance, indexerConfigmapName, "/sync")
+}
+
+func (r *SearchReconciler) IndexerValidationConfigmap(instance *searchv1alpha1.Search) *corev1.ConfigMap {
+	return r.indexerProxyConfigmap(instance, indexerValidationConfigmapName, "/validation")
+}
+
+func (r *SearchReconciler) indexerProxyConfigmap(instance *searchv1alpha1.Search, name, subresource string) *corev1.ConfigMap {
 
 	ns := instance.GetNamespace()
 	deploymentLabels := generateLabels("config", "acm-proxyserver")
 	cm := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      indexerConfigmapName,
+			Name:      name,
 			Namespace: ns,
 			Labels:    deploymentLabels,
 		},
@@ -23,7 +31,7 @@ func (r *SearchReconciler) IndexerConfigmap(instance *searchv1alpha1.Search) *co
 	data["service"] = ns + "/search-indexer"
 	data["port"] = "3010"
 	data["path"] = "/aggregator/clusters/"
-	data["sub-resource"] = "/sync"
+	data["sub-resource"] = subresource
 	data["use-id"] = "true"
 	data["secret"] = ns + "/search-indexer-certs"
 	data["caConfigMap"] = caCertConfigmapName
@@ -31,7 +39,7 @@ func (r *SearchReconciler) IndexerConfigmap(instance *searchv1alpha1.Search) *co
 
 	err := controllerutil.SetControllerReference(instance, cm, r.Scheme)
 	if err != nil {
-		log.V(2).Info("Could not set control for search-indexer configmap")
+		log.V(2).Info("Could not set control for search-indexer proxy configmap")
 	}
 	return cm
 }

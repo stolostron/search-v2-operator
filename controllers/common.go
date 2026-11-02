@@ -26,9 +26,10 @@ const (
 	indexerDeploymentName   = "search-indexer"
 	postgresDeploymentName  = "search-postgres"
 
-	indexerConfigmapName  = "search-indexer"
-	postgresConfigmapName = "search-postgres"
-	caCertConfigmapName   = "search-ca-crt"
+	indexerConfigmapName           = "search-indexer"
+	indexerValidationConfigmapName = "search-indexer-validation"
+	postgresConfigmapName          = "search-postgres"
+	caCertConfigmapName            = "search-ca-crt"
 
 	apiSecretName      = "search-api-certs"      // #nosec G101 - False positive, this is a secret name, not a password
 	indexerSecretName  = "search-indexer-certs"  // #nosec G101 - False positive, this is a secret name, not a password

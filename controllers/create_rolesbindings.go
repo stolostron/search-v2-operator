@@ -16,7 +16,6 @@ import (
 func (r *SearchReconciler) createUpdateRoles(ctx context.Context,
 	crole *rbacv1.ClusterRole,
 ) (*reconcile.Result, error) {
-
 	existingClusterRole := &rbacv1.ClusterRole{}
 	err := r.Get(ctx, types.NamespacedName{
 		Name:      crole.Name,
@@ -50,7 +49,6 @@ func (r *SearchReconciler) createUpdateRoles(ctx context.Context,
 func (r *SearchReconciler) createRoleBinding(ctx context.Context,
 	rolebinding *rbacv1.ClusterRoleBinding,
 ) (*reconcile.Result, error) {
-
 	found := &rbacv1.ClusterRoleBinding{}
 	err := r.Get(ctx, types.NamespacedName{
 		Name:      rolebinding.Name,
@@ -243,7 +241,7 @@ func getAddonRules() []rbacv1.PolicyRule {
 		{
 			APIGroups: []string{"proxy.open-cluster-management.io"},
 			Resources: []string{"clusterstatuses/aggregator"},
-			Verbs:     []string{"create"},
+			Verbs:     []string{"create", "get"},
 		},
 		{
 			APIGroups: []string{"coordination.k8s.io"},
