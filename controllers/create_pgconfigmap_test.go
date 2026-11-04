@@ -75,11 +75,16 @@ func TestPostgresConfigmapWithStatementTimeout(t *testing.T) {
 	assert.Contains(t, postgresConf, "statement_timeout = '60000")
 
 	// Verify other expected settings are still present
-	expectedSettings := []string{
+		expectedSettings := []string{
 		"ssl = 'on'",
 		"ssl_cert_file = '/sslcert/tls.crt'",
 		"ssl_key_file = '/sslcert/tls.key'",
 		"max_parallel_workers_per_gather = '8'",
+		"maintenance_work_mem = '256MB'",
+		"autovacuum_work_mem = '256MB'",
+		"autovacuum_vacuum_scale_factor = '0.05'",
+		"autovacuum_vacuum_threshold = '1000'",
+		"autovacuum_analyze_scale_factor = '0.02'",
 	}
 
 	for _, setting := range expectedSettings {

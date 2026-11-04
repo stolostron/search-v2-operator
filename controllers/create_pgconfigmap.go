@@ -31,12 +31,39 @@ func (r *SearchReconciler) PostgresConfigmap(instance *searchv1alpha1.Search, pg
 	data["custom-postgresql.conf"] = `# Customizations appended to postgresql.conf.
 `
 
+	// Default PostgreSQL settings tuned for our Search workload.
+	//
+	// - SSL
+	//   Enable and configure SSL.
+	// - max_parallel_workers_per_gather = 8
+	//   Increased to improve query parallelism. Postgres default is 2
+	// - maintenance_work_mem = 256MB
+	//   Increased to improve VACUUM/CREATE INDEX throughput. Postgres default is 64MB
+	// - autovacuum_work_mem = 256MB
+	//   Explicitly pinned to avoid future increases in per-autovacuum-worker memory usage. Postgres default is -1 which
+	//   means use maintenance_work_mem
+	// - autovacuum_vacuum_scale_factor = 0.05
+	//   Aggressive autovacuum/analyze for high-churn tables to reduce dead tuples. Postgres default is 0.2
+	// - autovacuum_vacuum_threshold = 1000
+	//   Aggressive autovacuum/analyze for high-churn tables to reduce dead tuples. Postgres default is 50
+	// - autovacuum_analyze_scale_factor = 0.02
+	//   More aggressive autovacuum/analyze for high-churn tables to reduce dead tuples. Postgres default is 0.1
+	// - statement_timeout = 60000
+	//   Safety default for long-running statements. Postgres default is 0
+	// - logging_collector = false
+	//   Disable logging collector, directs output to stderr or pod's logs. Makes it easier for must-gather to collect
+	//   logs and prevents the log files from filling up the PVC. Postgres default is true
 	data["postgresql.conf"] = fmt.Sprintf(`ssl = 'on'
 ssl_cert_file = '/sslcert/tls.crt'
 ssl_key_file = '/sslcert/tls.key'
 ssl_min_protocol_version = '%s'
 ssl_ciphers = '%s'
 max_parallel_workers_per_gather = '8'
+maintenance_work_mem = '256MB'
+autovacuum_work_mem = '256MB'
+autovacuum_vacuum_scale_factor = '0.05'
+autovacuum_vacuum_threshold = '1000'
+autovacuum_analyze_scale_factor = '0.02'
 statement_timeout = '60000'
 logging_collector = 'false'`, pgTLS.SSLMinProtocolVersion, pgTLS.SSLCiphers)
 
