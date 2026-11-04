@@ -31,6 +31,22 @@ func (r *SearchReconciler) PostgresConfigmap(instance *searchv1alpha1.Search, pg
 	data["custom-postgresql.conf"] = `# Customizations appended to postgresql.conf.
 `
 
+	// Default postgres settings tuned for Search's frequent-update workload.
+	//
+	// Current defaults and rationale:
+	// - max_parallel_workers_per_gather = 8
+	//   Existing Search query parallelism default.
+	// - maintenance_work_mem = 256MB
+	//   Raised from PostgreSQL default (64MB) to improve VACUUM/CREATE INDEX throughput.
+	// - autovacuum_work_mem = 256MB
+	//   Explicitly pinned so future maintenance_work_mem increases do not implicitly raise
+	//   per-autovacuum-worker memory usage.
+	// - autovacuum_vacuum_scale_factor = 0.05
+	// - autovacuum_vacuum_threshold = 1000
+	// - autovacuum_analyze_scale_factor = 0.02
+	//   More aggressive autovacuum/analyze for high-churn tables to reduce dead tuples.
+	// - statement_timeout = 60000
+	//   Existing safety default for long-running statements.
 	data["postgresql.conf"] = fmt.Sprintf(`ssl = 'on'
 ssl_cert_file = '/sslcert/tls.crt'
 ssl_key_file = '/sslcert/tls.key'
