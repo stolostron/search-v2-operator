@@ -37,6 +37,11 @@ ssl_key_file = '/sslcert/tls.key'
 ssl_min_protocol_version = '%s'
 ssl_ciphers = '%s'
 max_parallel_workers_per_gather = '8'
+maintenance_work_mem = '256MB'
+autovacuum_work_mem = '256MB'
+autovacuum_vacuum_scale_factor = '0.05'
+autovacuum_vacuum_threshold = '1000'
+autovacuum_analyze_scale_factor = '0.02'
 statement_timeout = '60000'
 logging_collector = 'false'`, pgTLS.SSLMinProtocolVersion, pgTLS.SSLCiphers)
 
