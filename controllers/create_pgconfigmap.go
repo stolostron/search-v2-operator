@@ -40,7 +40,8 @@ func (r *SearchReconciler) PostgresConfigmap(instance *searchv1alpha1.Search, pg
 	// - maintenance_work_mem = 256MB
 	//   Increased to improve VACUUM/CREATE INDEX throughput. Postgres default is 64MB
 	// - autovacuum_work_mem = 256MB
-	//   Explicitly pinned to avoid future increases in per-autovacuum-worker memory usage. Postgres default is 1MB
+	//   Explicitly pinned to avoid future increases in per-autovacuum-worker memory usage. Postgres default is -1 which
+	//   means use maintenance_work_mem
 	// - autovacuum_vacuum_scale_factor = 0.05
 	//   Aggressive autovacuum/analyze for high-churn tables to reduce dead tuples. Postgres default is 0.2
 	// - autovacuum_vacuum_threshold = 1000
