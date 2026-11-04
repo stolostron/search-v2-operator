@@ -49,6 +49,9 @@ func (r *SearchReconciler) PostgresConfigmap(instance *searchv1alpha1.Search, pg
 	//   More aggressive autovacuum/analyze for high-churn tables to reduce dead tuples. Postgres default is 0.1
 	// - statement_timeout = 60000
 	//   Safety default for long-running statements. Postgres default is 0
+	// - logging_collector = false
+	//   Disable logging collector, directs output to stderr or pod's logs. Makes it easier for must-gather to collect
+	//   logs and prevents the log files from filling up the PVC. Postgres default is true
 	data["postgresql.conf"] = fmt.Sprintf(`ssl = 'on'
 ssl_cert_file = '/sslcert/tls.crt'
 ssl_key_file = '/sslcert/tls.key'
