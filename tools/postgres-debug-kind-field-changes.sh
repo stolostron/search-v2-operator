@@ -193,6 +193,23 @@ from touched t, lateral jsonb_each(coalesce(t.data->'label','{}'::jsonb)) l;"
     psql -U "$PGUSER" -d "$DATABASE" -AtF $'\t' -qc "$query"
 }
 
+get_kind_field_hashes() {
+  local escaped_kind
+  local query
+  escaped_kind="$(sql_escape_literal "$KIND")"
+
+  query="select r.uid, j.key as field, md5(j.value::text) as vhash \
+from ${SCHEMA}.${TABLE} r, lateral jsonb_each(coalesce(r.data,'{}'::jsonb)) j \
+where r.data->>'kind'='${escaped_kind}' \
+union all \
+select r.uid, 'label.' || l.key as field, md5(l.value::text) as vhash \
+from ${SCHEMA}.${TABLE} r, lateral jsonb_each(coalesce(r.data->'label','{}'::jsonb)) l \
+where r.data->>'kind'='${escaped_kind}';"
+
+  oc -n "$NAMESPACE" exec "$POD" -- \
+    psql -U "$PGUSER" -d "$DATABASE" -AtF $'\t' -qc "$query"
+}
+
 print_ranked_file() {
   local file="$1"
   local top_n="$2"
@@ -217,6 +234,7 @@ main() {
   require_cmd awk
   require_cmd sort
   require_cmd join
+  require_cmd comm
   parse_args "$@"
   validate_args
   detect_pod
@@ -240,7 +258,7 @@ main() {
   echo "Note: sample #0 establishes baseline; change counts start at sample #1."
 
   local i
-  local start_info end_info
+  local start_info end_info now_info
   local total_touched_sum=0
   local total_insert_sum=0
   local total_update_sum=0
@@ -250,13 +268,18 @@ main() {
   local total_field_changes_sum=0
   local total_label_changes_sum=0
 
-  local prev_hash_file curr_hash_file prev_idx_file curr_idx_file joined_file
+  local prev_hash_file curr_hash_file touched_hash_file prev_idx_file curr_idx_file joined_file
+  local prev_uids_file curr_uids_file common_uids_file
   local all_directional_file all_collapsed_file label_directional_file label_collapsed_file
   prev_hash_file="$tmpdir/prev-hashes.tsv"
   curr_hash_file="$tmpdir/curr-hashes.tsv"
+  touched_hash_file="$tmpdir/touched-hashes.tsv"
   prev_idx_file="$tmpdir/prev-idx.tsv"
   curr_idx_file="$tmpdir/curr-idx.tsv"
   joined_file="$tmpdir/joined.tsv"
+  prev_uids_file="$tmpdir/prev-uids.txt"
+  curr_uids_file="$tmpdir/curr-uids.txt"
+  common_uids_file="$tmpdir/common-uids.txt"
   all_directional_file="$tmpdir/all-directional.tsv"
   all_collapsed_file="$tmpdir/all-collapsed.tsv"
   label_directional_file="$tmpdir/label-directional.tsv"
@@ -267,14 +290,23 @@ main() {
   end_info="$(get_epoch_txid32)"
 
   for (( i=0; i<=SAMPLES; i++ )); do
-    local start_epoch start_xid end_epoch end_xid elapsed
+    local start_epoch start_xid end_epoch end_xid now_epoch elapsed sleep_seconds
     local summary_rows summary_total summary_insert_est summary_update_est
     local touched_rate insert_rate update_rate
     local window_total_field_entries window_total_label_entries
 
     start_info="$end_info"
     IFS='|' read -r start_epoch start_xid <<< "$start_info"
-    sleep "$INTERVAL_SECONDS"
+
+    now_info="$(get_epoch_txid32)"
+    IFS='|' read -r now_epoch _ <<< "$now_info"
+    sleep_seconds=$(( INTERVAL_SECONDS - (now_epoch - start_epoch) ))
+    if (( sleep_seconds > 0 )); then
+      sleep "$sleep_seconds"
+    else
+      echo "WARNING: processing overran sample boundary by $(( -sleep_seconds ))s; taking end boundary immediately." >&2
+    fi
+
     end_info="$(get_epoch_txid32)"
     IFS='|' read -r end_epoch end_xid <<< "$end_info"
     elapsed=$(( end_epoch - start_epoch ))
@@ -299,9 +331,10 @@ main() {
     insert_rate="$(calc_rate "$summary_insert_est" "$elapsed")"
     update_rate="$(calc_rate "$summary_update_est" "$elapsed")"
 
-    get_touched_field_hashes "$start_xid" "$end_xid" > "$curr_hash_file"
-    window_total_field_entries=$(awk -F $'\t' 'NF>=3{if($2 !~ /^label\./) c++} END{print c+0}' "$curr_hash_file")
-    window_total_label_entries=$(awk -F $'\t' 'NF>=3{if($2 ~ /^label\./) c++} END{print c+0}' "$curr_hash_file")
+    get_touched_field_hashes "$start_xid" "$end_xid" > "$touched_hash_file"
+    get_kind_field_hashes > "$curr_hash_file"
+    window_total_field_entries=$(awk -F $'\t' 'NF>=3{if($2 !~ /^label\./) c++} END{print c+0}' "$touched_hash_file")
+    window_total_label_entries=$(awk -F $'\t' 'NF>=3{if($2 ~ /^label\./) c++} END{print c+0}' "$touched_hash_file")
 
     echo
     printf -- "--------------------------------------------------------------------------------\n"
@@ -317,20 +350,38 @@ main() {
       echo "Baseline sample: captured current field values for next-window diff."
       echo "No change report for sample #0."
     else
+      : > "$all_directional_file"
+      : > "$all_collapsed_file"
+      : > "$label_directional_file"
+      : > "$label_collapsed_file"
+
+      awk -F $'\t' 'NF>=3 {print $1}' "$prev_hash_file" | LC_ALL=C sort -u > "$prev_uids_file"
+      awk -F $'\t' 'NF>=3 {print $1}' "$curr_hash_file" | LC_ALL=C sort -u > "$curr_uids_file"
+      LC_ALL=C comm -12 "$prev_uids_file" "$curr_uids_file" > "$common_uids_file"
+
       awk -F $'\t' 'BEGIN{OFS="\t"} NF>=3 {print $1 "\034" $2, $3}' "$prev_hash_file" > "$prev_idx_file"
       awk -F $'\t' 'BEGIN{OFS="\t"} NF>=3 {print $1 "\034" $2, $3}' "$curr_hash_file" > "$curr_idx_file"
       LC_ALL=C sort -t $'\t' -k1,1 "$prev_idx_file" -o "$prev_idx_file"
       LC_ALL=C sort -t $'\t' -k1,1 "$curr_idx_file" -o "$curr_idx_file"
-      join -t $'\t' -a 1 -a 2 -e '' -o '0,1.2,2.2' "$prev_idx_file" "$curr_idx_file" > "$joined_file"
+      LC_ALL=C join -t $'\t' -a 1 -a 2 -e '' -o '0,1.2,2.2' "$prev_idx_file" "$curr_idx_file" > "$joined_file"
 
       awk -F $'\t' \
+        -v common_uids_file="$common_uids_file" \
         -v all_dir="$all_directional_file" \
         -v all_flat="$all_collapsed_file" \
         -v lbl_dir="$label_directional_file" \
         -v lbl_flat="$label_collapsed_file" '
+        BEGIN {
+          while ((getline u < common_uids_file) > 0) {
+            keep[u]=1
+          }
+          close(common_uids_file)
+        }
         {
           key=$1; oldv=$2; newv=$3
           split(key, a, "\034")
+          uid=a[1]
+          if (!(uid in keep)) next
           field=a[2]
           if (field == "") next
 
@@ -355,8 +406,8 @@ main() {
       ' "$joined_file"
 
       local sample_field_changes sample_label_changes
-      sample_field_changes=$(awk -F $'\t' '{s+=$1} END{print s+0}' "$all_directional_file" 2>/dev/null || echo 0)
-      sample_label_changes=$(awk -F $'\t' '{s+=$1} END{print s+0}' "$label_directional_file" 2>/dev/null || echo 0)
+      sample_field_changes=$(awk -F $'\t' '{s+=$1} END{print s+0}' "$all_directional_file")
+      sample_label_changes=$(awk -F $'\t' '{s+=$1} END{print s+0}' "$label_directional_file")
 
       echo
       echo "Actual field value changes vs previous sample"
