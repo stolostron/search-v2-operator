@@ -120,7 +120,7 @@ detect_pod() {
     return
   fi
 
-  POD="$(oc -n "$NAMESPACE" get pods -o name | sed -n 's#^pod/##p' | grep -m1 -E 'postgres')"
+  POD="$(oc -n "$NAMESPACE" get pods -o name | sed -n 's#^pod/##p' | { grep -m1 -E 'postgres' || true; })"
   if [[ -z "$POD" ]]; then
     echo "ERROR: could not auto-detect a postgres pod in namespace '$NAMESPACE'" >&2
     echo "Hint: pass --pod <name> explicitly" >&2
@@ -239,6 +239,7 @@ main() {
   echo "Note: sample #1 establishes baseline; change counts start at sample #2."
 
   local i
+  local start_info end_info
   local total_touched_sum=0
   local total_insert_sum=0
   local total_update_sum=0
@@ -262,14 +263,15 @@ main() {
 
   : > "$prev_hash_file"
 
+  end_info="$(get_epoch_txid32)"
+
   for (( i=1; i<=SAMPLES; i++ )); do
-    local start_info end_info
     local start_epoch start_xid end_epoch end_xid elapsed
     local summary_rows summary_total summary_insert_est summary_update_est
     local touched_rate insert_rate update_rate
     local window_total_field_entries window_total_label_entries
 
-    start_info="$(get_epoch_txid32)"
+    start_info="$end_info"
     IFS='|' read -r start_epoch start_xid <<< "$start_info"
     sleep "$INTERVAL_SECONDS"
     end_info="$(get_epoch_txid32)"
