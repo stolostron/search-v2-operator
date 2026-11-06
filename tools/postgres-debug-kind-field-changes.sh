@@ -241,7 +241,7 @@ main() {
 
   local tmpdir
   tmpdir="$(mktemp -d)"
-  trap 'rm -rf "$tmpdir"' EXIT
+  trap "rm -rf '$tmpdir'" EXIT
 
   echo "Postgres kind field-change report (xmin window)"
   echo "  Namespace : $NAMESPACE"
