@@ -37,7 +37,7 @@ SCHEMA="search"
 TABLE="resources"
 EDGES_TABLE="edges"
 INTERVAL_SECONDS=60
-SAMPLES=1
+SAMPLES=3
 KINDS_LIMIT=15
 EDGES_LIMIT=15
 
@@ -58,7 +58,7 @@ Options:
   -t, --table <table>      Table name (default: resources)
       --edges-table <name> Edge table name (default: edges)
   -i, --interval <secs>    Seconds between samples (default: 60)
-  -c, --samples <count>    Number of sample windows (default: 1)
+  -c, --samples <count>    Number of sample windows (default: 3)
   -k, --kinds-limit <n>    Max kinds to print per sample (default: 15)
       --edges-limit <n>    Max edge combos to print per sample (default: 15)
   -h, --help               Show this help
