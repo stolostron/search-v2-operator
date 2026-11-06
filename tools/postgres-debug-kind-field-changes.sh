@@ -416,13 +416,13 @@ main() {
       echo "total label changes: $sample_label_changes"
 
       echo
-      echo "Top changed top-level fields (collapsed)"
+      echo "Top changed top-level fields"
       echo "-----------------------------------------"
       awk -F $'\t' 'NF>=2 && $2 !~ /^label\./ {print}' "$all_collapsed_file" > "$tmpdir/top-level-collapsed.tsv" || true
       print_ranked_file "$tmpdir/top-level-collapsed.tsv" "$TOP_FIELDS" "<none changed vs previous sample>"
 
       echo
-      echo "Top changed label keys (collapsed)"
+      echo "Top changed label keys"
       echo "----------------------------------"
       print_ranked_file "$label_collapsed_file" "$TOP_LABELS" "<none changed vs previous sample>"
 
