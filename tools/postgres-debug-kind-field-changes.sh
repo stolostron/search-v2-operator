@@ -9,8 +9,9 @@
 #   Samples one kind across xid windows (xmin based, like update-rate) and
 #   compares each sample to the previous sample to report actual JSON field
 #   value changes. Includes top-level fields and per-label-key granularity
-#   (label.<key>). Supports multiple windows (default: 3 samples, 60s each)
-#   and prints per-sample counts/rates plus an average summary.
+#   (label.<key>). Always runs a baseline window (sample 0), then runs the
+#   requested number of samples (default: 3, 60s each), and prints per-sample
+#   counts/rates plus an average summary.
 
 set -euo pipefail
 
@@ -43,7 +44,7 @@ Options:
   -s, --schema <schema>     Table schema (default: search)
   -t, --table <table>       Table name (default: resources)
   -i, --interval <secs>     Seconds between xid samples (default: 60)
-  -c, --samples <count>     Number of sample windows (default: 3; must be > 1)
+  -c, --samples <count>     Number of non-baseline sample windows (default: 3; must be >= 1)
       --top-fields <n>      Max top-level fields to print (default: 20)
       --top-labels <n>      Max label keys to print (default: 20)
   -h, --help                Show this help
@@ -104,7 +105,7 @@ validate_args() {
   [[ "$TOP_FIELDS" =~ ^[0-9]+$ ]] || { echo "ERROR: --top-fields must be an integer" >&2; exit 1; }
   [[ "$TOP_LABELS" =~ ^[0-9]+$ ]] || { echo "ERROR: --top-labels must be an integer" >&2; exit 1; }
   (( INTERVAL_SECONDS > 0 )) || { echo "ERROR: --interval must be > 0" >&2; exit 1; }
-  (( SAMPLES > 1 )) || { echo "ERROR: --samples must be > 1 (sample #1 is baseline)" >&2; exit 1; }
+  (( SAMPLES > 0 )) || { echo "ERROR: --samples must be >= 1 (sample #0 is baseline)" >&2; exit 1; }
   (( TOP_FIELDS > 0 )) || { echo "ERROR: --top-fields must be > 0" >&2; exit 1; }
   (( TOP_LABELS > 0 )) || { echo "ERROR: --top-labels must be > 0" >&2; exit 1; }
 }
@@ -236,7 +237,7 @@ main() {
   echo "  Top labels: $TOP_LABELS"
   echo
   echo "Running... waiting ${INTERVAL_SECONDS}s between samples."
-  echo "Note: sample #1 establishes baseline; change counts start at sample #2."
+  echo "Note: sample #0 establishes baseline; change counts start at sample #1."
 
   local i
   local start_info end_info
@@ -265,7 +266,7 @@ main() {
 
   end_info="$(get_epoch_txid32)"
 
-  for (( i=1; i<=SAMPLES; i++ )); do
+  for (( i=0; i<=SAMPLES; i++ )); do
     local start_epoch start_xid end_epoch end_xid elapsed
     local summary_rows summary_total summary_insert_est summary_update_est
     local touched_rate insert_rate update_rate
@@ -311,10 +312,10 @@ main() {
       "$summary_total" "$touched_rate" "$summary_insert_est" "$insert_rate" "$summary_update_est" "$update_rate"
     printf "window field entries=%s  window label entries=%s\n" "$window_total_field_entries" "$window_total_label_entries"
 
-    if (( i == 1 )); then
+    if (( i == 0 )); then
       echo
       echo "Baseline sample: captured current field values for next-window diff."
-      echo "No change report for sample #1."
+      echo "No change report for sample #0."
     else
       awk -F $'\t' 'BEGIN{OFS="\t"} NF>=3 {print $1 "\034" $2, $3}' "$prev_hash_file" > "$prev_idx_file"
       awk -F $'\t' 'BEGIN{OFS="\t"} NF>=3 {print $1 "\034" $2, $3}' "$curr_hash_file" > "$curr_idx_file"
@@ -376,40 +377,37 @@ main() {
 
       total_field_changes_sum=$(( total_field_changes_sum + sample_field_changes ))
       total_label_changes_sum=$(( total_label_changes_sum + sample_label_changes ))
-    fi
 
-    total_touched_sum=$(( total_touched_sum + summary_total ))
-    total_insert_sum=$(( total_insert_sum + summary_insert_est ))
-    total_update_sum=$(( total_update_sum + summary_update_est ))
-    total_touched_rate=$(awk -v a="$total_touched_rate" -v b="$touched_rate" 'BEGIN{printf "%.4f", a+b}')
-    total_insert_rate=$(awk -v a="$total_insert_rate" -v b="$insert_rate" 'BEGIN{printf "%.4f", a+b}')
-    total_update_rate=$(awk -v a="$total_update_rate" -v b="$update_rate" 'BEGIN{printf "%.4f", a+b}')
+      total_touched_sum=$(( total_touched_sum + summary_total ))
+      total_insert_sum=$(( total_insert_sum + summary_insert_est ))
+      total_update_sum=$(( total_update_sum + summary_update_est ))
+      total_touched_rate=$(awk -v a="$total_touched_rate" -v b="$touched_rate" 'BEGIN{printf "%.4f", a+b}')
+      total_insert_rate=$(awk -v a="$total_insert_rate" -v b="$insert_rate" 'BEGIN{printf "%.4f", a+b}')
+      total_update_rate=$(awk -v a="$total_update_rate" -v b="$update_rate" 'BEGIN{printf "%.4f", a+b}')
+    fi
 
     cp "$curr_hash_file" "$prev_hash_file"
   done
 
-  if (( SAMPLES > 1 )); then
-    local avg_touched avg_insert avg_update
-    local avg_touched_rate avg_insert_rate avg_update_rate
-    local diff_windows avg_field_changes avg_label_changes
-    avg_touched=$(awk -v s="$total_touched_sum" -v n="$SAMPLES" 'BEGIN{printf "%.2f", s/n}')
-    avg_insert=$(awk -v s="$total_insert_sum" -v n="$SAMPLES" 'BEGIN{printf "%.2f", s/n}')
-    avg_update=$(awk -v s="$total_update_sum" -v n="$SAMPLES" 'BEGIN{printf "%.2f", s/n}')
-    avg_touched_rate=$(awk -v s="$total_touched_rate" -v n="$SAMPLES" 'BEGIN{printf "%.2f", s/n}')
-    avg_insert_rate=$(awk -v s="$total_insert_rate" -v n="$SAMPLES" 'BEGIN{printf "%.2f", s/n}')
-    avg_update_rate=$(awk -v s="$total_update_rate" -v n="$SAMPLES" 'BEGIN{printf "%.2f", s/n}')
-    diff_windows=$(( SAMPLES - 1 ))
-    avg_field_changes=$(awk -v s="$total_field_changes_sum" -v n="$diff_windows" 'BEGIN{printf "%.2f", s/n}')
-    avg_label_changes=$(awk -v s="$total_label_changes_sum" -v n="$diff_windows" 'BEGIN{printf "%.2f", s/n}')
+  local avg_touched avg_insert avg_update
+  local avg_touched_rate avg_insert_rate avg_update_rate
+  local avg_field_changes avg_label_changes
+  avg_touched=$(awk -v s="$total_touched_sum" -v n="$SAMPLES" 'BEGIN{printf "%.2f", s/n}')
+  avg_insert=$(awk -v s="$total_insert_sum" -v n="$SAMPLES" 'BEGIN{printf "%.2f", s/n}')
+  avg_update=$(awk -v s="$total_update_sum" -v n="$SAMPLES" 'BEGIN{printf "%.2f", s/n}')
+  avg_touched_rate=$(awk -v s="$total_touched_rate" -v n="$SAMPLES" 'BEGIN{printf "%.2f", s/n}')
+  avg_insert_rate=$(awk -v s="$total_insert_rate" -v n="$SAMPLES" 'BEGIN{printf "%.2f", s/n}')
+  avg_update_rate=$(awk -v s="$total_update_rate" -v n="$SAMPLES" 'BEGIN{printf "%.2f", s/n}')
+  avg_field_changes=$(awk -v s="$total_field_changes_sum" -v n="$SAMPLES" 'BEGIN{printf "%.2f", s/n}')
+  avg_label_changes=$(awk -v s="$total_label_changes_sum" -v n="$SAMPLES" 'BEGIN{printf "%.2f", s/n}')
 
-    echo
-    echo "SUMMARY (averages across samples)"
-    echo "---------------------------------"
-    printf "touched avg=%s (%.2f/min)  insert_estimate avg=%s (%.2f/min)  update_estimate avg=%s (%.2f/min)\n" \
-      "$avg_touched" "$avg_touched_rate" "$avg_insert" "$avg_insert_rate" "$avg_update" "$avg_update_rate"
-    printf "actual field changes avg (samples 2..N): %s\n" "$avg_field_changes"
-    printf "actual label changes avg (samples 2..N): %s\n" "$avg_label_changes"
-  fi
+  echo
+  echo "SUMMARY (averages across requested samples)"
+  echo "-------------------------------------------"
+  printf "touched avg=%s (%.2f/min)  insert_estimate avg=%s (%.2f/min)  update_estimate avg=%s (%.2f/min)\n" \
+    "$avg_touched" "$avg_touched_rate" "$avg_insert" "$avg_insert_rate" "$avg_update" "$avg_update_rate"
+  printf "actual field changes avg (samples 1..N): %s\n" "$avg_field_changes"
+  printf "actual label changes avg (samples 1..N): %s\n" "$avg_label_changes"
 
   echo
   echo "Note: change counts are computed by comparing each sample to the previous sample snapshot."
