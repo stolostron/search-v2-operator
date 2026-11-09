@@ -87,6 +87,7 @@ func main() {
 	dynClient, err := dynamic.NewForConfig(config)
 	if err != nil {
 		setupLog.Error(err, "Unable to create kubernetes dynamic client.")
+		os.Exit(1)
 	}
 
 	mgr, err := ctrl.NewManager(config, ctrl.Options{
