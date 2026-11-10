@@ -14,6 +14,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/dynamic"
 )
 
 var apiServerGVR = schema.GroupVersionResource{
@@ -57,6 +58,23 @@ func (r *SearchReconciler) getTLSEnvVars(ctx context.Context) []corev1.EnvVar {
 		newEnvVar("TLS_MIN_VERSION", strconv.FormatUint(uint64(cfg.MinVersion), 10)),
 		newEnvVar("TLS_CIPHERS", strings.Join(cipherNames, ",")),
 	}
+}
+
+// GetWebhookTLSOpts returns TLS options for the operator's admission webhook.
+func GetWebhookTLSOpts(ctx context.Context, dynamicClient dynamic.Interface) []func(*tls.Config) {
+	r := &SearchReconciler{DynamicClient: dynamicClient}
+	profileSpec, err := r.fetchTLSProfileSpec(ctx)
+	if err != nil {
+		log.Info("Could not read APIServer TLS profile for webhook, using Intermediate defaults", "error", err)
+		profileSpec = defaultProfileSpec()
+	}
+
+	tlsConfigFn, unsupported := openshifttls.NewTLSConfigFromProfile(*profileSpec)
+	if len(unsupported) > 0 {
+		log.Info("Webhook TLS profile contains cipher suites not supported by Go, skipped", "ciphers", unsupported)
+	}
+
+	return []func(*tls.Config){tlsConfigFn}
 }
 
 // fetchTLSProfileSpec reads the APIServer resource and returns the resolved TLSProfileSpec.

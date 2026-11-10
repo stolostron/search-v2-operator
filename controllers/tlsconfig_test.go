@@ -134,6 +134,29 @@ func TestGetTLSEnvVars_CustomProfile(t *testing.T) {
 	// The cipher is still valid — just not set because Go auto-manages TLS 1.3 ciphers.
 }
 
+func TestGetWebhookTLSOpts_UsesClusterProfile(t *testing.T) {
+	apiServer := newFakeAPIServer(map[string]interface{}{
+		"type": "Modern",
+	})
+	client := newFakeDynamicClient(apiServer)
+
+	webhookTLSConfig := &tls.Config{}
+	for _, opt := range GetWebhookTLSOpts(context.Background(), client) {
+		opt(webhookTLSConfig)
+	}
+
+	assert.Equal(t, uint16(tls.VersionTLS13), webhookTLSConfig.MinVersion)
+}
+
+func TestGetWebhookTLSOpts_FallsBackToIntermediate(t *testing.T) {
+	webhookTLSConfig := &tls.Config{}
+	for _, opt := range GetWebhookTLSOpts(context.Background(), newFakeDynamicClient()) {
+		opt(webhookTLSConfig)
+	}
+
+	assert.Equal(t, uint16(tls.VersionTLS12), webhookTLSConfig.MinVersion)
+}
+
 func TestGetTLSEnvVars_CiphersAreIANANames(t *testing.T) {
 	apiServer := newFakeAPIServer(map[string]interface{}{
 		"type": "Intermediate",

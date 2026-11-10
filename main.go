@@ -17,6 +17,7 @@ limitations under the License.
 package main
 
 import (
+	"context"
 	"flag"
 	"os"
 
@@ -82,10 +83,20 @@ func main() {
 		cacheOpts = cache.Options{DefaultNamespaces: map[string]cache.Config{watchNs: {}}}
 	}
 
-	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
-		Scheme:                 scheme,
-		Metrics:                server.Options{BindAddress: metricsAddr},
-		WebhookServer:          webhook.NewServer(webhook.Options{Port: 9443}),
+	config := ctrl.GetConfigOrDie()
+	dynClient, err := dynamic.NewForConfig(config)
+	if err != nil {
+		setupLog.Error(err, "Unable to create kubernetes dynamic client.")
+		os.Exit(1)
+	}
+
+	mgr, err := ctrl.NewManager(config, ctrl.Options{
+		Scheme:  scheme,
+		Metrics: server.Options{BindAddress: metricsAddr},
+		WebhookServer: webhook.NewServer(webhook.Options{
+			Port:    9443,
+			TLSOpts: controllers.GetWebhookTLSOpts(context.Background(), dynClient),
+		}),
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
 		Cache:                  cacheOpts,
@@ -95,11 +106,6 @@ func main() {
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
 		os.Exit(1)
-	}
-
-	dynClient, err := dynamic.NewForConfig(mgr.GetConfig())
-	if err != nil {
-		setupLog.Error(err, "Unable to create kubernetes dynamic client.")
 	}
 
 	if err := addonv1alpha1.AddToScheme(mgr.GetScheme()); err != nil {
