@@ -414,6 +414,18 @@ func (r *SearchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return ctrl.Result{}, err
 	}
 
+	// Remove legacy search-search-api Service left on clusters upgraded before the service naming fix.
+	// The service was mistakenly created as "search-search-api" instead of "search-api" due to
+	// double-prefixing in the naming logic. This cleanup ensures the obsolete service is removed
+	// on upgrades and only the correctly-named service remains.
+	legacyAPIService := &corev1.Service{}
+	legacyAPIService.Name = "search-search-api"
+	legacyAPIService.Namespace = instance.GetNamespace()
+	if err := r.Delete(ctx, legacyAPIService); err != nil && !errors.IsNotFound(err) {
+		log.Error(err, "Failed to delete legacy Service", "name", "search-search-api")
+		return ctrl.Result{}, err
+	}
+
 	return ctrl.Result{}, nil
 }
 
