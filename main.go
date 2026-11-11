@@ -30,13 +30,13 @@ import (
 	searchv1alpha1 "github.com/stolostron/search-v2-operator/api/v1alpha1"
 	"github.com/stolostron/search-v2-operator/controllers"
 	admissionv1 "k8s.io/api/admission/v1"
+
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
@@ -77,10 +77,7 @@ func main() {
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
 	watchNs := os.Getenv("WATCH_NAMESPACE")
-	var cacheOpts cache.Options
-	if watchNs != "" {
-		cacheOpts = cache.Options{DefaultNamespaces: map[string]cache.Config{watchNs: {}}}
-	}
+	cacheOpts := newCacheOptions(watchNs)
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:                 scheme,
