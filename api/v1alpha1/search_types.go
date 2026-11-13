@@ -56,9 +56,23 @@ type SearchSpec struct {
 	AvailabilityConfig AvailabilityType `json:"availabilityConfig,omitempty"`
 
 	// +optional
-	// Not currently supported. Reserved for future use.
-	// Secret should contain connection parameters [db_host, db_port, db_user, db_password, db_name, ca_cert]
-	// Not supported for development preview.
+	// Reserved for external PostgreSQL configuration.
+	// External database integration is not yet enabled.
+	//
+	// Name of a customer-provided Secret, in the same namespace as this Search CR,
+	// holding the connection details for an external PostgreSQL instance (version 16 or later).
+	// The Secret is owned by the customer.
+	//
+	// Required keys:
+	//   db-url          Connection endpoint without credentials, for example
+	//                   "postgresql://pg.example.com:5432/searchdb?sslmode=verify-full".
+	//                   The port defaults to 5432 and sslmode defaults to "require".
+	//                   sslmode is the only supported query parameter; any other
+	//                   query parameter or a URL fragment is rejected.
+	//   writer-user     User with read/write access, used by search-indexer.
+	//   writer-password Password for writer-user.
+	//   reader-user     User with read-only access, used by search-v2-api.
+	//   reader-password Password for reader-user.
 	ExternalDBInstance string `json:"externalDBInstance,omitempty"`
 
 	// +optional
