@@ -135,8 +135,8 @@ func TestPostgresNetworkPolicy(t *testing.T) {
 	assert.True(t, containsTCPPort(ingress.Ports, postgresPort))
 	assert.True(t, containsPodSelectorLabel(ingress.From, "name", indexerDeploymentName), "indexer must reach postgres")
 	assert.True(t, containsPodSelectorLabel(ingress.From, "name", apiDeploymentName), "api must reach postgres")
-	assert.True(t, containsPodSelectorLabel(ingress.From, "app.kubernetes.io/name", "acm-mcp-server"),
-		"mcp-server must reach postgres for read-only queries")
+	assert.True(t, containsNamespaceAndPodSelector(ingress.From, "acm-search", "app.kubernetes.io/name", "acm-mcp-server"),
+		"mcp-server in acm-search must reach postgres for read-only queries")
 }
 
 func TestIndexerNetworkPolicy(t *testing.T) {
