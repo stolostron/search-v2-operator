@@ -73,10 +73,6 @@ type SearchSpec struct {
 	//   writer-password Password for writer-user.
 	//   reader-user     User with read-only access, used by search-v2-api.
 	//   reader-password Password for reader-user.
-	//
-	// Optional keys:
-	//   mcp-user        Read-only user for the MCP server. If set, mcp-password is also required.
-	//   mcp-password    Password for mcp-user.
 	ExternalDBInstance string `json:"externalDBInstance,omitempty"`
 
 	// +optional
