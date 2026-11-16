@@ -63,16 +63,20 @@ type SearchSpec struct {
 	// holding the connection details for an external PostgreSQL instance (version 16 or later).
 	// The Secret is owned by the customer.
 	//
+	// Both roles connect to the same endpoint with different credentials.
+	//
 	// Required keys:
-	//   db-url          Connection endpoint without credentials, for example
-	//                   "postgresql://pg.example.com:5432/searchdb?sslmode=verify-full".
-	//                   The port defaults to 5432 and sslmode defaults to "require".
-	//                   sslmode is the only supported query parameter; any other
-	//                   query parameter or a URL fragment is rejected.
+	//   database-host   Hostname of the PostgreSQL instance, for example "pg.example.com".
+	//   database-name   Name of the database, for example "searchdb".
 	//   writer-user     User with read/write access, used by search-indexer.
 	//   writer-password Password for writer-user.
 	//   reader-user     User with read-only access, used by search-v2-api.
 	//   reader-password Password for reader-user.
+	//
+	// Optional keys:
+	//   database-port   Port of the PostgreSQL instance. Defaults to 5432 when the
+	//                   key is omitted. When the key is present it must be a number
+	//                   between 1 and 65535; an empty value is rejected.
 	ExternalDBInstance string `json:"externalDBInstance,omitempty"`
 
 	// +optional

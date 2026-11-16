@@ -3,7 +3,6 @@ package controllers
 
 import (
 	"fmt"
-	"net/url"
 	"strconv"
 	"strings"
 
@@ -14,10 +13,12 @@ import (
 // Search.spec.externalDBInstance. The Secret is owned by the customer: the
 // operator only reads it and never creates, mutates, or takes ownership of it.
 const (
-	// externalDBURLKey holds the connection endpoint, for example
-	// "postgresql://pg.example.com:5432/searchdb?sslmode=verify-full".
-	// Credentials must NOT be embedded in this URL; they are supplied per role below.
-	externalDBURLKey = "db-url"
+	// The endpoint is shared by both roles: search-indexer and search-v2-api
+	// connect to the same host, port and database with different credentials.
+	// A separate reader endpoint is handled in a later PR.
+	externalDBHostKey = "database-host" // Required.
+	externalDBPortKey = "database-port" // Optional, defaults to 5432.
+	externalDBNameKey = "database-name" // Required.
 
 	// Writer credentials are used by search-indexer. Required.
 	externalDBWriterUserKey     = "writer-user"
@@ -28,23 +29,7 @@ const (
 	externalDBReaderPasswordKey = "reader-password" // #nosec G101 - this is a secret key name, not a password
 )
 
-const (
-	// externalDBSSLModeParam is the only query parameter supported in db-url.
-	externalDBSSLModeParam = "sslmode"
-
-	defaultExternalDBPort    = "5432"
-	defaultExternalDBSSLMode = "require"
-)
-
-// validExternalDBSSLModes are the sslmode values accepted by libpq.
-var validExternalDBSSLModes = map[string]struct{}{
-	"disable":     {},
-	"allow":       {},
-	"prefer":      {},
-	"require":     {},
-	"verify-ca":   {},
-	"verify-full": {},
-}
+const defaultExternalDBPort = "5432"
 
 // ExternalDBConfig is the validated content of the customer-provided external
 // PostgreSQL Secret.
@@ -56,7 +41,6 @@ type ExternalDBConfig struct {
 	Host     string
 	Port     string
 	Database string
-	SSLMode  string
 
 	WriterUser     string
 	WriterPassword string
@@ -65,14 +49,26 @@ type ExternalDBConfig struct {
 	ReaderPassword string
 }
 
-// externalDBSecretValue reads a key from the Secret, preferring Data and falling
-// back to StringData. Values are returned verbatim: trimming would silently alter
-// credentials that legitimately contain leading or trailing whitespace.
-func externalDBSecretValue(secret *corev1.Secret, key string) string {
+// externalDBSecretLookup reads a key from the Secret, preferring Data and falling
+// back to StringData, and reports whether the key is present at all. Values are
+// returned verbatim: trimming would silently alter credentials that legitimately
+// contain leading or trailing whitespace.
+//
+// Presence is distinct from emptiness for optional keys: an absent key means
+// "use the default", while a key the customer set to an empty value is a mistake
+// worth reporting rather than papering over.
+func externalDBSecretLookup(secret *corev1.Secret, key string) (string, bool) {
 	if v, ok := secret.Data[key]; ok {
-		return string(v)
+		return string(v), true
 	}
-	return secret.StringData[key]
+	v, ok := secret.StringData[key]
+	return v, ok
+}
+
+// externalDBSecretValue returns the value of a key, or "" when it is absent.
+func externalDBSecretValue(secret *corev1.Secret, key string) string {
+	v, _ := externalDBSecretLookup(secret, key)
+	return v
 }
 
 // parseExternalDBSecret validates a customer-provided external PostgreSQL Secret
@@ -86,14 +82,17 @@ func parseExternalDBSecret(secret *corev1.Secret) (*ExternalDBConfig, error) {
 		return nil, fmt.Errorf("external database secret is nil")
 	}
 
+	port, portSet := externalDBSecretLookup(secret, externalDBPortKey)
+
 	config := &ExternalDBConfig{
+		Host:           externalDBSecretValue(secret, externalDBHostKey),
+		Port:           port,
+		Database:       externalDBSecretValue(secret, externalDBNameKey),
 		WriterUser:     externalDBSecretValue(secret, externalDBWriterUserKey),
 		WriterPassword: externalDBSecretValue(secret, externalDBWriterPasswordKey),
 		ReaderUser:     externalDBSecretValue(secret, externalDBReaderUserKey),
 		ReaderPassword: externalDBSecretValue(secret, externalDBReaderPasswordKey),
 	}
-
-	dbURL := externalDBSecretValue(secret, externalDBURLKey)
 
 	// Report every missing required key at once so the customer can fix the
 	// Secret in a single edit.
@@ -102,7 +101,8 @@ func parseExternalDBSecret(secret *corev1.Secret) (*ExternalDBConfig, error) {
 		key   string
 		value string
 	}{
-		{externalDBURLKey, dbURL},
+		{externalDBHostKey, config.Host},
+		{externalDBNameKey, config.Database},
 		{externalDBWriterUserKey, config.WriterUser},
 		{externalDBWriterPasswordKey, config.WriterPassword},
 		{externalDBReaderUserKey, config.ReaderUser},
@@ -117,78 +117,19 @@ func parseExternalDBSecret(secret *corev1.Secret) (*ExternalDBConfig, error) {
 			secret.GetName(), strings.Join(missing, ", "))
 	}
 
-	if err := parseExternalDBURL(dbURL, config); err != nil {
-		return nil, fmt.Errorf("external database secret %q has an invalid %q: %w",
-			secret.GetName(), externalDBURLKey, err)
+	// Omitting the key is the common case; a key the customer did set must be a
+	// usable TCP port, otherwise every connection attempt would fail later with
+	// an error far from its cause. An explicitly empty value is a mistake, not a
+	// request for the default.
+	if !portSet {
+		config.Port = defaultExternalDBPort
+	} else {
+		portNumber, err := strconv.Atoi(config.Port)
+		if err != nil || portNumber < 1 || portNumber > 65535 {
+			return nil, fmt.Errorf("external database secret %q has an invalid %q: must be a number between 1 and 65535",
+				secret.GetName(), externalDBPortKey)
+		}
 	}
 
 	return config, nil
-}
-
-// parseExternalDBURL validates the db-url value and fills the endpoint fields of config.
-func parseExternalDBURL(dbURL string, config *ExternalDBConfig) error {
-	parsed, err := url.Parse(dbURL)
-	if err != nil {
-		// err wraps the URL, which could carry credentials if the customer
-		// embedded them, so report only that parsing failed.
-		return fmt.Errorf("value is not a valid URL")
-	}
-
-	if parsed.Scheme != "postgresql" && parsed.Scheme != "postgres" {
-		return fmt.Errorf("scheme must be postgresql:// or postgres://")
-	}
-
-	// Credentials belong in the per-role keys. Accepting them here would create
-	// a second, ambiguous source of truth.
-	if parsed.User != nil {
-		return fmt.Errorf("URL must not contain credentials; use the %q, %q, %q and %q keys instead",
-			externalDBWriterUserKey, externalDBWriterPasswordKey, externalDBReaderUserKey, externalDBReaderPasswordKey)
-	}
-
-	config.Host = parsed.Hostname()
-	if config.Host == "" {
-		return fmt.Errorf("URL must specify a host")
-	}
-
-	config.Port = parsed.Port()
-	if config.Port == "" {
-		config.Port = defaultExternalDBPort
-	} else {
-		port, err := strconv.Atoi(config.Port)
-		if err != nil || port < 1 || port > 65535 {
-			return fmt.Errorf("port must be a number between 1 and 65535")
-		}
-	}
-
-	config.Database = strings.TrimPrefix(strings.TrimSuffix(parsed.Path, "/"), "/")
-	if config.Database == "" || strings.Contains(config.Database, "/") {
-		return fmt.Errorf("URL path must be a database name, for example postgresql://host:5432/searchdb")
-	}
-
-	if parsed.Fragment != "" {
-		return fmt.Errorf("URL must not contain a fragment")
-	}
-
-	query, err := url.ParseQuery(parsed.RawQuery)
-	if err != nil {
-		return fmt.Errorf("query parameters are not valid")
-	}
-
-	// Reject anything we do not act on. Ignoring an unrecognized parameter would
-	// leave the customer believing it took effect.
-	for name := range query {
-		if name != externalDBSSLModeParam {
-			return fmt.Errorf("db-url only supports the sslmode query parameter")
-		}
-	}
-
-	config.SSLMode = query.Get(externalDBSSLModeParam)
-	if config.SSLMode == "" {
-		config.SSLMode = defaultExternalDBSSLMode
-	}
-	if _, ok := validExternalDBSSLModes[config.SSLMode]; !ok {
-		return fmt.Errorf("unsupported sslmode")
-	}
-
-	return nil
 }
