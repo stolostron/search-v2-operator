@@ -61,6 +61,19 @@ func podSelectorPeer(labels map[string]string) networkingv1.NetworkPolicyPeer {
 	}
 }
 
+// namespacedPodSelectorPeer builds a NetworkPolicyPeer that matches pods
+// with the given labels in the provided namespace
+func namespacedPodSelectorPeer(namespaceName string, labels map[string]string) networkingv1.NetworkPolicyPeer {
+	return networkingv1.NetworkPolicyPeer{
+		NamespaceSelector: &metav1.LabelSelector{
+			MatchLabels: map[string]string{nsLabelKey: namespaceName},
+		},
+		PodSelector: &metav1.LabelSelector{
+			MatchLabels: labels,
+		},
+	}
+}
+
 func tcpPort(port int32) []networkingv1.NetworkPolicyPort {
 	proto := corev1.ProtocolTCP
 	p := intstr.FromInt32(port)
@@ -127,7 +140,9 @@ func (r *SearchReconciler) PostgresNetworkPolicy(instance *searchv1alpha1.Search
 			From: []networkingv1.NetworkPolicyPeer{
 				podSelectorPeer(generateLabels("name", indexerDeploymentName)),
 				podSelectorPeer(generateLabels("name", apiDeploymentName)),
-				podSelectorPeer(map[string]string{"app.kubernetes.io/name": "acm-mcp-server"}),
+				namespacedPodSelectorPeer(
+					"acm-search",
+					map[string]string{"app.kubernetes.io/name": "acm-mcp-server"}),
 			},
 			Ports: tcpPort(postgresPort),
 		},
