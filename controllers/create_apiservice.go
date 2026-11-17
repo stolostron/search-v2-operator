@@ -15,7 +15,7 @@ func (r *SearchReconciler) APIService(instance *searchv1alpha1.Search) *corev1.S
 
 	svc := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        "search-search-api",
+			Name:        SearchApi,
 			Namespace:   instance.GetNamespace(),
 			Annotations: map[string]string{"service.beta.openshift.io/serving-cert-secret-name": "search-api-certs"},
 			Labels:      map[string]string{"search-monitor": SearchApi},
