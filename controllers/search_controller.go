@@ -18,6 +18,7 @@ package controllers
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"strings"
 	"sync"
@@ -313,15 +314,20 @@ func (r *SearchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		log.Error(err, "Collector Deployment  setup failed")
 		return *result, err
 	}
-	result, err = r.createOrUpdateDeployment(ctx, r.IndexerDeployment(instance, tlsEnvVars))
-	if result != nil {
-		log.Error(err, "Indexer Deployment  setup failed")
-		return *result, err
-	}
-	result, err = r.createOrUpdateDeployment(ctx, r.APIDeployment(instance, tlsEnvVars))
-	if result != nil {
-		log.Error(err, "API Deployment  setup failed")
-		return *result, err
+	externalDB, externalDBErr := r.validateExternalPostgres(ctx, instance)
+	if externalDBErr != nil {
+		log.Error(externalDBErr, "External PostgreSQL validation failed; skipping Search database switch")
+	} else {
+		result, err = r.createOrUpdateDeployment(ctx, r.IndexerDeployment(instance, tlsEnvVars, externalDB))
+		if result != nil {
+			log.Error(err, "Indexer Deployment  setup failed")
+			return *result, err
+		}
+		result, err = r.createOrUpdateDeployment(ctx, r.APIDeployment(instance, tlsEnvVars, externalDB))
+		if result != nil {
+			log.Error(err, "API Deployment  setup failed")
+			return *result, err
+		}
 	}
 	result, err = r.reconcileNetworkPolicies(ctx, instance)
 	if result != nil {
@@ -413,8 +419,39 @@ func (r *SearchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		log.Error(err, "Failed to delete legacy ServiceAccount", "name", "search-serviceaccount")
 		return ctrl.Result{}, err
 	}
-
+	if externalDBErr != nil {
+		return ctrl.Result{}, externalDBErr
+	}
 	return ctrl.Result{}, nil
+}
+
+func (r *SearchReconciler) validateExternalPostgres(
+	ctx context.Context, instance *searchv1alpha1.Search,
+) (*ExternalDBConfig, error) {
+	secretName := instance.Spec.ExternalDBInstance
+	if secretName == "" {
+		return nil, nil
+	}
+
+	key := types.NamespacedName{
+		Namespace: instance.Namespace,
+		Name:      secretName,
+	}
+	secret := &corev1.Secret{}
+	if err := r.Get(ctx, key, secret); err != nil {
+		return nil, fmt.Errorf("get external PostgreSQL Secret %s: %w", key, err)
+	}
+
+	db, err := parseExternalDBSecret(secret)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := checkExternalPostgresVersion(ctx, db); err != nil {
+		return nil, err
+	}
+
+	return db, nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
