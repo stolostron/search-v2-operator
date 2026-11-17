@@ -26,11 +26,12 @@ import (
 	"k8s.io/client-go/dynamic"
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
-	"github.com/cloudflare/cfssl/log"
 	monitorv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	searchv1alpha1 "github.com/stolostron/search-v2-operator/api/v1alpha1"
 	"github.com/stolostron/search-v2-operator/controllers"
 	admissionv1 "k8s.io/api/admission/v1"
+	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -38,6 +39,7 @@ import (
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
@@ -56,6 +58,7 @@ func init() {
 	utilruntime.Must(searchv1alpha1.AddToScheme(scheme))
 	utilruntime.Must(monitorv1.AddToScheme(scheme))
 	utilruntime.Must(clusterv1.AddToScheme(scheme))
+	utilruntime.Must(addonv1alpha1.AddToScheme(scheme))
 	utilruntime.Must(admissionv1.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
 }
@@ -90,6 +93,17 @@ func main() {
 		os.Exit(1)
 	}
 
+	disableFor := []client.Object{
+		&addonv1alpha1.ClusterManagementAddOn{},
+		&rbacv1.ClusterRole{},
+		&rbacv1.ClusterRoleBinding{},
+		&monitorv1.ServiceMonitor{},
+		&corev1.PersistentVolumeClaim{},
+		&monitorv1.PrometheusRule{},
+		&corev1.Service{},
+		&corev1.ServiceAccount{},
+	}
+
 	mgr, err := ctrl.NewManager(config, ctrl.Options{
 		Scheme:  scheme,
 		Metrics: server.Options{BindAddress: metricsAddr},
@@ -100,16 +114,17 @@ func main() {
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
 		Cache:                  cacheOpts,
-		LeaderElectionID:       "b648e39a.open-cluster-management.io",
+		Client: client.Options{
+			Cache: &client.CacheOptions{
+				DisableFor: disableFor,
+			},
+		},
+		LeaderElectionID: "b648e39a.open-cluster-management.io",
 	})
 
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
 		os.Exit(1)
-	}
-
-	if err := addonv1alpha1.AddToScheme(mgr.GetScheme()); err != nil {
-		log.Error(err, "unable to add to scheme, search addon will be unavailable")
 	}
 
 	if err = (&controllers.SearchReconciler{
