@@ -12,6 +12,7 @@ RUN go mod download
 
 # Copy the go source
 COPY main.go main.go
+COPY cache_options.go cache_options.go
 COPY api/ api/
 COPY controllers/ controllers/
 COPY addon/ addon/
@@ -19,7 +20,7 @@ COPY config/ config/
 COPY internal/ internal/
 
 # Build
-RUN CGO_ENABLED=1 go build -a -o manager main.go
+RUN CGO_ENABLED=1 go build -a -o manager .
 FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
 
 ENV USER_UID=1001 \
