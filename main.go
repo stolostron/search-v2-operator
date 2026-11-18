@@ -93,6 +93,8 @@ func main() {
 		os.Exit(1)
 	}
 
+	// A Get or List on these unWatched resources initializes a cache so Gets and Lists can query the local cache.
+	// Disable for these resources to save on memory, especially resources observed in high quanitity scale environments.
 	disableFor := []client.Object{
 		&addonv1alpha1.ClusterManagementAddOn{},
 		&rbacv1.ClusterRole{},
