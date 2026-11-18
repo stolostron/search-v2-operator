@@ -16,6 +16,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
@@ -560,7 +561,13 @@ func (r *SearchReconciler) addEnvToSearchAPI(ctx context.Context,
 }
 
 func (r *SearchReconciler) createConfigMap(ctx context.Context, cm *corev1.ConfigMap) (*reconcile.Result, error) {
-	found := &corev1.ConfigMap{}
+	// copy only configmap metadata in existence check Get to avoid storing entire object in memory
+	found := &metav1.PartialObjectMetadata{}
+	found.SetGroupVersionKind(schema.GroupVersionKind{
+		Group:   "",
+		Version: "v1",
+		Kind:    "ConfigMap",
+	})
 	err := r.Get(ctx, types.NamespacedName{
 		Name:      cm.Name,
 		Namespace: cm.Namespace,
@@ -769,7 +776,13 @@ func (r *SearchReconciler) createOrUpdateDeployment(ctx context.Context, deploy 
 }
 
 func (r *SearchReconciler) createService(ctx context.Context, svc *corev1.Service) (*reconcile.Result, error) {
-	found := &corev1.Service{}
+	// copy only service metadata in existence check Get to avoid storing entire object in memory
+	found := &metav1.PartialObjectMetadata{}
+	found.SetGroupVersionKind(schema.GroupVersionKind{
+		Group:   "",
+		Version: "v1",
+		Kind:    "Service",
+	})
 	err := r.Get(ctx, types.NamespacedName{
 		Name:      svc.Name,
 		Namespace: svc.Namespace,
@@ -792,7 +805,13 @@ func (r *SearchReconciler) createService(ctx context.Context, svc *corev1.Servic
 }
 
 func (r *SearchReconciler) createSecret(ctx context.Context, secret *corev1.Secret) (*reconcile.Result, error) {
-	found := &corev1.Secret{}
+	// copy only secret metadata in existence check Get to avoid storing entire object in memory
+	found := &metav1.PartialObjectMetadata{}
+	found.SetGroupVersionKind(schema.GroupVersionKind{
+		Group:   "",
+		Version: "v1",
+		Kind:    "Secret",
+	})
 	err := r.Get(ctx, types.NamespacedName{
 		Name:      secret.Name,
 		Namespace: secret.Namespace,

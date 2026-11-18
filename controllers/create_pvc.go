@@ -9,6 +9,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -20,7 +21,13 @@ func (r *SearchReconciler) configurePVC(ctx context.Context, instance *searchv1a
 }
 
 func (r *SearchReconciler) createPVC(ctx context.Context, instance *searchv1alpha1.Search) error {
-	pvc := &corev1.PersistentVolumeClaim{}
+	// copy only pvc metadata object in existence check Get to avoid storing entire object in memory
+	pvc := &metav1.PartialObjectMetadata{}
+	pvc.SetGroupVersionKind(schema.GroupVersionKind{
+		Group:   "",
+		Version: "v1",
+		Kind:    "PersistentVolumeClaim",
+	})
 	pvcName := getPVCName(instance.Spec.DBStorage.StorageClassName)
 	namespace := instance.GetNamespace()
 	storageClass := instance.Spec.DBStorage.StorageClassName
@@ -45,7 +52,13 @@ func (r *SearchReconciler) createPVC(ctx context.Context, instance *searchv1alph
 }
 
 func (r *SearchReconciler) isPVCPresent(ctx context.Context, instance *searchv1alpha1.Search) bool {
-	pvc := &corev1.PersistentVolumeClaim{}
+	// copy only pvc metadata object in existence check Get to avoid storing entire object in memory
+	pvc := &metav1.PartialObjectMetadata{}
+	pvc.SetGroupVersionKind(schema.GroupVersionKind{
+		Group:   "",
+		Version: "v1",
+		Kind:    "PersistentVolumeClaim",
+	})
 	namespace := instance.GetNamespace()
 	pvcName := getPVCName(instance.Spec.DBStorage.StorageClassName)
 	resource := client.ObjectKey{Name: pvcName, Namespace: namespace}
