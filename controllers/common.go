@@ -561,13 +561,7 @@ func (r *SearchReconciler) addEnvToSearchAPI(ctx context.Context,
 }
 
 func (r *SearchReconciler) createConfigMap(ctx context.Context, cm *corev1.ConfigMap) (*reconcile.Result, error) {
-	// copy only configmap metadata in existence check Get to avoid storing entire object in memory
-	found := &metav1.PartialObjectMetadata{}
-	found.SetGroupVersionKind(schema.GroupVersionKind{
-		Group:   "",
-		Version: "v1",
-		Kind:    "ConfigMap",
-	})
+	found := &corev1.ConfigMap{}
 	err := r.Get(ctx, types.NamespacedName{
 		Name:      cm.Name,
 		Namespace: cm.Namespace,
@@ -805,13 +799,7 @@ func (r *SearchReconciler) createService(ctx context.Context, svc *corev1.Servic
 }
 
 func (r *SearchReconciler) createSecret(ctx context.Context, secret *corev1.Secret) (*reconcile.Result, error) {
-	// copy only secret metadata in existence check Get to avoid storing entire object in memory
-	found := &metav1.PartialObjectMetadata{}
-	found.SetGroupVersionKind(schema.GroupVersionKind{
-		Group:   "",
-		Version: "v1",
-		Kind:    "Secret",
-	})
+	found := &corev1.Secret{}
 	err := r.Get(ctx, types.NamespacedName{
 		Name:      secret.Name,
 		Namespace: secret.Namespace,
