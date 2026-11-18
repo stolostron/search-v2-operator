@@ -9,6 +9,7 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -109,8 +110,13 @@ func (r *SearchReconciler) ServiceMonitor(instance *searchv1alpha1.Search,
 func (r *SearchReconciler) createServiceMonitor(ctx context.Context,
 	smonitor *monitorv1.ServiceMonitor,
 ) (*reconcile.Result, error) {
-
-	found := &monitorv1.ServiceMonitor{}
+	// copy only servicemonitor metadata in existence check Get to avoid storing entire object in memory
+	found := &metav1.PartialObjectMetadata{}
+	found.SetGroupVersionKind(schema.GroupVersionKind{
+		Group:   "monitoring.coreos.com",
+		Version: "v1",
+		Kind:    "ServiceMonitor",
+	})
 	err := r.Get(ctx, types.NamespacedName{
 		Name:      smonitor.Name,
 		Namespace: smonitor.Namespace,
