@@ -1715,7 +1715,11 @@ func TestExternalPostgresDeploymentEnv(t *testing.T) {
 				"DB_USER": tc.userKey,
 				"DB_PASS": tc.passwordKey,
 			}
-
+			wantReaderUserCount := 0
+			if tc.name == "indexer" {
+				wantKeys["EXTERNAL_DB_READER_USER"] = "reader-user"
+				wantReaderUserCount = 1
+			}
 			counts := make(map[string]int)
 			for _, env := range tc.env {
 				counts[env.Name]++
@@ -1737,6 +1741,8 @@ func TestExternalPostgresDeploymentEnv(t *testing.T) {
 			for _, name := range []string{"DB_HOST", "DB_PORT", "DB_NAME", "DB_USER", "DB_PASS"} {
 				assert.Equal(t, 1, counts[name], "%s should appear exactly once", name)
 			}
+			assert.Equal(t, wantReaderUserCount, counts["EXTERNAL_DB_READER_USER"],
+				"EXTERNAL_DB_READER_USER should appear once on the Indexer and be absent from the API")
 		})
 	}
 }

@@ -72,6 +72,10 @@ func (r *SearchReconciler) IndexerDeployment(instance *searchv1alpha1.Search,
 			indexerContainer.Env, externalDB, instance.Spec.ExternalDBInstance,
 			externalDBWriterUserKey, externalDBWriterPasswordKey,
 		)
+		indexerContainer.Env = append(indexerContainer.Env,
+			newSecretEnvVar("EXTERNAL_DB_READER_USER",
+				externalDBReaderUserKey, instance.Spec.ExternalDBInstance),
+		)
 	}
 	indexerContainer.Resources = getResourceRequirements(deploymentName, instance)
 	volumes := []corev1.Volume{
