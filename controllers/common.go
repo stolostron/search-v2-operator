@@ -3,6 +3,8 @@ package controllers
 
 import (
 	"context"
+	"crypto/rand"
+	"math/big"
 	"os"
 	"regexp"
 	"strings"
@@ -791,7 +793,7 @@ func (r *SearchReconciler) createService(ctx context.Context, svc *corev1.Servic
 	return nil, nil
 }
 
-func (r *SearchReconciler) createSecret(ctx context.Context, secret *corev1.Secret) (*reconcile.Result, error) {
+func (r *SearchReconciler) createDatabaseSecret(ctx context.Context, secret *corev1.Secret) (*reconcile.Result, error) {
 	found := &corev1.Secret{}
 	err := r.Get(ctx, types.NamespacedName{
 		Name:      secret.Name,
@@ -799,6 +801,10 @@ func (r *SearchReconciler) createSecret(ctx context.Context, secret *corev1.Secr
 	}, found)
 	if err != nil {
 		if errors.IsNotFound(err) {
+			// generate password only when certain secret doesn't exist
+			if p, ok := secret.StringData["database-password"]; ok && len(p) == 0 {
+				secret.StringData["database-password"] = generatePass(16)
+			}
 			err = r.Create(ctx, secret)
 			if err != nil {
 				log.Error(err, "Could not create secret")
@@ -811,7 +817,19 @@ func (r *SearchReconciler) createSecret(ctx context.Context, secret *corev1.Secr
 		return &reconcile.Result{}, err
 	}
 	return nil, nil
+}
 
+func generatePass(length int) string {
+	chars := "ABCDEFGHIJKLMNOPQRSTUVWXYZ" +
+		"abcdefghijklmnopqrstuvwxyz" +
+		"0123456789"
+
+	buf := make([]byte, length)
+	for i := 0; i < length; i++ {
+		nBig, _ := rand.Int(rand.Reader, big.NewInt(int64(len(chars))))
+		buf[i] = chars[nBig.Int64()]
+	}
+	return string(buf)
 }
 
 func DeploymentEquals(current, new *appsv1.Deployment) bool {

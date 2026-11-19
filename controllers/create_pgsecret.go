@@ -2,9 +2,6 @@
 package controllers
 
 import (
-	"crypto/rand"
-	"math/big"
-
 	searchv1alpha1 "github.com/stolostron/search-v2-operator/api/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -28,7 +25,7 @@ func (r *SearchReconciler) PGSecret(instance *searchv1alpha1.Search) *corev1.Sec
 	}
 	secret.StringData = map[string]string{
 		"database-user":     "searchuser",
-		"database-password": generatePass(16),
+		"database-password": "",
 		"database-name":     DBNAME,
 	}
 
@@ -49,7 +46,7 @@ func (r *SearchReconciler) APIReadonlySecret(instance *searchv1alpha1.Search) *c
 	}
 	secret.StringData = map[string]string{
 		"database-user":     "search_api_ro",
-		"database-password": generatePass(16),
+		"database-password": "",
 		"database-name":     DBNAME,
 	}
 	err := controllerutil.SetControllerReference(instance, secret, r.Scheme)
@@ -69,7 +66,7 @@ func (r *SearchReconciler) MCPReadonlySecret(instance *searchv1alpha1.Search) *c
 	}
 	secret.StringData = map[string]string{
 		"database-user":     "search_mcp_ro",
-		"database-password": generatePass(16),
+		"database-password": "",
 		"database-name":     DBNAME,
 	}
 	err := controllerutil.SetControllerReference(instance, secret, r.Scheme)
@@ -77,16 +74,4 @@ func (r *SearchReconciler) MCPReadonlySecret(instance *searchv1alpha1.Search) *c
 		log.V(2).Info("Could not set control for search-postgres-mcp-readonly secret")
 	}
 	return secret
-}
-func generatePass(length int) string {
-	chars := "ABCDEFGHIJKLMNOPQRSTUVWXYZ" +
-		"abcdefghijklmnopqrstuvwxyz" +
-		"0123456789"
-
-	buf := make([]byte, length)
-	for i := 0; i < length; i++ {
-		nBig, _ := rand.Int(rand.Reader, big.NewInt(int64(len(chars))))
-		buf[i] = chars[nBig.Int64()]
-	}
-	return string(buf)
 }

@@ -238,17 +238,17 @@ func (r *SearchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		log.Error(err, "Merged CollectorConfig setup failed")
 		return *result, err
 	}
-	result, err = r.createSecret(ctx, r.PGSecret(instance))
+	result, err = r.createDatabaseSecret(ctx, r.PGSecret(instance))
 	if result != nil {
 		log.Error(err, "Postgres Secret setup failed")
 		return *result, err
 	}
-	result, err = r.createSecret(ctx, r.APIReadonlySecret(instance))
+	result, err = r.createDatabaseSecret(ctx, r.APIReadonlySecret(instance))
 	if result != nil {
 		log.Error(err, "Postgres API readonly Secret setup failed")
 		return *result, err
 	}
-	result, err = r.createSecret(ctx, r.MCPReadonlySecret(instance))
+	result, err = r.createDatabaseSecret(ctx, r.MCPReadonlySecret(instance))
 	if result != nil {
 		log.Error(err, "Postgres MCP readonly Secret setup failed")
 		return *result, err
