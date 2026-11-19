@@ -10,7 +10,7 @@ import (
 )
 
 func (r *SearchReconciler) APIDeployment(instance *searchv1alpha1.Search,
-	tlsEnvVars []corev1.EnvVar) *appsv1.Deployment {
+	tlsEnvVars []corev1.EnvVar, externalDB *ExternalDBConfig) *appsv1.Deployment {
 	deploymentName := apiDeploymentName
 	image_sha := getImageSha(deploymentName, instance)
 	log.V(2).Info("Using api image ", "name", image_sha)
@@ -65,6 +65,15 @@ func (r *SearchReconciler) APIDeployment(instance *searchv1alpha1.Search,
 	env := getContainerEnvVar(deploymentName, instance)
 	if env != nil {
 		apiContainer.Env = append(apiContainer.Env, env...)
+	}
+	if externalDB != nil {
+		apiContainer.Env = setExternalPostgresEnv(
+			apiContainer.Env,
+			externalDB,
+			instance.Spec.ExternalDBInstance,
+			externalDBReaderUserKey,
+			externalDBReaderPasswordKey,
+		)
 	}
 	apiContainer.Resources = getResourceRequirements(apiDeploymentName, instance)
 	volumes := []corev1.Volume{

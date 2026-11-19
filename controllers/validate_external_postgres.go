@@ -2,10 +2,17 @@
 package controllers
 
 import (
+	"context"
+	"errors"
 	"fmt"
+	"net"
+	"net/url"
 	"strconv"
 	"strings"
+	"time"
 
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 	corev1 "k8s.io/api/core/v1"
 )
 
@@ -75,8 +82,8 @@ func externalDBSecretValue(secret *corev1.Secret, key string) string {
 // and returns its contents. Errors name only the offending Secret keys, never
 // their values, so they are safe to surface in logs and CR status.
 //
-// This performs structural validation only. Connecting to the database and
-// checking the server version (PostgreSQL >= 16) is handled in a later PR.
+// This performs structural validation only. Use checkExternalPostgresVersion
+// to validate connectivity and the server version.
 func parseExternalDBSecret(secret *corev1.Secret) (*ExternalDBConfig, error) {
 	if secret == nil {
 		return nil, fmt.Errorf("external database secret is nil")
@@ -132,4 +139,78 @@ func parseExternalDBSecret(secret *corev1.Secret) (*ExternalDBConfig, error) {
 	}
 
 	return config, nil
+}
+
+const minimumExternalPostgresVersion = 160000
+
+// checkExternalPostgresVersion checks the server version as the writer and verifies that the reader can connect.
+func checkExternalPostgresVersion(ctx context.Context, db *ExternalDBConfig) error {
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	port, err := strconv.Atoi(db.Port)
+	if err != nil || port < 1 || port > 65535 {
+		return errors.New("invalid external PostgreSQL port")
+	}
+
+	endpoint := url.URL{
+		Scheme:   "postgresql",
+		Host:     net.JoinHostPort(db.Host, strconv.Itoa(port)),
+		RawQuery: "sslmode=require",
+	}
+
+	poolConfig, err := pgxpool.ParseConfig(endpoint.String())
+	if err != nil {
+		return errors.New("could not parse external PostgreSQL connection settings")
+	}
+
+	connConfig := poolConfig.ConnConfig
+	connConfig.Database = db.Database
+	connConfig.User = db.WriterUser
+	connConfig.Password = db.WriterPassword
+
+	conn, err := pgx.ConnectConfig(ctx, connConfig)
+	if err != nil {
+		return errors.New("could not connect to external PostgreSQL with writer credentials")
+	}
+	defer func() {
+		closeCtx, cancelClose := context.WithTimeout(context.Background(), time.Second)
+		defer cancelClose()
+		_ = conn.Close(closeCtx)
+	}()
+
+	var version int
+	if err := conn.QueryRow(ctx, "SELECT current_setting('server_version_num')::integer").
+		Scan(&version); err != nil {
+		return errors.New("could not read external PostgreSQL server version")
+	}
+
+	if err := validateExternalPostgresVersion(version); err != nil {
+		return err
+	}
+
+	readerConfig := connConfig.Copy()
+	readerConfig.User = db.ReaderUser
+	readerConfig.Password = db.ReaderPassword
+
+	readerConn, err := pgx.ConnectConfig(ctx, readerConfig)
+	if err != nil {
+		return errors.New("could not connect to external PostgreSQL with reader credentials")
+	}
+
+	closeCtx, cancelClose := context.WithTimeout(context.Background(), time.Second)
+	defer cancelClose()
+	_ = readerConn.Close(closeCtx)
+
+	return nil
+}
+
+func validateExternalPostgresVersion(version int) error {
+	if version < minimumExternalPostgresVersion {
+		return fmt.Errorf(
+			"external PostgreSQL must be version 16 or later (server_version_num: %d)",
+			version,
+		)
+	}
+	return nil
 }

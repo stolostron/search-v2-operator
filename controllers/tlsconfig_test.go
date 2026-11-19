@@ -189,7 +189,7 @@ func TestIndexerDeploymentIncludesTLSEnvVars(t *testing.T) {
 		{Name: "TLS_CIPHERS", Value: "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256"},
 	}
 
-	deployment := r.IndexerDeployment(instance, tlsEnvVars)
+	deployment := r.IndexerDeployment(instance, tlsEnvVars, nil)
 	envNames := envVarNames(deployment.Spec.Template.Spec.Containers[0].Env)
 	assert.Contains(t, envNames, "TLS_MIN_VERSION")
 	assert.Contains(t, envNames, "TLS_CIPHERS")
@@ -210,7 +210,7 @@ func TestAPIDeploymentIncludesTLSEnvVars(t *testing.T) {
 		{Name: "TLS_CIPHERS", Value: "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256"},
 	}
 
-	deployment := r.APIDeployment(instance, tlsEnvVars)
+	deployment := r.APIDeployment(instance, tlsEnvVars, nil)
 	envNames := envVarNames(deployment.Spec.Template.Spec.Containers[0].Env)
 	assert.Contains(t, envNames, "TLS_MIN_VERSION")
 	assert.Contains(t, envNames, "TLS_CIPHERS")
@@ -226,8 +226,8 @@ func TestDeploymentsWorkWithNilTLSEnvVars(t *testing.T) {
 		Scheme:        s,
 	}
 
-	indexer := r.IndexerDeployment(instance, nil)
-	api := r.APIDeployment(instance, nil)
+	indexer := r.IndexerDeployment(instance, nil, nil)
+	api := r.APIDeployment(instance, nil, nil)
 
 	indexerNames := envVarNames(indexer.Spec.Template.Spec.Containers[0].Env)
 	apiNames := envVarNames(api.Spec.Template.Spec.Containers[0].Env)
