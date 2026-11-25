@@ -339,7 +339,7 @@ func TestIndexerWorkloadIdentityContract(t *testing.T) {
 	}
 
 	// IndexerDeployment ServiceAccountName must reference the indexer SA.
-	deploy := r.IndexerDeployment(instance, nil)
+	deploy := r.IndexerDeployment(instance, nil, nil)
 	if deploy.Spec.Template.Spec.ServiceAccountName != getIndexerServiceAccountName() {
 		t.Errorf("IndexerDeployment ServiceAccountName = %q; want %q",
 			deploy.Spec.Template.Spec.ServiceAccountName, getIndexerServiceAccountName())
@@ -1668,4 +1668,107 @@ func TestGetPrometheusAlertMaxIndexerCountOver30m(t *testing.T) {
 	// Test case: Annotation overrides default value from env var
 	search.Annotations = map[string]string{AnnotationPrometheusAlertMaxIndexerCountOver30m: "8000"}
 	assert.Equal(t, "8000", getPrometheusAlertMaxIndexerCountOver30m(search))
+}
+
+func TestExternalPostgresDeploymentEnv(t *testing.T) {
+	const secretName = "search-external-pg"
+
+	instance := &searchv1alpha1.Search{
+		ObjectMeta: metav1.ObjectMeta{Name: OperatorName, Namespace: "test-ns"},
+	}
+	instance.Spec.ExternalDBInstance = secretName
+
+	// Simulate an existing Search CR override.
+	instance.Spec.Deployments.Indexer.Env = []corev1.EnvVar{
+		{Name: "DB_HOST", Value: "old-postgres"},
+	}
+	instance.Spec.Deployments.QueryAPI.Env = []corev1.EnvVar{
+		{Name: "DB_HOST", Value: "old-postgres"},
+	}
+
+	db := &ExternalDBConfig{
+		Host:     "external-postgres.search-external-pg-test",
+		Port:     "6432",
+		Database: "searchtest",
+	}
+
+	r := &SearchReconciler{Scheme: testScheme()}
+	indexer := r.IndexerDeployment(instance, nil, db)
+	api := r.APIDeployment(instance, nil, db)
+	externalPod := indexer.Spec.Template.Spec
+	assert.Contains(t, externalPod.Volumes, corev1.Volume{
+		Name: "postgres-init",
+		VolumeSource: corev1.VolumeSource{
+			ConfigMap: &corev1.ConfigMapVolumeSource{
+				LocalObjectReference: corev1.LocalObjectReference{
+					Name: "search-postgres",
+				},
+				Items: []corev1.KeyToPath{
+					{Key: "postgresql.sql", Path: "postgresql.sql"},
+				},
+			},
+		},
+	})
+	assert.Contains(t, externalPod.Containers[0].VolumeMounts, corev1.VolumeMount{
+		Name:      "postgres-init",
+		MountPath: "/etc/search/postgres-init",
+		ReadOnly:  true,
+	})
+
+	internalPod := r.IndexerDeployment(instance, nil, nil).Spec.Template.Spec
+	for _, volume := range internalPod.Volumes {
+		assert.NotEqual(t, "postgres-init", volume.Name)
+	}
+	for _, mount := range internalPod.Containers[0].VolumeMounts {
+		assert.NotEqual(t, "postgres-init", mount.Name)
+	}
+	for _, tc := range []struct {
+		name        string
+		env         []corev1.EnvVar
+		userKey     string
+		passwordKey string
+	}{
+		{"indexer", indexer.Spec.Template.Spec.Containers[0].Env, "writer-user", "writer-password"},
+		{"api", api.Spec.Template.Spec.Containers[0].Env, "reader-user", "reader-password"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			wantValues := map[string]string{
+				"DB_HOST": db.Host,
+				"DB_PORT": db.Port,
+				"DB_NAME": db.Database,
+			}
+			wantKeys := map[string]string{
+				"DB_USER": tc.userKey,
+				"DB_PASS": tc.passwordKey,
+			}
+			wantReaderUserCount := 0
+			if tc.name == "indexer" {
+				wantKeys["EXTERNAL_DB_READER_USER"] = "reader-user"
+				wantReaderUserCount = 1
+			}
+			counts := make(map[string]int)
+			for _, env := range tc.env {
+				counts[env.Name]++
+
+				if want, ok := wantValues[env.Name]; ok {
+					assert.Equal(t, want, env.Value, env.Name)
+					assert.Nil(t, env.ValueFrom, env.Name)
+				}
+				if wantKey, ok := wantKeys[env.Name]; ok {
+					if env.ValueFrom == nil || env.ValueFrom.SecretKeyRef == nil {
+						t.Fatalf("%s is missing its Secret reference", env.Name)
+					}
+					assert.Equal(t, secretName, env.ValueFrom.SecretKeyRef.Name)
+					assert.Equal(t, wantKey, env.ValueFrom.SecretKeyRef.Key)
+					assert.Empty(t, env.Value, env.Name)
+				}
+			}
+
+			for _, name := range []string{"DB_HOST", "DB_PORT", "DB_NAME", "DB_USER", "DB_PASS"} {
+				assert.Equal(t, 1, counts[name], "%s should appear exactly once", name)
+			}
+			assert.Equal(t, wantReaderUserCount, counts["EXTERNAL_DB_READER_USER"],
+				"EXTERNAL_DB_READER_USER should appear once on the Indexer and be absent from the API")
+		})
+	}
 }

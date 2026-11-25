@@ -5,6 +5,7 @@ import (
 	"context"
 	"os"
 	"regexp"
+	"slices"
 	"strings"
 
 	searchv1alpha1 "github.com/stolostron/search-v2-operator/api/v1alpha1"
@@ -761,7 +762,7 @@ func (r *SearchReconciler) createOrUpdateDeployment(ctx context.Context, deploy 
 	if !DeploymentEquals(found, deploy) {
 		if err := r.Update(ctx, deploy); err != nil {
 			log.Error(err, "Could not update deployment")
-			return nil, nil
+			return &reconcile.Result{}, err
 		}
 		log.V(9).Info("Updated deployment ", "name", deploy)
 	}
@@ -878,4 +879,27 @@ func updateStatusCondition(instance *searchv1alpha1.Search, podList *corev1.PodL
 func searchLabels(labels map[string]string) bool {
 	value, ok := labels["component"]
 	return ok && value == "search-v2-operator"
+}
+
+func setExternalPostgresEnv(
+	env []corev1.EnvVar,
+	db *ExternalDBConfig,
+	secretName, userKey, passwordKey string,
+) []corev1.EnvVar {
+	env = slices.DeleteFunc(env, func(entry corev1.EnvVar) bool {
+		switch entry.Name {
+		case "DB_HOST", "DB_PORT", "DB_NAME", "DB_USER", "DB_PASS":
+			return true
+		default:
+			return false
+		}
+	})
+
+	return append(env,
+		newEnvVar("DB_HOST", db.Host),
+		newEnvVar("DB_PORT", db.Port),
+		newEnvVar("DB_NAME", db.Database),
+		newSecretEnvVar("DB_USER", userKey, secretName),
+		newSecretEnvVar("DB_PASS", passwordKey, secretName),
+	)
 }

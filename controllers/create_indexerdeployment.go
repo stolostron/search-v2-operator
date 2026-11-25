@@ -10,7 +10,7 @@ import (
 )
 
 func (r *SearchReconciler) IndexerDeployment(instance *searchv1alpha1.Search,
-	tlsEnvVars []corev1.EnvVar) *appsv1.Deployment {
+	tlsEnvVars []corev1.EnvVar, externalDB *ExternalDBConfig) *appsv1.Deployment {
 	deploymentName := indexerDeploymentName
 	image_sha := getImageSha(deploymentName, instance)
 	log.V(2).Info("Using indexer image ", "name", image_sha)
@@ -67,6 +67,16 @@ func (r *SearchReconciler) IndexerDeployment(instance *searchv1alpha1.Search,
 	if env != nil {
 		indexerContainer.Env = append(indexerContainer.Env, env...)
 	}
+	if externalDB != nil {
+		indexerContainer.Env = setExternalPostgresEnv(
+			indexerContainer.Env, externalDB, instance.Spec.ExternalDBInstance,
+			externalDBWriterUserKey, externalDBWriterPasswordKey,
+		)
+		indexerContainer.Env = append(indexerContainer.Env,
+			newSecretEnvVar("EXTERNAL_DB_READER_USER",
+				externalDBReaderUserKey, instance.Spec.ExternalDBInstance),
+		)
+	}
 	indexerContainer.Resources = getResourceRequirements(deploymentName, instance)
 	volumes := []corev1.Volume{
 		{
@@ -77,6 +87,26 @@ func (r *SearchReconciler) IndexerDeployment(instance *searchv1alpha1.Search,
 				},
 			},
 		},
+	}
+	if externalDB != nil {
+		volumes = append(volumes, corev1.Volume{
+			Name: "postgres-init",
+			VolumeSource: corev1.VolumeSource{
+				ConfigMap: &corev1.ConfigMapVolumeSource{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: postgresConfigmapName,
+					},
+					Items: []corev1.KeyToPath{
+						{Key: "postgresql.sql", Path: "postgresql.sql"},
+					},
+				},
+			},
+		})
+		indexerContainer.VolumeMounts = append(indexerContainer.VolumeMounts, corev1.VolumeMount{
+			Name:      "postgres-init",
+			MountPath: "/etc/search/postgres-init",
+			ReadOnly:  true,
+		})
 	}
 	indexerContainer.ImagePullPolicy = getImagePullPolicy(deploymentName, instance)
 	indexerContainer.SecurityContext = getContainerSecurityContext()

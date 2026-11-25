@@ -2,11 +2,14 @@
 package controllers
 
 import (
+	"context"
 	"testing"
 
+	searchv1alpha1 "github.com/stolostron/search-v2-operator/api/v1alpha1"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
 const testWriterPassword = "wr1ter-p4ss" // #nosec G101 - test fixture, not a real credential
@@ -221,4 +224,45 @@ func TestParseExternalDBSecretErrorsDoNotEchoCredentials(t *testing.T) {
 func TestExternalDBSecretIsNotOperatorManaged(t *testing.T) {
 	_, ok := operatorManagedSecrets["my-external-pg"]
 	assert.False(t, ok)
+}
+
+func TestValidateExternalPostgresVersion(t *testing.T) {
+	if err := validateExternalPostgresVersion(150009); err == nil {
+		t.Fatal("expected PostgreSQL 15.9 to be rejected")
+	}
+
+	for _, version := range []int{160000, 160015} {
+		if err := validateExternalPostgresVersion(version); err != nil {
+			t.Errorf("expected server_version_num %d to be accepted: %v", version, err)
+		}
+	}
+}
+
+func TestReconcilerValidateExternalPostgres(t *testing.T) {
+	ctx := context.Background()
+	secret := externalDBSecret(validExternalDBData())
+	delete(secret.Data, "database-host")
+
+	r := &SearchReconciler{
+		Client: fake.NewClientBuilder().WithObjects(secret).Build(),
+	}
+	instance := &searchv1alpha1.Search{}
+	instance.Namespace = "other-namespace"
+
+	// No external Secret configured.
+	db, err := r.validateExternalPostgres(ctx, instance)
+	assert.Nil(t, db)
+	assert.NoError(t, err)
+
+	// The Secret is in a different namespace.
+	instance.Spec.ExternalDBInstance = secret.Name
+	db, err = r.validateExternalPostgres(ctx, instance)
+	assert.Nil(t, db)
+	assert.ErrorContains(t, err, "get external PostgreSQL Secret")
+
+	// The Secret exists in this namespace but is missing a required key.
+	instance.Namespace = secret.Namespace
+	db, err = r.validateExternalPostgres(ctx, instance)
+	assert.Nil(t, db)
+	assert.ErrorContains(t, err, "database-host")
 }
