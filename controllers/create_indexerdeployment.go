@@ -88,6 +88,26 @@ func (r *SearchReconciler) IndexerDeployment(instance *searchv1alpha1.Search,
 			},
 		},
 	}
+	if externalDB != nil {
+		volumes = append(volumes, corev1.Volume{
+			Name: "postgres-init",
+			VolumeSource: corev1.VolumeSource{
+				ConfigMap: &corev1.ConfigMapVolumeSource{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: postgresConfigmapName,
+					},
+					Items: []corev1.KeyToPath{
+						{Key: "postgresql.sql", Path: "postgresql.sql"},
+					},
+				},
+			},
+		})
+		indexerContainer.VolumeMounts = append(indexerContainer.VolumeMounts, corev1.VolumeMount{
+			Name:      "postgres-init",
+			MountPath: "/etc/search/postgres-init",
+			ReadOnly:  true,
+		})
+	}
 	indexerContainer.ImagePullPolicy = getImagePullPolicy(deploymentName, instance)
 	indexerContainer.SecurityContext = getContainerSecurityContext()
 

@@ -1695,7 +1695,33 @@ func TestExternalPostgresDeploymentEnv(t *testing.T) {
 	r := &SearchReconciler{Scheme: testScheme()}
 	indexer := r.IndexerDeployment(instance, nil, db)
 	api := r.APIDeployment(instance, nil, db)
+	externalPod := indexer.Spec.Template.Spec
+	assert.Contains(t, externalPod.Volumes, corev1.Volume{
+		Name: "postgres-init",
+		VolumeSource: corev1.VolumeSource{
+			ConfigMap: &corev1.ConfigMapVolumeSource{
+				LocalObjectReference: corev1.LocalObjectReference{
+					Name: "search-postgres",
+				},
+				Items: []corev1.KeyToPath{
+					{Key: "postgresql.sql", Path: "postgresql.sql"},
+				},
+			},
+		},
+	})
+	assert.Contains(t, externalPod.Containers[0].VolumeMounts, corev1.VolumeMount{
+		Name:      "postgres-init",
+		MountPath: "/etc/search/postgres-init",
+		ReadOnly:  true,
+	})
 
+	internalPod := r.IndexerDeployment(instance, nil, nil).Spec.Template.Spec
+	for _, volume := range internalPod.Volumes {
+		assert.NotEqual(t, "postgres-init", volume.Name)
+	}
+	for _, mount := range internalPod.Containers[0].VolumeMounts {
+		assert.NotEqual(t, "postgres-init", mount.Name)
+	}
 	for _, tc := range []struct {
 		name        string
 		env         []corev1.EnvVar
